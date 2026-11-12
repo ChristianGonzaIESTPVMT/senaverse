@@ -7,7 +7,11 @@ import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { HomePage } from './pages/HomePage';
 import { LessonPage } from './pages/LessonPage';
+import { LibraryPage } from './pages/LibraryPage';
 import './App.css';
+import './components/StudentLayout.css';
+import './pages/DashboardPage.css';
+import './pages/LibraryPage.css';
 
 const PROGRESS_KEY = 'senaverse-demo-completed-v1';
 
@@ -29,11 +33,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/panel" element={<StudentLayout><DashboardPage completed={completed}/></StudentLayout>} />
+        <Route path="/" element={<StudentLayout><DashboardPage completed={completed}/></StudentLayout>} />
+        <Route path="/panel" element={<Navigate to="/" replace />} />
+        <Route path="/presentacion" element={<HomePage />} />
         <Route path="/academia" element={<StudentLayout><AcademyPage completed={completed}/></StudentLayout>} />
         <Route path="/leccion/saludos" element={<StudentLayout><LessonPage completed={completed} onComplete={completeLesson}/></StudentLayout>} />
-        <Route path="/biblioteca" element={<StudentLayout><ComingSoonPage title="Biblioteca de señas"/></StudentLayout>} />
+        <Route path="/biblioteca" element={<StudentLayout><LibraryPage /></StudentLayout>} />
+        <Route path="/camara" element={<StudentLayout><ComingSoonPage title="Práctica con cámara"/></StudentLayout>} />
         <Route path="/minijuegos" element={<StudentLayout><ComingSoonPage title="Minijuegos educativos"/></StudentLayout>} />
         <Route path="/simulador" element={<StudentLayout><ComingSoonPage title="Simulador de situaciones"/></StudentLayout>} />
         <Route path="/progreso" element={<StudentLayout><ComingSoonPage title="Mi progreso"/></StudentLayout>} />

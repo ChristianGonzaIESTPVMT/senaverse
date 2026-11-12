@@ -1,26 +1,80 @@
-import { ArrowRight, BookOpen, Camera, ChartNoAxesColumn, CheckCircle2, Gamepad2, Library, Sparkles, Trophy } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { initialCompletedLessonIds, totalLessons } from '../data/curriculum';
+import { HomeVisual } from '../components/HomeVisual';
+import { totalLessons, units } from '../data/curriculum';
+import type { HomeVisualName } from '../data/homeVisuals';
+
+const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
+  { title: 'Ruta de aprendizaje', description: 'Lecciones organizadas por niveles.', action: 'Explorar', to: '/academia', visual: 'learning' },
+  { title: 'Biblioteca', description: 'Encuentra vocabulario de LSP.', action: 'Ver señas', to: '/biblioteca', visual: 'library' },
+  { title: 'Minijuegos', description: 'Actividades para reforzar.', action: 'Practicar', to: '/minijuegos', visual: 'games' },
+];
 
 export function DashboardPage({ completed }: { completed: string[] }) {
-  const finishedCount = completed.length;
+  const finishedCount = units.flatMap(unit => unit.lessons).filter(lesson => completed.includes(lesson.id)).length;
   const percent = Math.round(finishedCount / totalLessons * 100);
-  const unitCount = completed.filter(id => ['introduccion','abecedario','saludos'].includes(id)).length;
+  const experience = finishedCount * 80;
+  const lessonCompleted = completed.includes('saludos');
+
   return (
-    <>
-      <div className="page-heading"><div><span className="section-eyebrow">TU ESPACIO DE APRENDIZAJE</span><h1>¡Bienvenido a SeñaVerse! <span>👋</span></h1><p>Hoy es una buena oportunidad para seguir aprendiendo.</p></div><span className="demo-chip">Datos de demostración</span></div>
-      <section className="welcome-banner"><div><span><Sparkles size={16}/> SIGUE APRENDIENDO</span><h2>¡Cada seña que aprendes abre una nueva conexión!</h2><p>Continúa a tu ritmo y descubre nuevas formas de comunicarte.</p></div><BookOpen size={105} strokeWidth={1.1} className="banner-icon" aria-hidden="true" /></section>
-      <div className="stat-grid">
-        <div className="stat-card"><span className="stat-icon violet"><BookOpen size={20}/></span><span>Lecciones completadas</span><strong>{finishedCount} / {totalLessons}</strong></div>
-        <div className="stat-card"><span className="stat-icon mint"><ChartNoAxesColumn size={20}/></span><span>Progreso general</span><strong>{percent}%</strong></div>
-        <div className="stat-card"><span className="stat-icon peach"><Trophy size={20}/></span><span>Unidades completas</span><strong>{unitCount === 3 ? '1 / 2' : '0 / 2'}</strong></div>
+    <div className="home-dashboard">
+      <div className="home-heading">
+        <h1>¡Bienvenido a <span className="home-heading-brand">SeñaVerse! <HomeVisual name="welcome" /></span></h1>
+        <p>Descubre una forma interactiva de aprender Lengua de Señas Peruana.</p>
       </div>
-      <div className="dashboard-grid">
-        <section className="white-card continue-card"><div className="card-overline">RETOMA TU APRENDIZAJE</div><h2>{completed.includes('saludos') ? '¡Unidad 1 completada!' : 'Saludos y despedidas'}</h2><p>{completed.includes('saludos') ? 'Puedes revisar la lección de ejemplo o explorar la academia.' : 'Aprende a reconocer expresiones habituales para saludar y despedirte.'}</p><div className="between"><span>Unidad 1 · {unitCount} de 3 lecciones</span><b>{Math.round(unitCount/3*100)}%</b></div><div className="bar"><div style={{width:`${unitCount/3*100}%`}}/></div><Link to="/leccion/saludos" className="button button-primary">{completed.includes('saludos') ? 'Revisar lección' : 'Continuar lección'} <ArrowRight size={17}/></Link></section>
-        <section className="white-card quick-card"><div className="card-overline">ACCESOS RÁPIDOS</div><h2>¿Qué te gustaría hacer?</h2><div className="quick-grid"><Link to="/academia"><span className="quick-icon violet"><BookOpen size={22}/></span><strong>Academia</strong></Link><Link to="/biblioteca"><span className="quick-icon mint"><Library size={22}/></span><strong>Biblioteca</strong></Link><Link to="/minijuegos"><span className="quick-icon peach"><Gamepad2 size={22}/></span><strong>Minijuegos</strong></Link><Link to="/simulador"><span className="quick-icon violet"><Camera size={22}/></span><strong>Simulador</strong></Link></div></section>
-      </div>
-      <section className="recommendation"><div className="recommendation-icon"><CheckCircle2 size={25}/></div><div><strong>Recomendación de aprendizaje</strong><p>{completed.includes('saludos') ? '¡Bien! Ya terminaste la lección de muestra. Revisa la academia para continuar.' : 'Refuerza los conceptos de saludo y despedida antes de realizar tu evaluación.'}</p></div><Link to="/academia">Ir a academia <ArrowRight size={16}/></Link></section>
-      <p className="demo-note">Esta versión utiliza {initialCompletedLessonIds.length} lecciones completadas de ejemplo. El progreso de la lección interactiva se guarda únicamente en este navegador, sin cuenta ni base de datos.</p>
-    </>
+
+      <section className="home-banner" aria-labelledby="home-banner-title">
+        <div className="home-banner-copy">
+          <span className="home-banner-eyebrow">Continúa aprendiendo</span>
+          <h2 id="home-banner-title">Cada seña nos acerca un poco más.</h2>
+          <p>Explora las lecciones, practica lo aprendido y avanza a tu propio ritmo.</p>
+          <Link to="/leccion/saludos" className="home-continue">
+            {lessonCompleted ? 'Repasar lección' : 'Continuar lección'} <ArrowRight size={23} aria-hidden="true" />
+          </Link>
+        </div>
+        <div className="home-banner-art" aria-hidden="true">
+          <span className="home-banner-rays"><i /><i /><i /></span>
+          <HomeVisual name="hero" />
+          <span className="home-banner-shadow" />
+        </div>
+        <svg className="home-banner-wave" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 180C105 105 156 53 270 85S430 46 479 20 561 4 600 0v180Z" fill="currentColor" />
+        </svg>
+      </section>
+
+      <section className="home-learning" aria-labelledby="home-learning-title">
+        <div className="home-section-heading">
+          <h2 id="home-learning-title">Mi aprendizaje</h2>
+          <span className="home-demo-label">Datos ilustrativos</span>
+        </div>
+        <div className="home-stats">
+          <div className="home-stat">
+            <HomeVisual name="lessons" />
+            <dl className="home-stat-copy"><dt>Lecciones completadas</dt><dd>{finishedCount}<span>/{totalLessons}</span></dd></dl>
+          </div>
+          <div className="home-stat">
+            <HomeVisual name="experience" />
+            <dl className="home-stat-copy"><dt>Puntos de experiencia</dt><dd>{experience}</dd></dl>
+          </div>
+          <div className="home-stat">
+            <HomeVisual name="progress" />
+            <dl className="home-stat-copy"><dt>Progreso del recorrido</dt><dd>{percent}%</dd></dl>
+          </div>
+        </div>
+      </section>
+
+      <section className="home-explore" aria-labelledby="home-explore-title">
+        <div className="home-section-heading"><h2 id="home-explore-title">Explora SeñaVerse</h2></div>
+        <div className="home-explore-grid">
+          {exploreItems.map(item => (
+            <article className="home-explore-card" key={item.to}>
+              <HomeVisual name={item.visual} />
+              <div className="home-explore-copy"><h3>{item.title}</h3><p>{item.description}</p></div>
+              <Link className="home-explore-link" to={item.to} aria-label={`${item.action}: ${item.title}`}>{item.action}</Link>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
