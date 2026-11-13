@@ -97,7 +97,7 @@ body:has(.app-shell) {
   padding: 12px 32px;
 }
 
-.app-breadcrumb { display: flex; align-items: center; gap: 7px; color: #4e4868; font-size: 17px; font-weight: 650; }
+.app-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; color: #4e4868; font-size: 17px; font-weight: 650; }
 .app-breadcrumb a:hover { color: var(--violet); }
 .app-profile { display: flex; align-items: center; gap: 29px; }
 .app-example-xp { display: inline-flex; align-items: center; gap: 10px; color: #463f63; font-size: 17px; font-weight: 650; }

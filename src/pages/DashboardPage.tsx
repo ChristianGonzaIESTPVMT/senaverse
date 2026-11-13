@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
-import { totalLessons, units } from '../data/curriculum';
+import { getLessonPath, getResumeLesson, totalLessons, units } from '../data/curriculum';
 import type { HomeVisualName } from '../data/homeVisuals';
 
 const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
@@ -10,11 +10,12 @@ const exploreItems: { title: string; description: string; action: string; to: st
   { title: 'Minijuegos', description: 'Actividades para reforzar.', action: 'Practicar', to: '/minijuegos', visual: 'games' },
 ];
 
-export function DashboardPage({ completed }: { completed: string[] }) {
+export function DashboardPage({ completed, lastLessonId = null }: { completed: string[]; lastLessonId?: string | null }) {
   const finishedCount = units.flatMap(unit => unit.lessons).filter(lesson => completed.includes(lesson.id)).length;
   const percent = Math.round(finishedCount / totalLessons * 100);
   const experience = finishedCount * 80;
-  const lessonCompleted = completed.includes('saludos');
+  const resume = getResumeLesson(completed, lastLessonId);
+  const lessonCompleted = completed.includes(resume.lesson.id);
 
   return (
     <div className="home-dashboard">
@@ -28,7 +29,7 @@ export function DashboardPage({ completed }: { completed: string[] }) {
           <span className="home-banner-eyebrow">Continúa aprendiendo</span>
           <h2 id="home-banner-title">Cada seña nos acerca un poco más.</h2>
           <p>Explora las lecciones, practica lo aprendido y avanza a tu propio ritmo.</p>
-          <Link to="/leccion/saludos" className="home-continue">
+          <Link to={getLessonPath(resume.unit.id, resume.lesson.id)} className="home-continue">
             {lessonCompleted ? 'Repasar lección' : 'Continuar lección'} <ArrowRight size={23} aria-hidden="true" />
           </Link>
         </div>

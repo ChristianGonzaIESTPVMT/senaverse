@@ -1,12 +1,13 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
-import { Camera, ChartPie, House, LayoutGrid, LibraryBig, List, Menu, Play, Sparkles, Star, X } from 'lucide-react';
+import { Fragment, useEffect, useRef, type ReactNode } from 'react';
+import { NavLink, Link, useLocation, useParams } from 'react-router-dom';
+import { Camera, ChartPie, House, LayoutGrid, LibraryBig, List, Menu, Sparkles, Star, X } from 'lucide-react';
+import { getUnitPath, units } from '../data/curriculum';
+import { getSituationFilter, getSituationPath, getSituationsPath, situations } from '../data/situations';
 import { Brand } from './Brand';
 
 const items = [
   { to: '/', label: 'Inicio', icon: House },
   { to: '/academia', label: 'Aprender', icon: LayoutGrid },
-  { to: '/leccion/saludos', label: 'Lección', icon: Play },
   { to: '/biblioteca', label: 'Biblioteca', icon: LibraryBig },
   { to: '/camara', label: 'Cámara', icon: Camera },
   { to: '/simulador', label: 'Situaciones', icon: List },
@@ -33,8 +34,30 @@ function LearningTip() {
 
 export function StudentLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const { unitId, lessonId, situationId, sceneId } = useParams();
   const menuRef = useRef<HTMLDialogElement>(null);
-  const pageName = items.find(item => item.to === location.pathname)?.label ?? 'Mi perfil';
+  const currentItem = items.find(item => item.to === location.pathname || (item.to !== '/' && location.pathname.startsWith(`${item.to}/`)));
+  const unit = units.find(item => String(item.id) === unitId);
+  const lessonIndex = unit?.lessons.findIndex(lesson => lesson.id === lessonId) ?? -1;
+  const situationFilter = getSituationFilter(new URLSearchParams(location.search).get('nivel'));
+  const breadcrumbs = [
+    { label: 'SeñaVerse', to: '/' },
+    { label: currentItem?.label ?? 'Mi perfil', to: currentItem?.to === '/simulador' ? getSituationsPath(situationFilter) : currentItem?.to ?? '/perfil' },
+  ];
+  if (unit) breadcrumbs.push({ label: `Unidad ${unit.id}`, to: getUnitPath(unit.id) });
+  if (lessonIndex >= 0) breadcrumbs.push({ label: `Lección ${lessonIndex + 1}`, to: location.pathname });
+  const practicePage = [
+    { label: 'Práctica libre', to: '/camara/libre' },
+    { label: 'Desafío de señas', to: '/camara/desafio' },
+  ].find(page => page.to === location.pathname);
+  if (practicePage) breadcrumbs.push(practicePage);
+  const situation = situations.find(item => item.id === situationId);
+  if (situation) {
+    breadcrumbs.push({ label: situation.title, to: getSituationPath(situation.id, situationFilter) });
+    const sceneIndex = situation.scenes.findIndex(scene => scene.id === sceneId);
+    if (sceneIndex >= 0) breadcrumbs.push({ label: `Escena ${sceneIndex + 1}`, to: location.pathname });
+    if (location.pathname.endsWith('/resultados')) breadcrumbs.push({ label: 'Resumen', to: location.pathname });
+  }
   const closeMenu = () => menuRef.current?.close();
 
   useEffect(() => {
@@ -54,7 +77,14 @@ export function StudentLayout({ children }: { children: ReactNode }) {
         <header className="app-topbar">
           <div className="app-mobile-brand"><Brand /></div>
           <nav className="app-breadcrumb" aria-label="Ubicación actual">
-            <Link to="/">SeñaVerse</Link><span aria-hidden="true">/</span><span aria-current="page">{pageName}</span>
+            {breadcrumbs.map((breadcrumb, index) => (
+              <Fragment key={breadcrumb.label}>
+                {index > 0 && <span aria-hidden="true">/</span>}
+                {index === breadcrumbs.length - 1
+                  ? <span aria-current="page">{breadcrumb.label}</span>
+                  : <Link to={breadcrumb.to}>{breadcrumb.label}</Link>}
+              </Fragment>
+            ))}
           </nav>
           <div className="app-profile">
             <span className="app-example-xp"><Star size={23} aria-hidden="true" /> <span>XP de ejemplo</span></span>
