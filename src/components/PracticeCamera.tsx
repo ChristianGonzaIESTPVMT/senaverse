@@ -1,12 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, ScanLine } from 'lucide-react';
 import { useHandDetection } from '../features/sign-recognition/useHandDetection';
-import { handDetectionMessage } from '../features/sign-recognition/types';
+import { handDetectionMessage, type FreshHandInference, type HandDetectionState } from '../features/sign-recognition/types';
 import { CAMERA_VIDEO_CONSTRAINTS, DEFAULT_HAND_PROFILE, type HandDetectionProfile } from '../features/sign-recognition/config';
 
 const HandDiagnostics = import.meta.env.DEV ? lazy(() => import('../features/sign-recognition/HandDiagnostics')) : null;
 
 type CameraStatus = 'idle' | 'requesting' | 'active' | 'error';
+export type PracticeCameraSessionState = { cameraStatus: CameraStatus; detector: HandDetectionState };
 
 const cameraErrors: Record<string, string> = {
   NotAllowedError: 'El permiso de cámara está desactivado. Puedes habilitarlo en tu navegador y volver a intentarlo.',
@@ -15,7 +16,10 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'No se pudo acceder a la cámara. Comprueba si otra aplicación la está utilizando.',
 };
 
-export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
+export function PracticeCamera({ disabled = false, onFreshInference, onSessionState }: { disabled?: boolean;
+  onFreshInference?: (event: FreshHandInference) => void;
+  onSessionState?: (state: PracticeCameraSessionState) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -25,7 +29,11 @@ export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
   const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(() => import.meta.env.DEV && typeof window !== 'undefined'
     && (import.meta.env.VITE_HAND_DEBUG === 'true' || new URLSearchParams(window.location.search).get('handDebug') === '1'));
   const [profile, setProfile] = useState<HandDetectionProfile>(DEFAULT_HAND_PROFILE);
-  const detection = useHandDetection(videoRef, canvasRef, status === 'active', { profile, diagnosticsEnabled });
+  const detection = useHandDetection(videoRef, canvasRef, status === 'active', { profile, diagnosticsEnabled, onFreshInference });
+  const detectorStatus = detection.state.status;
+  const detectedHands = detection.state.handCount;
+  const missingHands = detection.state.missingHands;
+  useEffect(() => { onSessionState?.({ cameraStatus: status, detector: { status: detectorStatus, handCount: detectedHands, ...(missingHands ? { missingHands } : {}) } }); }, [onSessionState, status, detectorStatus, detectedHands, missingHands]);
 
   useEffect(() => {
     const video = videoRef.current;

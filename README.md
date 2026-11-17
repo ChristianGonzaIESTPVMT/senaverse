@@ -18,6 +18,8 @@ La cámara compartida integra el Hito 1 de MediaPipe Hand Landmarker: detección
 
 La [optimización del seguimiento](docs/hand-tracking-optimization.md) añade inferencia en Worker, captura de fotogramas nuevos, continuidad breve y diagnóstico de desarrollo (`/camara/libre?handDebug=1`). Incluye perfiles aislados de umbrales y un protocolo de medición física; el rendimiento de 20–30 FPS es un objetivo pendiente de validación en hardware real.
 
+El Hito 2 incorpora [SeñaVerse Dataset Studio](docs/dataset-studio.md), herramienta interna en `/herramientas/dataset`. Para habilitarla en desarrollo, agrega `VITE_ENABLE_DATA_COLLECTION=true` a `.env.development.local` y reinicia Vite. Recopila únicamente inferencias frescas del detector compartido, con consentimiento, revisión, IndexedDB y respaldo/restauración JSON. Está desactivada por defecto y no añade clasificación ni entrenamiento.
+
 ## Cambiar las imágenes del inicio
 
 1. Guarda tus imágenes en `public/images/`.

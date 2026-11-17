@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { StudentLayout } from './components/StudentLayout';
 import { getLessonPath } from './data/curriculum';
 import { summarizeProgress } from './data/progress';
@@ -27,6 +28,8 @@ import './pages/LibraryPage.css';
 import './pages/CameraPage.css';
 import './pages/SituationsPage.css';
 
+const DatasetStudioPage = import.meta.env.VITE_ENABLE_DATA_COLLECTION === 'true' ? lazy(() => import('./pages/DatasetStudioPage')) : null;
+
 function StudentApp() {
   const situationProgress = useSituationProgress();
   const learning = useLearningActivity();
@@ -37,6 +40,7 @@ function StudentApp() {
   return (
     <BrowserRouter>
       <Routes>
+        {DatasetStudioPage && <Route path="/herramientas/dataset" element={<Suspense fallback={<p role="status">Abriendo Dataset Studio…</p>}><DatasetStudioPage /></Suspense>} />}
         <Route path="/" element={<StudentLayout><DashboardPage completed={completed} lastLessonId={learning.activity.lastLessonId}/></StudentLayout>} />
         <Route path="/panel" element={<Navigate to="/" replace />} />
         <Route path="/presentacion" element={<HomePage />} />

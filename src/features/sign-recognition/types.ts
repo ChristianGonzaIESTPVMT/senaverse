@@ -34,6 +34,30 @@ export type HandInferenceBackend = {
   close: () => void;
 };
 export type BackendOptions = { profile: HandDetectionProfile };
+export type HandCaptureConfiguration = {
+  delegate: DetectionDelegate;
+  profile: HandDetectionProfile;
+  runningMode: 'VIDEO';
+  numHands: 2;
+  minHandDetectionConfidence: number;
+  minHandPresenceConfidence: number;
+  minTrackingConfidence: number;
+  processingWidth: number;
+  processingHeight: number;
+  cameraWidth: number;
+  cameraHeight: number;
+  cameraFrameRate: number | null;
+  inputMirrored: false;
+};
+/** Emitted once per accepted Worker inference, independently of visual retention/redraws. */
+export type FreshHandInference = {
+  source: 'worker';
+  inferenceTimestampMs: number;
+  capturedAtMs: number;
+  receivedAtMs: number;
+  result: HandDetectionResult;
+  configuration: HandCaptureConfiguration;
+};
 export type HandDiagnosticSnapshot = {
   elapsedSeconds: number;
   cameraFps: number | null;

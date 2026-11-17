@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { startHandDetection } from './detectionSession';
 import { DEFAULT_HAND_PROFILE, type HandDetectionProfile } from './config';
-import type { HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot } from './types';
+import type { FreshHandInference, HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot } from './types';
 
 export function useHandDetection(videoRef: RefObject<HTMLVideoElement | null>, canvasRef: RefObject<HTMLCanvasElement | null>, active: boolean,
-  { profile = DEFAULT_HAND_PROFILE, diagnosticsEnabled = false }: { profile?: HandDetectionProfile; diagnosticsEnabled?: boolean } = {}) {
+  { profile = DEFAULT_HAND_PROFILE, diagnosticsEnabled = false, onFreshInference }: { profile?: HandDetectionProfile; diagnosticsEnabled?: boolean; onFreshInference?: (event: FreshHandInference) => void } = {}) {
   const [state, setState] = useState<HandDetectionState>({ status: 'idle', handCount: 0 });
   const [attempt, setAttempt] = useState(0);
   const [diagnostics, setDiagnostics] = useState<HandDiagnosticSnapshot | null>(null);
   const resultRef = useRef<HandDetectionResult | null>(null);
   const sessionRef = useRef<HandDetectionSession | null>(null);
+  const freshListener = useRef(onFreshInference);
+  const hasFreshListener = !!onFreshInference;
+  useEffect(() => { freshListener.current = onFreshInference; }, [onFreshInference]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -20,6 +23,7 @@ export function useHandDetection(videoRef: RefObject<HTMLVideoElement | null>, c
       onState: next => setState(previous => previous.status === next.status && previous.handCount === next.handCount && previous.missingHands === next.missingHands ? previous : next),
       onResult: result => { resultRef.current = result; },
       onDiagnostics: diagnosticsEnabled ? setDiagnostics : undefined,
+      onFreshInference: hasFreshListener ? event => freshListener.current?.(event) : undefined,
     });
     sessionRef.current = session;
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(session.redraw);
@@ -31,7 +35,7 @@ export function useHandDetection(videoRef: RefObject<HTMLVideoElement | null>, c
       session.stop();
       if (sessionRef.current === session) sessionRef.current = null;
     };
-  }, [active, attempt, videoRef, canvasRef, profile, diagnosticsEnabled]);
+  }, [active, attempt, videoRef, canvasRef, profile, diagnosticsEnabled, hasFreshListener]);
 
   const stop = useCallback(() => {
     sessionRef.current?.stop();

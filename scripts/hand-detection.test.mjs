@@ -403,3 +403,31 @@ test('worker initialization failure terminates the failed worker and exposes the
   await assert.rejects(fixture.ready, /WASM unavailable/);
   assert.equal(fixture.terminated(), 1);
 });
+
+test('fresh-inference subscribers receive each accepted Worker result once, never retained points or redraws', async () => {
+  const observations = [];
+  const fixture = sessionFixture(undefined, { onFreshInference: event => observations.push(event) });
+  await flush();
+  fixture.setResult(result(1)); fixture.tick(0); await flush();
+  fixture.session.redraw(); fixture.session.redraw();
+  assert.equal(observations.length, 1);
+  assert.equal(observations[0].source, 'worker');
+  assert.equal(observations[0].configuration.inputMirrored, false);
+  fixture.setResult(result(0)); fixture.tick(40, .04); await flush();
+  fixture.session.redraw();
+  assert.equal(observations.length, 2);
+  assert.equal(observations[1].result.landmarks.length, 0);
+  assert.equal(observations[1].capturedAtMs, 40);
+});
+
+test('the fresh-inference channel rejects stale results and suppresses deliveries after shutdown', async () => {
+  const observations = [];
+  const fixture = sessionFixture(undefined, { onFreshInference: event => observations.push(event) });
+  let finish;
+  fixture.backend.infer = () => new Promise(resolve => { finish = () => resolve({ result: result(1), inferenceMs: 200 }); });
+  await flush(); fixture.tick(0); await flush();
+  fixture.setTime(200); finish(); await flush();
+  assert.equal(observations.length, 0);
+  fixture.tick(250, .25); await flush(); fixture.session.stop(); finish(); await flush();
+  assert.equal(observations.length, 0);
+});

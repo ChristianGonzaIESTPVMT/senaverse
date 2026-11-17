@@ -1,9 +1,9 @@
-import { DEFAULT_HAND_PROFILE, DIAGNOSTIC_INTERVAL_MS, MAX_DETECTION_FPS, MAX_RESULT_AGE_MS, type HandDetectionProfile } from './config.ts';
+import { DEFAULT_HAND_PROFILE, DIAGNOSTIC_INTERVAL_MS, MAX_DETECTION_FPS, MAX_RESULT_AGE_MS, getHandLandmarkerOptions, type HandDetectionProfile } from './config.ts';
 import { clearHandCanvas, drawHandLandmarks } from './drawHandLandmarks.ts';
 import { captureHandFrame, closeCapturedFrame, createHandInferenceBackend } from './inferenceBackend.ts';
 import { HandPerformanceMetrics } from './performanceMetrics.ts';
 import { HandTrackingContinuity } from './trackingContinuity.ts';
-import type { BackendOptions, CapturedHandFrame, HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot, HandInferenceBackend } from './types.ts';
+import type { BackendOptions, CapturedHandFrame, FreshHandInference, HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot, HandInferenceBackend } from './types.ts';
 
 type FrameMetadata = { mediaTime: number; presentedFrames?: number };
 type FrameCallback = (timestamp: number, metadata: FrameMetadata) => void;
@@ -36,6 +36,7 @@ type DetectionOptions = {
   onState: (state: HandDetectionState) => void;
   onResult: (result: HandDetectionResult | null) => void;
   onDiagnostics?: (snapshot: HandDiagnosticSnapshot) => void;
+  onFreshInference?: (event: FreshHandInference) => void;
   profile?: HandDetectionProfile;
   createBackend?: (signal: AbortSignal, options: BackendOptions) => Promise<HandInferenceBackend>;
   captureFrame?: (video: HTMLVideoElement) => Promise<CapturedHandFrame>;
@@ -43,7 +44,7 @@ type DetectionOptions = {
 };
 
 /** Single flight: capture the current frame only when idle, never enqueue a waiting frame. */
-export function startHandDetection({ video, canvas, onState, onResult, onDiagnostics, profile = DEFAULT_HAND_PROFILE,
+export function startHandDetection({ video, canvas, onState, onResult, onDiagnostics, onFreshInference, profile = DEFAULT_HAND_PROFILE,
   createBackend = createHandInferenceBackend, captureFrame = captureHandFrame, scheduler = createHandFrameScheduler(video),
 }: DetectionOptions): HandDetectionSession {
   const abort = new AbortController();
@@ -65,6 +66,7 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
   let processingHeight = 0;
   let busy = false;
   let stopped = false;
+  let cameraFrameRate: number | null = null;
 
   function publishDiagnostics() {
     if (!onDiagnostics || stopped) return;
@@ -132,6 +134,11 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
         return;
       }
       lastAcceptedTimestamp = timestamp;
+      onFreshInference?.({ source: 'worker', inferenceTimestampMs: timestamp, capturedAtMs: capturedAt,
+        receivedAtMs: completedAt, result: output.result,
+        configuration: { ...getHandLandmarkerOptions(profile), delegate: backend!.delegate, profile,
+          processingWidth, processingHeight, cameraWidth: video.videoWidth, cameraHeight: video.videoHeight,
+          cameraFrameRate, inputMirrored: false } });
       metrics.hands(output.result.landmarks.length, capturedAt);
       continuity.observe(output.result, capturedAt, completedAt);
       redraw();
@@ -179,6 +186,7 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
   void createBackend(abort.signal, { profile }).then(instance => {
     if (stopped) { instance.close(); return; }
     backend = instance;
+    cameraFrameRate = (video.srcObject as MediaStream | null)?.getVideoTracks?.()[0]?.getSettings?.().frameRate ?? null;
     onState({ status: 'searching', handCount: 0 });
     publishDiagnostics();
     frameId = scheduler.request(observeFrame);
