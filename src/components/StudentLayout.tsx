@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useParams } from 'react-router-dom';
-import { Camera, ChartPie, House, LayoutGrid, LibraryBig, List, Menu, Sparkles, Star, X } from 'lucide-react';
+import { Camera, ChartNoAxesColumnIncreasing, House, LayoutGrid, LibraryBig, List, Menu, Sparkles, Star, X } from 'lucide-react';
+import { summarizeProgress } from '../data/progress';
+import { useStudentProgress } from '../hooks/progressContext';
 import { getUnitPath, units } from '../data/curriculum';
 import { getSituationFilter, getSituationPath, getSituationsPath, situations } from '../data/situations';
 import { Brand } from './Brand';
@@ -12,7 +14,7 @@ const items = [
   { to: '/camara', label: 'Cámara', icon: Camera },
   { to: '/simulador', label: 'Situaciones', icon: List },
   { to: '/minijuegos', label: 'Minijuegos', icon: Sparkles },
-  { to: '/progreso', label: 'Mi progreso', icon: ChartPie },
+  { to: '/progreso', label: 'Mi progreso', icon: ChartNoAxesColumnIncreasing },
 ];
 
 function NavigationLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -33,6 +35,8 @@ function LearningTip() {
 }
 
 export function StudentLayout({ children }: { children: ReactNode }) {
+  const { progress } = useStudentProgress();
+  const { xp } = summarizeProgress(progress);
   const location = useLocation();
   const { unitId, lessonId, situationId, sceneId } = useParams();
   const menuRef = useRef<HTMLDialogElement>(null);
@@ -87,7 +91,7 @@ export function StudentLayout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="app-profile">
-            <span className="app-example-xp"><Star size={23} aria-hidden="true" /> <span>XP de ejemplo</span></span>
+            <span className="app-example-xp"><Star size={23} aria-hidden="true" /> <span>{xp.toLocaleString('es-PE')} XP</span></span>
             <Link className="app-avatar" to="/perfil" aria-label="Ver mi perfil">SV</Link>
           </div>
         </header>

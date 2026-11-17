@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { StudentLayout } from './components/StudentLayout';
-import { getLessonPath, initialCompletedLessonIds } from './data/curriculum';
+import { getLessonPath } from './data/curriculum';
+import { summarizeProgress } from './data/progress';
+import { StudentProgressProvider } from './components/StudentProgressProvider';
+import { useStudentProgress } from './hooks/progressContext';
+import { ProgressPage } from './pages/ProgressPage';
 import { AcademyPage } from './pages/AcademyPage';
 import { CameraPage } from './pages/CameraPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
@@ -24,24 +27,12 @@ import './pages/LibraryPage.css';
 import './pages/CameraPage.css';
 import './pages/SituationsPage.css';
 
-const PROGRESS_KEY = 'senaverse-demo-completed-v1';
-
-function App() {
+function StudentApp() {
   const situationProgress = useSituationProgress();
   const learning = useLearningActivity();
-  const [completed, setCompleted] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(PROGRESS_KEY);
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.every(id => typeof id === 'string')) return [...new Set([...initialCompletedLessonIds, ...parsed])];
-      }
-    } catch { /* Usar valores demostrativos cuando no hay almacenamiento */ }
-    return initialCompletedLessonIds;
-  });
-
-  useEffect(() => { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(completed)); } catch { /* Modo sin persistencia */ } }, [completed]);
-  const completeLesson = (id: string) => setCompleted(prev => prev.includes(id) ? prev : [...prev,id]);
+  const { progress, recordActivity } = useStudentProgress();
+  const { completed } = summarizeProgress(progress);
+  const completeLesson = (lessonId: string) => recordActivity({ type: 'lesson', lessonId });
 
   return (
     <BrowserRouter>
@@ -65,12 +56,16 @@ function App() {
         <Route path="/simulador/:situationId/escena/:sceneId" element={<StudentLayout><SituationScenePage progress={situationProgress} /></StudentLayout>} />
         <Route path="/simulador/:situationId/resultados" element={<StudentLayout><SituationResultsPage progress={situationProgress} /></StudentLayout>} />
         <Route path="/simulador/*" element={<Navigate to="/simulador" replace />} />
-        <Route path="/progreso" element={<StudentLayout><ComingSoonPage title="Mi progreso"/></StudentLayout>} />
+        <Route path="/progreso" element={<StudentLayout><ProgressPage /></StudentLayout>} />
         <Route path="/perfil" element={<StudentLayout><ComingSoonPage title="Mi perfil"/></StudentLayout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
+}
+
+function App() {
+  return <StudentProgressProvider><StudentApp /></StudentProgressProvider>;
 }
 
 export default App;

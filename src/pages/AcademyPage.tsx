@@ -50,7 +50,7 @@ function UnitLessons({ unit, completed, activity }: AcademyProps & { unit: Unit 
           );
         })}
       </ol>
-      <p className="learning-progress-note">El progreso se guarda en este navegador e incluye las lecciones de ejemplo del prototipo.</p>
+      <p className="learning-progress-note">El progreso de las lecciones que completes se guarda en este navegador.</p>
       <Link className="button button-outline" to="/academia"><ArrowLeft size={18} aria-hidden="true" /> Volver a las unidades</Link>
     </div>
   );
@@ -81,7 +81,7 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
           <div className="learning-banner-stat"><Layers3 size={31} aria-hidden="true" /><dl><dt>Unidad actual</dt><dd>Unidad {current.unit.id}</dd></dl></div>
         </div>
       </section>
-      <div className="learning-banner-foot"><span>Progreso local · incluye datos de muestra</span>{last && <Link to={getLessonPath(last.unit.id, last.lesson.id)}>Última lección visitada · {last.lesson.title}<ArrowRight size={16} aria-hidden="true" /></Link>}</div>
+      <div className="learning-banner-foot"><span>Progreso local · lecciones completadas</span>{last && <Link to={getLessonPath(last.unit.id, last.lesson.id)}>Última lección visitada · {last.lesson.title}<ArrowRight size={16} aria-hidden="true" /></Link>}</div>
 
       <div className="learning-section-heading"><h2>Unidades de aprendizaje</h2></div>
       <section className="learning-units-grid" aria-label="Unidades de aprendizaje">

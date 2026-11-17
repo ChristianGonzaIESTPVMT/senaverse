@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { getLessonPath, getResumeLesson, totalLessons, units } from '../data/curriculum';
 import type { HomeVisualName } from '../data/homeVisuals';
+import { summarizeProgress } from '../data/progress';
+import { useStudentProgress } from '../hooks/progressContext';
 
 const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
   { title: 'Ruta de aprendizaje', description: 'Lecciones organizadas por niveles.', action: 'Explorar', to: '/academia', visual: 'learning' },
@@ -11,9 +13,10 @@ const exploreItems: { title: string; description: string; action: string; to: st
 ];
 
 export function DashboardPage({ completed, lastLessonId = null }: { completed: string[]; lastLessonId?: string | null }) {
+  const { progress } = useStudentProgress();
   const finishedCount = units.flatMap(unit => unit.lessons).filter(lesson => completed.includes(lesson.id)).length;
   const percent = Math.round(finishedCount / totalLessons * 100);
-  const experience = finishedCount * 80;
+  const experience = summarizeProgress(progress).xp;
   const resume = getResumeLesson(completed, lastLessonId);
   const lessonCompleted = completed.includes(resume.lesson.id);
 
@@ -46,7 +49,7 @@ export function DashboardPage({ completed, lastLessonId = null }: { completed: s
       <section className="home-learning" aria-labelledby="home-learning-title">
         <div className="home-section-heading">
           <h2 id="home-learning-title">Mi aprendizaje</h2>
-          <span className="home-demo-label">Datos ilustrativos</span>
+          <span className="home-demo-label">Tu progreso local</span>
         </div>
         <div className="home-stats">
           <div className="home-stat">

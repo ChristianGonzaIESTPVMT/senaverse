@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bookmark, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Frown, Hand, Heart, HeartHandshake, LayoutGrid, Play, Search, SearchX, Smile, Soup, Sparkles, UsersRound, UserRound, Video, X, Droplets, Circle } from 'lucide-react';
 import { libraryCategories, libraryEntries, type LibraryCategory, type LibraryEntry } from '../data/library';
+import { useStudentProgress } from '../hooks/progressContext';
 
 type CategoryFilter = 'all' | 'saved' | LibraryCategory;
 
@@ -48,6 +49,7 @@ function LibraryThumbnail({ entry }: { entry: LibraryEntry }) {
 }
 
 export function LibraryPage() {
+  const { consultSign } = useStudentProgress();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [page, setPage] = useState(1);
@@ -115,6 +117,7 @@ export function LibraryPage() {
   }
 
   function openEntry(entry: LibraryEntry) {
+    consultSign(entry.id);
     setSelected(entry);
     dialogRef.current?.showModal();
   }

@@ -96,7 +96,7 @@ function LessonContent({ unit, lesson, completed, activity, onComplete, onVisit 
             <button className="button button-primary" type="button" disabled={!passed || isDone} onClick={() => onComplete(lesson.id)}>{isDone ? <><Check size={17} aria-hidden="true" /> Lección completada</> : <>Marcar como completada <Check size={17} aria-hidden="true" /></>}</button>
           </div>
           {isDone && hasPending && <div className="learning-next-step"><Link to={getLessonPath(next.unit.id, next.lesson.id)} className="button button-outline">Continuar aprendizaje <ArrowRight size={18} aria-hidden="true" /></Link></div>}
-          <p className="demo-note">La evaluación de esta lección es conceptual. La ejecución de las señas se evaluará con los recursos y el reconocimiento correspondientes. El progreso se guarda en este navegador e incluye datos de muestra.</p>
+          <p className="demo-note">La evaluación de esta lección es conceptual. La ejecución de las señas se evaluará con los recursos y el reconocimiento correspondientes. El progreso de las lecciones completadas se guarda en este navegador.</p>
         </div>
 
         <aside className="lesson-aside">
