@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, ScanLine } from 'lucide-react';
+import { useHandDetection } from '../features/sign-recognition/useHandDetection';
+import { handDetectionMessage } from '../features/sign-recognition/types';
+import { CAMERA_VIDEO_CONSTRAINTS, DEFAULT_HAND_PROFILE, type HandDetectionProfile } from '../features/sign-recognition/config';
+
+const HandDiagnostics = import.meta.env.DEV ? lazy(() => import('../features/sign-recognition/HandDiagnostics')) : null;
 
 type CameraStatus = 'idle' | 'requesting' | 'active' | 'error';
 
@@ -12,10 +17,15 @@ const cameraErrors: Record<string, string> = {
 
 export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestRef = useRef(0);
   const [status, setStatus] = useState<CameraStatus>('idle');
   const [error, setError] = useState('');
+  const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(() => import.meta.env.DEV && typeof window !== 'undefined'
+    && (import.meta.env.VITE_HAND_DEBUG === 'true' || new URLSearchParams(window.location.search).get('handDebug') === '1'));
+  const [profile, setProfile] = useState<HandDetectionProfile>(DEFAULT_HAND_PROFILE);
+  const detection = useHandDetection(videoRef, canvasRef, status === 'active', { profile, diagnosticsEnabled });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -28,6 +38,7 @@ export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
   }, []);
 
   function stopCamera() {
+    detection.stop();
     requestRef.current += 1;
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
@@ -44,6 +55,7 @@ export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
 
   async function startCamera() {
     if (disabled) return;
+    detection.stop();
     if (!navigator.mediaDevices?.getUserMedia) {
       failCamera('La vista previa requiere acceso a cámara en un navegador compatible mediante HTTPS o localhost.');
       return;
@@ -55,7 +67,7 @@ export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: CAMERA_VIDEO_CONSTRAINTS,
         audio: false,
       });
 
@@ -98,19 +110,22 @@ export function PracticeCamera({ disabled = false }: { disabled?: boolean }) {
       </div>
       <div className="practice-camera-preview">
         <video ref={videoRef} autoPlay playsInline muted hidden={!isActive} aria-label="Vista previa de tu cámara" onError={() => failCamera('La vista previa no pudo reproducirse. Puedes volver a activar la cámara.')} />
+        <canvas ref={canvasRef} className="practice-hand-overlay" hidden={!isActive} aria-hidden="true" />
         {!isActive && <div className="practice-camera-placeholder">
           <CameraOff size={43} strokeWidth={1.5} aria-hidden="true" />
           <strong>{isRequesting ? 'Esperando tu autorización' : 'La cámara está desactivada'}</strong>
           <p>{disabled ? 'Selecciona primero una seña para practicar.' : isRequesting ? 'Responde a la solicitud de permisos de tu navegador.' : 'Actívala cuando estés listo para practicar.'}</p>
         </div>}
       </div>
-      <div className="practice-recognition-state"><ScanLine size={20} aria-hidden="true" /><span>Reconocimiento pendiente de integración</span></div>
+      <div className={`practice-recognition-state${detection.state.status === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" aria-atomic="true"><ScanLine size={20} aria-hidden="true" /><span>{handDetectionMessage(detection.state)}</span></div>
+      {isActive && detection.state.status === 'error' && <button className="button button-outline practice-detector-retry" type="button" onClick={detection.retry}>Reintentar detector</button>}
       {error && <p className="practice-camera-error" role="alert">{error}</p>}
       <button className="button button-primary practice-camera-button" type="button" disabled={disabled} onClick={() => { if (isActive || isRequesting) stopCamera(); else void startCamera(); }}>
         {isActive || isRequesting ? <CameraOff size={19} aria-hidden="true" /> : <Camera size={19} aria-hidden="true" />}
         {buttonLabels[status]}
       </button>
-      <p className="practice-camera-privacy">La vista previa permanece en este dispositivo.</p>
+      <p className="practice-camera-privacy">Tu cámara se procesa localmente en este dispositivo.</p>
+      {diagnosticsEnabled && HandDiagnostics && <Suspense fallback={null}><HandDiagnostics snapshot={detection.diagnostics} profile={profile} onProfile={setProfile} onReset={detection.resetDiagnostics} onDisable={() => { setDiagnosticsEnabled(false); setProfile(DEFAULT_HAND_PROFILE); }} /></Suspense>}
     </section>
   );
 }

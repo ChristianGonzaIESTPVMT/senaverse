@@ -92,16 +92,30 @@
 .practice-camera-status.is-active { color: #187b63; }
 .practice-camera-status.is-active::before { background: #2b9c7d; }
 .practice-camera-preview { position: relative; background: #f1eff6; }
-.practice-camera-preview video { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.practice-camera-preview video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .practice-camera-preview video[hidden] { display: none; }
+.practice-hand-overlay { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); transform-origin: center; pointer-events: none; }
+.practice-hand-overlay[hidden] { display: none; }
 .practice-camera-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; padding: 25px; color: #88769f; text-align: center; }
 .practice-camera-placeholder strong { color: #544361; font-size: 17px; }
 .practice-camera-placeholder p { max-width: 280px; margin: 0; font-size: 14px; line-height: 1.5; }
 .practice-recognition-state { display: flex; align-items: center; gap: 9px; margin-top: 15px; padding: 11px 13px; border-radius: 11px; background: #f3eefb; color: #655276; font-size: 13px; line-height: 1.4; }
 .practice-recognition-state svg { flex-shrink: 0; color: #8c67c1; }
+.practice-recognition-state.is-error { color: #a03e4b; background: #fff0f1; }
+.practice-detector-retry { margin-top: 12px; }
 .practice-camera-button { justify-content: center; width: 100%; margin-top: 16px; }
 .practice-camera-error { margin: 13px 0 0; color: #a03e4b; font-size: 14px; line-height: 1.5; }
 .practice-camera-privacy { margin: 11px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
+.hand-diagnostics { margin-top: 20px; padding: 15px; border: 1px dashed #b7a4d4; border-radius: 13px; background: #faf7ff; font-size: 12px; }
+.hand-diagnostics summary { cursor: pointer; color: #5a3688; font-size: 13px; font-weight: 850; }
+.hand-diagnostics label { display: grid; gap: 6px; margin-top: 14px; font-weight: 800; }
+.hand-diagnostics select { width: 100%; padding: 8px; border: 1px solid #d6c7ec; border-radius: 8px; background: #fff; color: #4c3468; font: inherit; }
+.hand-diagnostics p { color: #70617d; font-size: 11px; line-height: 1.5; }
+.hand-diagnostics dl { margin: 15px 0; }
+.hand-diagnostics dl > div { display: flex; justify-content: space-between; gap: 14px; padding: 5px 0; border-bottom: 1px solid #e9e0f4; }
+.hand-diagnostics dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 800; }
+.hand-diagnostics-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hand-diagnostics-actions .button { padding: 8px 10px; min-height: 35px; font-size: 11px; }
 .practice-navigation, .challenge-step-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 13px; margin-top: 23px; }
 .practice-page .button { min-height: 46px; font-size: 15px; }
 

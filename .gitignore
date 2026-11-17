@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Generated from the exact installed version by postinstall/predev/prebuild.
+public/mediapipe/wasm/
 *.local
 
 # Editor directories and files

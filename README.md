@@ -14,6 +14,10 @@ En PowerShell, si la política de scripts bloquea `npm`, utiliza `npm.cmd`.
 
 La página principal está en `/`. La dirección anterior `/panel` redirige al inicio y la presentación del proyecto sigue disponible en `/presentacion`.
 
+La cámara compartida integra el Hito 1 de MediaPipe Hand Landmarker: detección local de hasta dos manos y sus 21 puntos, sin clasificación de señas ni recompensas. Consulta la [guía de instalación, archivos y pruebas con webcam](docs/hand-landmarker-hito-1.md).
+
+La [optimización del seguimiento](docs/hand-tracking-optimization.md) añade inferencia en Worker, captura de fotogramas nuevos, continuidad breve y diagnóstico de desarrollo (`/camara/libre?handDebug=1`). Incluye perfiles aislados de umbrales y un protocolo de medición física; el rendimiento de 20–30 FPS es un objetivo pendiente de validación en hardware real.
+
 ## Cambiar las imágenes del inicio
 
 1. Guarda tus imágenes en `public/images/`.

@@ -4,13 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/sync-mediapipe-assets.mjs",
+    "predev": "node scripts/sync-mediapipe-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-mediapipe-assets.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "pretest": "node scripts/sync-mediapipe-assets.mjs",
     "test": "node --experimental-strip-types --test scripts/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.3",
     "lucide-react": "^1.71.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
