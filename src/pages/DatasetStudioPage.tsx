@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Download, FileJson, FlaskConical, LockKeyhole, ShieldCheck, Upload, X } from 'lucide-react';
 import { Brand } from '../components/Brand';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { DatasetStatistics } from '../components/dataset/DatasetStatistics';
 import { ParticipantSelector } from '../components/dataset/ParticipantSelector';
 import { RecordingPanel } from '../components/dataset/RecordingPanel';
@@ -94,7 +95,7 @@ export default function DatasetStudioPage() {
   }
 
   return <div className="dataset-studio">
-    <header className="dataset-topbar"><Brand /><Link to="/" className="dataset-back"><ArrowLeft size={17} aria-hidden="true" /> Volver a SeñaVerse</Link></header>
+    <header className="dataset-topbar"><Brand /><div className="header-controls"><ThemeToggle /><Link to="/" className="dataset-back"><ArrowLeft size={17} aria-hidden="true" /> Volver a SeñaVerse</Link></div></header>
     <main className="dataset-content"><header className="dataset-heading"><div className="dataset-heading-icon"><FlaskConical size={31} aria-hidden="true" /></div><div><span className="dataset-eyebrow">HERRAMIENTA INTERNA · HITO 2</span><h1>SeñaVerse Dataset Studio</h1><p>Recopila secuencias reales de manos. Revisa cada repetición antes de guardarla.</p></div></header>
       <div className="dataset-privacy"><ShieldCheck size={22} aria-hidden="true" /><p><strong>Puntos de referencia y metadatos, guardados localmente.</strong> Sin videos, rostros, fotografías, audio ni datos de identidad. Esta herramienta se habilita por configuración; todavía no tiene autenticación.</p></div>
       {error && <p className="dataset-error dataset-feedback" role="alert">{error}</p>}{notice && <p className="dataset-success dataset-feedback" role="status">{notice}</p>}

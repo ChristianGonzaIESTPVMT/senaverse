@@ -13,7 +13,7 @@ type HomeVisual = {
  * Sin src se muestra la ilustración de respaldo.
  */
 export const homeVisuals: Record<HomeVisualName, HomeVisual> = {
-  brand: { alt: 'SeñaVerse' },
+  brand: { src: '/images/logo-senaverse.png', alt: 'SeñaVerse', fit: 'contain' },
   welcome: { alt: 'Mano saludando' },
   hero: { alt: 'Una mano para darte la bienvenida' },
   lessons: { alt: 'Libro abierto' },

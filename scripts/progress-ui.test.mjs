@@ -7,19 +7,20 @@ import { createServer } from 'vite';
 import { units, totalLessons } from '../src/data/curriculum.ts';
 import { emptyProgress, recordProgressEvent, recordSignConsultation } from '../src/data/progress.ts';
 
-const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
-let ProgressPage, StudentLayout, ProgressContext;
+const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: 'custom' });
+let ProgressPage, StudentLayout, ProgressContext, StudentProfileProvider;
 try {
   ({ ProgressPage } = await server.ssrLoadModule('/src/pages/ProgressPage.tsx'));
   ({ StudentLayout } = await server.ssrLoadModule('/src/components/StudentLayout.tsx'));
   ({ ProgressContext } = await server.ssrLoadModule('/src/hooks/progressContext.ts'));
+  ({ StudentProfileProvider } = await server.ssrLoadModule('/src/components/StudentProfileProvider.tsx'));
 } finally {
   await server.close();
 }
 
 function renderProgress(progress) {
   return renderToStaticMarkup(createElement(ProgressContext, { value: { progress, recordActivity() {}, consultSign() {} } },
-    createElement(MemoryRouter, { initialEntries: ['/progreso'] }, createElement(StudentLayout, null, createElement(ProgressPage)))));
+    createElement(StudentProfileProvider, null, createElement(MemoryRouter, { initialEntries: ['/progreso'] }, createElement(StudentLayout, null, createElement(ProgressPage))))));
 }
 
 test('the real progress page renders an empty student, shared navigation, dialogs and curriculum', () => {

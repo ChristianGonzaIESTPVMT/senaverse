@@ -8,16 +8,16 @@
 
 /* Shared frame for the learning area. */
 body:has(.app-shell) {
-  background: radial-gradient(ellipse at 48% 15%, #faf8ff 0%, #eee9fc 75%, #e8e1fa 100%);
+  background: radial-gradient(ellipse at 48% 15%, light-dark(#faf8ff, var(--color-canvas)) 0%, light-dark(#eee9fc, var(--color-canvas)) 75%, light-dark(#e8e1fa, var(--color-canvas)) 100%);
 }
 
 .app-shell {
-  --violet: #6330da;
-  --violet-dark: #4924a4;
-  --violet-soft: #eee7fc;
-  --ink: #251d49;
-  --muted: #514d6c;
-  --line: #ded9ef;
+  --violet: light-dark(#6330da, var(--color-primary));
+  --violet-dark: light-dark(#4924a4, var(--color-primary-hover));
+  --violet-soft: light-dark(#eee7fc, var(--color-surface));
+  --ink: light-dark(#251d49, var(--color-text));
+  --muted: light-dark(#514d6c, var(--color-text-secondary));
+  --line: light-dark(#ded9ef, var(--color-line));
   display: flex;
   width: calc(100% - 64px);
   max-width: 1680px;
@@ -27,8 +27,8 @@ body:has(.app-shell) {
   color: var(--ink);
   font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
   font-weight: 500;
-  background: #fff;
-  border: 1px solid #ffffffc7;
+  background: light-dark(#fff, var(--color-card));
+  border: 1px solid light-dark(#ffffffc7, color-mix(in srgb, var(--color-line) 78%, transparent));
   border-radius: 30px;
   box-shadow: 0 8px 28px #4b2d9320;
 }
@@ -42,7 +42,7 @@ body:has(.app-shell) {
   flex-direction: column;
   min-height: calc(100svh - 58px);
   padding: 26px 18px 34px;
-  background: #ffffffed;
+  background: light-dark(#ffffffed, color-mix(in srgb, var(--color-card) 93%, transparent));
 }
 
 .app-sidebar > .brand {
@@ -65,28 +65,28 @@ body:has(.app-shell) {
   min-height: 55px;
   padding: 12px 20px;
   border-radius: 16px;
-  color: #514d66;
+  color: light-dark(#514d66, var(--color-text-secondary));
   font-size: 19px;
   font-weight: 700;
   transition: color .15s, background .15s;
 }
 
 .app-nav-link svg { flex-shrink: 0; }
-.app-nav-link:hover { color: var(--violet-dark); background: #f6f2fd; }
-.app-nav-link.active { color: #5524c6; background: #eee8fc; font-weight: 900; }
+.app-nav-link:hover { color: var(--violet-dark); background: light-dark(#f6f2fd, var(--color-card)); }
+.app-nav-link.active { color: light-dark(#5524c6, var(--color-primary)); background: light-dark(#eee8fc, var(--color-surface)); font-weight: 900; }
 
 .app-learning-tip {
   margin-top: auto;
   padding: 22px 21px;
   border-radius: 18px;
-  background: #f0eafd;
+  background: light-dark(#f0eafd, var(--color-surface));
 }
 
 .app-sidebar .app-learning-tip { margin-top: max(40px, 7vh); }
-.app-learning-tip strong { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 850; color: #5725c3; }
+.app-learning-tip strong { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 850; color: light-dark(#5725c3, var(--color-primary)); }
 .app-learning-tip strong svg, .app-example-xp svg { flex-shrink: 0; fill: #ffdc4b; stroke: #251d3e; }
-.app-learning-tip p { margin: 8px 0 0; color: #514b6b; font-size: 17px; line-height: 1.45; }
-.app-main { flex: 1; min-width: 0; border-left: 1px solid #e5dff3; background: radial-gradient(ellipse at 80% 0, #f9f7ff, transparent 70%), #f7f5ff; }
+.app-learning-tip p { margin: 8px 0 0; color: light-dark(#514b6b, var(--color-text-secondary)); font-size: 17px; line-height: 1.45; }
+.app-main { flex: 1; min-width: 0; border-left: 1px solid light-dark(#e5dff3, var(--color-line)); background: radial-gradient(ellipse at 80% 0, light-dark(#f9f7ff, var(--color-page)), transparent 70%), light-dark(#f7f5ff, var(--color-page)); }
 
 .app-topbar {
   display: flex;
@@ -97,20 +97,20 @@ body:has(.app-shell) {
   padding: 12px 32px;
 }
 
-.app-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; color: #4e4868; font-size: 17px; font-weight: 650; }
+.app-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; color: light-dark(#4e4868, var(--color-text-secondary)); font-size: 17px; font-weight: 650; }
 .app-breadcrumb a:hover { color: var(--violet); }
 .app-profile { display: flex; align-items: center; gap: 29px; }
-.app-example-xp { display: inline-flex; align-items: center; gap: 10px; color: #463f63; font-size: 17px; font-weight: 650; }
-.app-avatar { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: #e6dbff; color: #5725ba; font-size: 21px; font-weight: 950; transition: background .15s; }
-.app-avatar:hover { background: #d9c8fb; }
+.app-example-xp { display: inline-flex; align-items: center; gap: 10px; color: light-dark(#463f63, var(--color-text-secondary)); font-size: 17px; font-weight: 650; }
+.app-avatar { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: light-dark(#e6dbff, var(--color-surface)); color: light-dark(#5725ba, var(--color-primary)); font-size: 21px; font-weight: 950; transition: background .15s; }
+.app-avatar:hover { background: light-dark(#d9c8fb, var(--color-hover)); }
 .app-content { padding: 0 32px 32px; }
 .app-content:focus { outline: none; }
 .app-content > .page-heading, .app-content > .lesson-breadcrumb, .app-content > .coming-soon { margin-top: 10px; }
 .app-mobile-brand, .app-bottom-nav { display: none; }
 
-.app-skip-link { position: fixed; top: -100px; left: 30px; z-index: 100; padding: 12px 18px; border-radius: 10px; background: #fff; color: var(--violet-dark); font-weight: 800; }
+.app-skip-link { position: fixed; top: -100px; left: 30px; z-index: 100; padding: 12px 18px; border-radius: 10px; background: light-dark(#fff, var(--color-card)); color: var(--violet-dark); font-weight: 800; }
 .app-skip-link:focus { top: 12px; }
-.app-menu-dialog { width: min(420px, calc(100% - 28px)); max-height: calc(100svh - 40px); padding: 0; border: 1px solid var(--line); border-radius: 24px; color: var(--ink); background: #fff; box-shadow: 0 20px 80px #22114040; }
+.app-menu-dialog { width: min(420px, calc(100% - 28px)); max-height: calc(100svh - 40px); padding: 0; border: 1px solid var(--line); border-radius: 24px; color: var(--ink); background: light-dark(#fff, var(--color-card)); box-shadow: 0 20px 80px #22114040; }
 .app-menu-dialog::backdrop { background: #24174360; backdrop-filter: blur(4px); }
 .app-menu-content { padding: 20px; }
 .app-menu-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -149,9 +149,9 @@ body:has(.app-menu-dialog[open]) { overflow: hidden; }
   .app-mobile-brand .brand { font-size: 26px; font-weight: 950; }
   .app-mobile-brand .brand-icon { width: 47px; height: 47px; border-radius: 15px; }
   .app-content { padding-bottom: 110px; }
-  .app-bottom-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; justify-content: space-around; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid #e5dff1; background: #ffffffed; backdrop-filter: blur(15px); }
-  .app-bottom-nav a, .app-bottom-nav button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 54px; min-height: 49px; padding: 5px 9px; border: 0; border-radius: 12px; color: #6e6582; background: none; font-size: 11px; font-weight: 800; }
-  .app-bottom-nav a.active { color: var(--violet); background: #eee7fc; }
+  .app-bottom-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; justify-content: space-around; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid light-dark(#e5dff1, var(--color-line)); background: light-dark(#ffffffed, color-mix(in srgb, var(--color-card) 93%, transparent)); backdrop-filter: blur(15px); }
+  .app-bottom-nav a, .app-bottom-nav button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 54px; min-height: 49px; padding: 5px 9px; border: 0; border-radius: 12px; color: light-dark(#6e6582, var(--color-text-secondary)); background: none; font-size: 11px; font-weight: 800; }
+  .app-bottom-nav a.active { color: var(--violet); background: light-dark(#eee7fc, var(--color-surface)); }
   .app-bottom-nav a:hover, .app-bottom-nav button:hover { color: var(--violet); }
   .app-content .lesson-layout { grid-template-columns: 1fr; }
 }

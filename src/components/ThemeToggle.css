@@ -1,0 +1,12 @@
+.theme-toggle { display: inline-grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; padding: 0; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-card); color: var(--color-primary); transition: background .15s, border-color .15s; }
+.theme-toggle:hover { background: var(--color-hover); border-color: var(--color-primary); }
+.theme-toggle:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.header-controls { display: flex; align-items: center; gap: 12px; }
+@media (max-width: 600px) {
+  .app-profile { gap: 10px; }
+  .app-topbar { gap: 12px; }
+  .theme-toggle { border-radius: 12px; }
+  .header-controls { gap: 8px; }
+  .landing-header { flex-wrap: wrap; }
+  .landing-header .header-controls { margin-left: auto; }
+}

@@ -1,0 +1,17 @@
+.profile-dialog [hidden] { display: none; }
+.avatar-modes { display: flex; gap: 7px; margin-bottom: 18px; padding: 5px; border-radius: 13px; background: var(--color-surface); }
+.avatar-modes button { flex: 1; min-height: 44px; padding: 7px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 13px; font-weight: 800; }
+.avatar-modes button[aria-pressed='true'] { background: var(--color-card); color: var(--color-primary); border-color: var(--color-line); }
+.avatar-photo-editor { display: grid; gap: 14px; margin-bottom: 20px; }
+.avatar-photo-editor > label { font-size: 14px; font-weight: 800; }
+.avatar-photo-editor > label span { display: block; margin-top: 4px; color: var(--color-text-secondary); font-size: 12px; font-weight: 500; }
+.avatar-photo-editor input[type='file'] { width: 100%; min-width: 0; font-size: 12px; color: var(--color-text-secondary); }
+.avatar-photo-editor input::file-selector-button { min-height: 44px; margin-right: 10px; padding: 8px 12px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); color: var(--color-primary); font: inherit; cursor: pointer; }
+.avatar-crop-preview { display: block; width: min(230px, 100%); height: auto; aspect-ratio: 1; margin: 3px auto; border-radius: 50%; box-shadow: 0 0 0 3px var(--color-line); background: var(--color-surface); }
+.avatar-crop-controls { display: grid; gap: 10px; }
+.avatar-crop-controls label { display: grid; gap: 5px; font-size: 12px; font-weight: 750; color: var(--color-text-secondary); }
+.avatar-crop-controls input { width: 100%; min-height: 28px; margin: 0; accent-color: var(--color-primary); }
+.avatar-current-photo { display: flex; align-items: center; gap: 13px; padding-block: 8px; }
+.avatar-current-photo .student-avatar { width: 64px; height: 64px; }
+.avatar-current-photo p { margin: 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.5; }
+.avatar-remove-photo { justify-self: start; min-height: 44px; padding: 7px 0; border: 0; background: transparent; color: var(--color-error); font: inherit; font-size: 12px; font-weight: 750; }

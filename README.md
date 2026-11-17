@@ -76,6 +76,54 @@ Comprobaciones: `npm run build`, `npm run lint` y `npm test`. Las 17 pruebas usa
 - `scripts/progress.test.mjs`, `scripts/progress-ui.test.mjs`, `package.json`: pruebas de lógica y renderizado, sin nuevas dependencias.
 - `README.md`: comportamiento, reglas, migración e integraciones pendientes.
 
+## Logo oficial y temas
+
+El símbolo oficial se sirve desde `public/images/logo-senaverse.png` (PNG con alfa, 256 × 256, 72 KB). Procede del archivo `logo_señaverse.png` adjunto: se recortó el margen exterior prácticamente transparente y se aisló la silueta de la mano a partir de sus regiones internas translúcidas. La mano se convierte a blanco #FFFFFF opaco, incluyendo los pequeños residuos interiores, conservando el corazón, los espacios entre dedos y todos los píxeles exteriores antes de reducir proporcionalmente. El remuestreo mantiene bordes suaves. `public/favicon.png` es la versión de 64 × 64 del mismo símbolo (8 KB). No se utilizan filtros CSS ni un fondo blanco detrás del logo.
+
+`src/data/homeVisuals.ts` configura el recurso de marca que reutiliza `Brand` en el sidebar, encabezado móvil, presentación, pie y Dataset Studio. Su contenedor queda transparente, sin el recuadro morado anterior. `scripts/prepare-brand-assets.ps1 -SourcePath <archivo.png>` permite volver a preparar ambos tamaños en Windows con System.Drawing, sin instalar dependencias; `-PublicPath` permite indicar el destino.
+
+El botón de sol/luna del encabezado cambia inmediatamente entre claro y oscuro. Las rutas con encabezado propio (presentación y Dataset Studio) reutilizan el mismo `ThemeToggle`, con un único selector por pantalla. El control tiene nombre accesible, estado presionado, foco visible y tamaño de 42 px.
+
+La preferencia se guarda como `light` o `dark` en `localStorage`, clave **`senaverse-theme-v1`**, independiente del perfil, progreso e IndexedDB. El valor inicial es claro. Un script pequeño en el `<head>` de `index.html` valida la preferencia y aplica `data-theme` al elemento raíz antes de iniciar React; el fondo inicial y `color-scheme` se establecen también en el encabezado para evitar un destello de otro tema. Si el almacenamiento está bloqueado, se conserva el funcionamiento durante la sesión.
+
+`src/data/theme.ts` aplica el tema global y sincroniza controles y pestañas. `ThemeToggle` utiliza `useSyncExternalStore`; no depende del perfil ni del progreso. `src/themes.css` centraliza superficies, tarjetas, bordes, texto, acentos, hover, foco y estados de éxito, advertencia, error e información. Los estilos existentes conservan sus colores claros mediante `light-dark(colorOriginal, tokenSemántico)`, y el modo oscuro utiliza esa paleta común. Requiere soporte de CSS `light-dark()` y `color-mix()`.
+
+La adaptación incluye Inicio, presentación, Aprender, lecciones y evaluaciones, Biblioteca y fichas, Cámara y prácticas, Situaciones y resultados, Minijuegos, Mi progreso y sus diálogos, Mi perfil y Dataset Studio habilitado. Las ilustraciones mantienen sus colores. El video, canvas, puntos de manos, inferencia, Workers, captura y almacenamiento IndexedDB conservan su lógica.
+
+En **Mi perfil**, la tarjeta principal tiene un degradado lavanda adaptable, avatar con aro, cifras destacadas y divisores integrados. Información personal añade iconos, separadores y campos con fondo suave y foco claro; Configuración mejora las filas y estados hover. Conserva los tres bloques y las mismas acciones de edición, exportación y restablecimiento.
+
+`scripts/theme.test.mjs` comprueba selección, arranque previo a React, persistencia al recargar, almacenamiento bloqueado, sincronización, aislamiento y contraste de los tokens. `scripts/theme-ui.test.mjs` verifica el logo y favicon con alfa, el control accesible, encabezados independientes y uso de la paleta en las superficies de cada sección. La prueba de restablecimiento del perfil también conserva la preferencia oscura. Se mantienen las pruebas de progreso y MediaPipe.
+
+## Mi perfil
+
+La ruta `/perfil` se abre desde el avatar del encabezado existente. Conserva el layout y muestra tres bloques: resumen del estudiante, información personal y configuración. Las dos tarjetas inferiores se apilan en pantallas pequeñas.
+
+El nombre visible es obligatorio (máximo 40 caracteres) y la biografía es opcional (máximo 180). Al guardar se eliminan espacios al inicio y al final y se unifican espacios repetidos y saltos de línea. **Cancelar** descarta la edición. El selector ofrece seis avatares con iconos locales de Lucide y una alternativa compacta para subir una foto. El nombre y el avatar se comparten con el encabezado y se sincronizan entre pestañas.
+
+`StudentProfileProvider` recupera y valida el perfil al iniciar y guarda los cambios en `localStorage`, clave `senaverse-student-profile-v1`, con `{ version: 1, displayName, bio, avatarId }`. Los datos dañados, versiones desconocidas, campos inválidos y avatares ajenos al catálogo recuperan valores iniciales seguros. Si el navegador bloquea el almacenamiento, la aplicación continúa en memoria y avisa que los cambios durarán solo durante la sesión.
+
+El resumen lee `useStudentProgress()` y `summarizeProgress()`, igual que **Mi progreso**: XP, lecciones realmente completadas y número de insignias obtenidas. Consultar o editar el perfil no registra actividades ni concede recompensas. No se cambia la lógica de progreso.
+
+**Exportar mis datos** descarga JSON con `schemaVersion: 2`, fecha, información personal validada, avatar, registros de progreso y resumen calculado por el sistema existente. Si hay foto, `profile.avatar` contiene `kind: 'photo'`, MIME, dimensiones y `dataUrl` Base64 de la imagen procesada y validada (máximo 192 KB antes de Base64); no contiene únicamente una referencia interna. Sin foto contiene `kind: 'preset'` e identificador. El respaldo es portátil para consulta y futuras herramientas; **no existe importación/restauración de estos archivos en la interfaz**. Si falta o está dañada la foto, la exportación avisa y permite reemplazarla o eliminarla antes de continuar. No se lee Dataset Studio ni muestras de entrenamiento.
+
+**Restablecer perfil** pide confirmación, elimina el Blob de la foto y restaura nombre «Estudiante», biografía vacía y avatar «Saludo». Conserva XP, lecciones, insignias, preferencia de tema y Dataset Studio.
+
+### Fotografías locales
+
+`AvatarPicker` incorpora vista previa circular, zoom de 1× a 3× y encuadre horizontal/vertical mediante controles de rango accesibles. Se valida el contenido de JPG/JPEG, PNG y WebP mediante firma binaria y decodificación real del navegador, con límites de 5 MB, 24 megapíxeles y 12000 píxeles por lado. Cancelar descarta el recorte; cambiar a un avatar prediseñado elimina la foto anterior. «Eliminar foto» recupera el avatar prediseñado de respaldo.
+
+`profilePhoto.ts` calcula una región cuadrada y usa canvas nativo de 256 × 256, suavizado de alta calidad y codificación WebP a calidad 0,9. Si WebP no está disponible, utiliza JPEG para imágenes opacas o PNG para conservar transparencia. La imagen se vuelve a codificar, sin conservar el archivo original ni sus metadatos EXIF, y se limita a 192 KB. No se instalan librerías de recorte.
+
+`profilePhotoStore.ts` guarda el Blob en la base **`senaverse-profile-photos`**, almacén `photos`, completamente separada del dataset. El perfil v1 conserva el formato anterior y añade solo `photoId` cuando se usa una foto; `avatarId` sigue siendo el respaldo. Los perfiles anteriores se leen sin migración destructiva. Las referencias inválidas o remotas se descartan. Si IndexedDB está bloqueado, se muestra un error al guardar la foto; si el Blob falta o no se puede decodificar, se muestra el avatar prediseñado.
+
+`StudentProfileProvider` distribuye una única URL local de Blob al encabezado y a Mi perfil. Las URLs se revocan al cambiar la foto o desmontar; los ImageBitmap se cierran y las selecciones pendientes se descartan al cancelar. Una escritura fallida de la referencia revierte el Blob nuevo; reemplazar o eliminar borra el anterior. El arranque elimina huérfanos antiguos de esta base, con un margen de cinco minutos que protege escrituras en curso de otras pestañas. La persistencia es exclusiva del navegador/dispositivo, sin sincronización entre dispositivos, servidores, MediaPipe ni entrenamiento.
+
+Archivos de fotografías: `src/components/AvatarPicker.tsx/.css`, `StudentAvatar.tsx/.css`, `StudentProfileProvider.tsx`, `src/hooks/profileContext.ts`, `src/data/profile.ts`, `profilePhoto.ts`, `profilePhotoStore.ts`, `profileBackup.ts`, `src/pages/ProfilePage.tsx` y la integración del encabezado en `StudentLayout.tsx`. Las pruebas están en `scripts/profile-photo.test.mjs` y `profile-ui.test.mjs`; `brand-pixels.test.mjs` verifica píxeles blancos opacos, huecos, degradados y transparencia exterior en logo y favicon.
+
+Archivos añadidos: `src/pages/ProfilePage.tsx` y `.css`, `src/data/profile.ts`, `src/hooks/profileContext.ts`, `src/components/StudentProfileProvider.tsx`, `src/components/StudentAvatar.tsx` y `.css`, y `scripts/profile.test.mjs` y `scripts/profile-ui.test.mjs`. Se integran mediante `src/App.tsx` y `src/components/StudentLayout.tsx`; el montaje de las pruebas de progreso usa también el proveedor del perfil.
+
+Pruebas: `npm test`, `npm run lint` y `npm run build`. Los casos de perfil cubren validación, recuperación de almacenamiento corrupto o bloqueado, persistencia al montar de nuevo, avatares, valores reales compartidos con el encabezado, exportación versionada sin datos ajenos y restablecimiento sin modificar otras claves.
+
 ## Biblioteca de señas
 
 La ruta `/biblioteca` incluye búsqueda sin distinción de tildes, filtros por categoría, seis tarjetas por página y marcadores guardados en este navegador. En **Más → Guardadas** se consultan las palabras marcadas.

@@ -4,11 +4,12 @@ import { StudentLayout } from './components/StudentLayout';
 import { getLessonPath } from './data/curriculum';
 import { summarizeProgress } from './data/progress';
 import { StudentProgressProvider } from './components/StudentProgressProvider';
+import { StudentProfileProvider } from './components/StudentProfileProvider';
 import { useStudentProgress } from './hooks/progressContext';
 import { ProgressPage } from './pages/ProgressPage';
 import { AcademyPage } from './pages/AcademyPage';
 import { CameraPage } from './pages/CameraPage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FreePracticePage } from './pages/FreePracticePage';
 import { HomePage } from './pages/HomePage';
@@ -61,7 +62,7 @@ function StudentApp() {
         <Route path="/simulador/:situationId/resultados" element={<StudentLayout><SituationResultsPage progress={situationProgress} /></StudentLayout>} />
         <Route path="/simulador/*" element={<Navigate to="/simulador" replace />} />
         <Route path="/progreso" element={<StudentLayout><ProgressPage /></StudentLayout>} />
-        <Route path="/perfil" element={<StudentLayout><ComingSoonPage title="Mi perfil"/></StudentLayout>} />
+        <Route path="/perfil" element={<StudentLayout><ProfilePage /></StudentLayout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
@@ -69,7 +70,7 @@ function StudentApp() {
 }
 
 function App() {
-  return <StudentProgressProvider><StudentApp /></StudentProgressProvider>;
+  return <StudentProgressProvider><StudentProfileProvider><StudentApp /></StudentProfileProvider></StudentProgressProvider>;
 }
 
 export default App;

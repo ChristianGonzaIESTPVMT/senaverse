@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, Camera, CheckCircle2, GraduationCap, HeartHandshake, Play, Sparkles, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function HomePage() {
   return (
@@ -12,7 +13,7 @@ export function HomePage() {
           <a href="#como-funciona">Cómo funciona</a>
           <Link to="/academia">Academia</Link>
         </nav>
-        <Link className="button button-primary header-action" to="/panel">Explorar demo <ArrowRight size={17} /></Link>
+        <div className="header-controls"><ThemeToggle /><Link className="button button-primary header-action" to="/panel">Explorar demo <ArrowRight size={17} /></Link></div>
       </header>
       <main>
         <section className="hero">

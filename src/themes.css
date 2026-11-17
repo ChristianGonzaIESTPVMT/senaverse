@@ -1,0 +1,102 @@
+/* Semantic palette shared by every route, including dialogs and Dataset Studio.
+   Existing light colors use light-dark(original, token) to keep the current design. */
+:root {
+  color-scheme: light;
+  --color-canvas: #faf9ff;
+  --color-page: #f7f5ff;
+  --color-sidebar: #ffffff;
+  --color-card: #ffffff;
+  --color-surface: #f2ecfc;
+  --color-hover: #eee7fc;
+  --color-highlight: #e9dffa;
+  --color-line: #ded9ef;
+  --color-line-strong: #c4b2e6;
+  --color-text: #251d49;
+  --color-text-secondary: #514d6c;
+  --color-text-muted: #746880;
+  --color-primary: #6330da;
+  --color-primary-hover: #4924a4;
+  --color-button-primary: #6330da;
+  --color-button-hover: #4924a4;
+  --color-on-primary: #ffffff;
+  --color-focus: #128572;
+  --color-success: #216e52;
+  --color-success-bg: #edf8f1;
+  --color-success-line: #c8e6d6;
+  --color-warning: #805619;
+  --color-warning-bg: #fff5de;
+  --color-warning-line: #e8d4a9;
+  --color-error: #a52c46;
+  --color-error-bg: #fff1f5;
+  --color-error-line: #e5bdca;
+  --color-info: #365d98;
+  --color-info-bg: #edf4ff;
+  --color-info-line: #cbdcef;
+  --color-feature-start: #f0e7ff;
+  --color-feature-end: #e5d5fb;
+  --color-banner-start: #6742ad;
+  --color-banner-end: #4d278f;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #171326;
+  --color-page: #1d172e;
+  --color-sidebar: #201a31;
+  --color-card: #29223d;
+  --color-surface: #332a4b;
+  --color-hover: #42345e;
+  --color-highlight: #3c2c59;
+  --color-line: #504365;
+  --color-line-strong: #78638f;
+  --color-text: #f5f0ff;
+  --color-text-secondary: #c2b7d6;
+  --color-text-muted: #b4a6c9;
+  --color-primary: #b69bff;
+  --color-primary-hover: #d4c3ff;
+  --color-button-primary: #7944d1;
+  --color-button-hover: #8954e2;
+  --color-focus: #7ee2c4;
+  --color-success: #8bdfb7;
+  --color-success-bg: #203b35;
+  --color-success-line: #416d5b;
+  --color-warning: #f2cd83;
+  --color-warning-bg: #413624;
+  --color-warning-line: #816641;
+  --color-error: #ffa7be;
+  --color-error-bg: #452737;
+  --color-error-line: #895166;
+  --color-info: #a2cdfb;
+  --color-info-bg: #26384f;
+  --color-info-line: #506b85;
+  --color-feature-start: #38264f;
+  --color-feature-end: #493266;
+}
+
+html { background: var(--color-canvas); color: var(--color-text); }
+body { background: var(--color-canvas); color: var(--color-text); }
+:is(a, button, input, textarea, select, summary):focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+::selection { background: var(--color-highlight); color: var(--color-text); }
+
+/* The official transparent symbol keeps its own colors in both themes. */
+.brand .brand-icon { overflow: visible; background: transparent; border-radius: 0; box-shadow: none; }
+.brand .home-visual-brand img { object-fit: contain; border-radius: 0; }
+.app-shell { background: var(--color-sidebar); }
+.app-sidebar { background: var(--color-sidebar); }
+.app-main { background-color: var(--color-page); }
+
+@media (max-width: 600px) {
+  .app-profile { gap: 10px; }
+  .app-topbar { gap: 12px; }
+}
+
+@media (max-width: 359px) {
+  .app-topbar { padding-inline: 16px; }
+  .app-mobile-brand .brand { gap: 7px; font-size: 20px; }
+  .app-mobile-brand .brand-icon { width: 40px; height: 40px; }
+  .app-shell:has(.progress-page) .app-example-xp { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle { transition: none; }
+}

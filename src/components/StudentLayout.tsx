@@ -3,9 +3,12 @@ import { NavLink, Link, useLocation, useParams } from 'react-router-dom';
 import { Camera, ChartNoAxesColumnIncreasing, House, LayoutGrid, LibraryBig, List, Menu, Sparkles, Star, X } from 'lucide-react';
 import { summarizeProgress } from '../data/progress';
 import { useStudentProgress } from '../hooks/progressContext';
+import { useStudentProfile } from '../hooks/profileContext';
 import { getUnitPath, units } from '../data/curriculum';
 import { getSituationFilter, getSituationPath, getSituationsPath, situations } from '../data/situations';
 import { Brand } from './Brand';
+import { StudentAvatar } from './StudentAvatar';
+import { ThemeToggle } from './ThemeToggle';
 
 const items = [
   { to: '/', label: 'Inicio', icon: House },
@@ -36,6 +39,7 @@ function LearningTip() {
 
 export function StudentLayout({ children }: { children: ReactNode }) {
   const { progress } = useStudentProgress();
+  const { profile, photoUrl } = useStudentProfile();
   const { xp } = summarizeProgress(progress);
   const location = useLocation();
   const { unitId, lessonId, situationId, sceneId } = useParams();
@@ -92,7 +96,8 @@ export function StudentLayout({ children }: { children: ReactNode }) {
           </nav>
           <div className="app-profile">
             <span className="app-example-xp"><Star size={23} aria-hidden="true" /> <span>{xp.toLocaleString('es-PE')} XP</span></span>
-            <Link className="app-avatar" to="/perfil" aria-label="Ver mi perfil">SV</Link>
+            <ThemeToggle />
+            <Link className="app-avatar" to="/perfil" aria-label={`Ver mi perfil: ${profile.displayName}`} aria-current={location.pathname === '/perfil' ? 'page' : undefined} title={`Mi perfil · ${profile.displayName}`}><StudentAvatar avatarId={profile.avatarId} photoUrl={photoUrl} /></Link>
           </div>
         </header>
         <main id="contenido" className="app-content" tabIndex={-1}>{children}</main>
