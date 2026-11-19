@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, RotateCcw, Save, Trash2 } from 'lucide-react';
 import type { DatasetSample, SampleSummary } from '../../features/sign-recognition/dataset/datasetTypes';
-import { sampleCanBeSaved } from '../../features/sign-recognition/dataset/datasetValidation';
+import { sampleCanBeSaved, sampleReviewWarnings } from '../../features/sign-recognition/dataset/datasetValidation';
 import { HAND_CONNECTIONS } from '../../features/sign-recognition/drawHandLandmarks';
 
 export function SampleFrames({ sample }: { sample: DatasetSample }) {
@@ -16,11 +16,12 @@ export function SampleFrames({ sample }: { sample: DatasetSample }) {
 
 export function SampleQuality({ sample }: { sample: SampleSummary }) {
   const quality = sample.qualityMetrics;
+  const warnings = sampleReviewWarnings(sample);
   const values = [['Observaciones', quality.frameCount], ['Ventana de grabación', `${(sample.durationMs / 1000).toFixed(2)} s`],
     ['Datos observados', `${(quality.observedDurationMs / 1000).toFixed(2)} s`], ['Manos detectadas', `${quality.minimumHands}–${quality.maximumHands}`],
-    ['Con las manos esperadas', `${(quality.expectedHandsRatio * 100).toFixed(1)}%`], ['Frecuencia real', `${quality.averageFps.toFixed(1)} obs/s`], ['Pérdidas de seguimiento', quality.trackingLosses], ['Incidencias', sample.incidents.length]];
+    [sample.captureMetadata.labelSnapshot.expectedHands === 0 ? 'Requisito de manos' : 'Con las manos esperadas', sample.captureMetadata.labelSnapshot.expectedHands === 0 ? 'Sin requisito' : `${(quality.expectedHandsRatio * 100).toFixed(1)}%`], ['Frecuencia real', `${quality.averageFps.toFixed(1)} obs/s`], ['Pérdidas de seguimiento', quality.trackingLosses], ['Incidencias', sample.incidents.length]];
   return <><dl className="dataset-quality-grid">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-    {quality.warnings.length > 0 && <ul className="dataset-quality-warnings">{quality.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
+    {warnings.length > 0 && <ul className="dataset-quality-warnings">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
     <p className="dataset-muted">La calidad describe la captura de puntos. No demuestra que la seña ejecutada sea lingüísticamente correcta.</p></>;
 }
 

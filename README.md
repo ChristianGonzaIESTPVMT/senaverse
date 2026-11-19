@@ -16,9 +16,13 @@ La página principal está en `/`. La dirección anterior `/panel` redirige al i
 
 La cámara compartida integra el Hito 1 de MediaPipe Hand Landmarker: detección local de hasta dos manos y sus 21 puntos, sin clasificación de señas ni recompensas. Consulta la [guía de instalación, archivos y pruebas con webcam](docs/hand-landmarker-hito-1.md).
 
-La [optimización del seguimiento](docs/hand-tracking-optimization.md) añade inferencia en Worker, captura de fotogramas nuevos, continuidad breve y diagnóstico de desarrollo (`/camara/libre?handDebug=1`). Incluye perfiles aislados de umbrales y un protocolo de medición física; el rendimiento de 20–30 FPS es un objetivo pendiente de validación en hardware real.
+La [optimización del seguimiento](docs/hand-tracking-optimization.md) utiliza inferencia en Worker, captura de fotogramas recientes, continuidad breve y diagnóstico de desarrollo (`/camara/libre?handDebug=1`). Corrige el borrado al caducar resultados y el descarte de bitmaps todavía recientes; separa pérdidas del modelo, resultados tardíos, retención visual y fallos del Worker. El panel exporta contadores JSON por escenario y conserva los perfiles de umbrales aislados. La estabilidad física y el rendimiento de 20–30 FPS siguen pendientes de medición en hardware real.
 
 El Hito 2 incorpora [SeñaVerse Dataset Studio](docs/dataset-studio.md), herramienta interna en `/herramientas/dataset`. Para habilitarla en desarrollo, agrega `VITE_ENABLE_DATA_COLLECTION=true` a `.env.development.local` y reinicia Vite. Recopila únicamente inferencias frescas del detector compartido, con consentimiento, revisión, IndexedDB y respaldo/restauración JSON. Está desactivada por defecto y no añade clasificación ni entrenamiento.
+
+`.env.example` es solo una plantilla y Vite no lo carga. El archivo `.env.development.local` debe estar junto a `package.json`; queda fuera de Git y solo afecta al modo de desarrollo. Ejecuta `npm.cmd run dev` y abre `http://localhost:5173/herramientas/dataset` (o el puerto que anuncie Vite). Con la variable ausente o distinta de `true`, esa ruta está deshabilitada y redirige a Inicio. Consulta la [guía de acceso y diagnóstico](docs/dataset-studio.md).
+
+El [catálogo inicial y protocolo piloto de LSP](docs/lsp-catalog-pilot.md) configura diez entradas estables `LSP-001` a `LSP-010`, con referencia MINEDU (2015), duración individual y revisión lingüística pendiente. Conserva las etiquetas y muestras anteriores sin asignar correspondencias, y separa los ejemplos negativos en una categoría técnica. El piloto físico previsto reúne 24 muestras reales de Uno, Tres, Sí y Mucho; permanece pendiente hasta recopilarlo con dos participantes.
 
 ## Cambiar las imágenes del inicio
 

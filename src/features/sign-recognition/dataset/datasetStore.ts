@@ -1,6 +1,6 @@
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, DATASET_DATABASE_NAME, MODEL_METADATA, type DatasetDocument, type DatasetMeta, type DatasetParticipant, type DatasetSample, type DatasetSign, type DatasetSnapshot, type SampleSummary } from './datasetTypes.ts';
 import { validateDatasetDocument, validateDatasetSample, validateSign } from './datasetExport.ts';
-import { createInitialSignCatalog, signConfigurationErrors } from './signCatalog.ts';
+import { catalogAdditions, createDatasetCatalog, signConfigurationErrors } from './signCatalog.ts';
 
 const STORES = ['meta', 'participants', 'signs', 'samples', 'sequences'];
 const request = <T>(value: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
@@ -53,10 +53,14 @@ export class DatasetStore {
             const initial: DatasetMeta = { datasetId: `dataset-${crypto.randomUUID()}`, createdAt: new Date().toISOString(), schemaVersion: 1,
               nextParticipantNumber: 1, captureConfiguration: structuredClone(CAPTURE_DEFAULTS), mediaPipeModel: structuredClone(MODEL_METADATA) };
             meta.put(initial, 'dataset');
-            for (const sign of createInitialSignCatalog()) tx.objectStore('signs').put(sign);
-          } else if (!Number.isInteger(existing.nextParticipantNumber)) {
-            const participants = await request<DatasetParticipant[]>(tx.objectStore('participants').getAll());
-            meta.put({ ...existing, nextParticipantNumber: Math.max(0, ...participants.map(person => Number(person.id.slice(1)))) + 1 }, 'dataset');
+            for (const sign of createDatasetCatalog()) tx.objectStore('signs').add(sign);
+          } else {
+            if (!Number.isInteger(existing.nextParticipantNumber)) {
+              const participants = await request<DatasetParticipant[]>(tx.objectStore('participants').getAll());
+              meta.put({ ...existing, nextParticipantNumber: Math.max(0, ...participants.map(person => Number(person.id.slice(1)))) + 1 }, 'dataset');
+            }
+            const signs = tx.objectStore('signs');
+            for (const sign of catalogAdditions(await request<DatasetSign[]>(signs.getAll()))) signs.add(sign);
           }
         }).then(() => resolve(db), error => { db.close(); reject(error); });
       };
@@ -179,7 +183,7 @@ export class DatasetStore {
       const { datasetId, createdAt, schemaVersion, nextParticipantNumber, captureConfiguration, mediaPipeModel } = document;
       tx.objectStore('meta').put({ datasetId, createdAt, schemaVersion, nextParticipantNumber, captureConfiguration, mediaPipeModel }, 'dataset');
       for (const person of document.participants) tx.objectStore('participants').add(person);
-      for (const sign of document.signs) tx.objectStore('signs').add(sign);
+      for (const sign of [...document.signs, ...catalogAdditions(document.signs)]) tx.objectStore('signs').add(sign);
       for (const sample of document.samples) {
         const { frames, ...summary } = sample;
         tx.objectStore('samples').add(summary); tx.objectStore('sequences').add({ sampleId: sample.sampleId, frames });
@@ -191,7 +195,7 @@ export class DatasetStore {
 }
 
 export function datasetStatistics(snapshot: DatasetSnapshot) {
-  return { participants: snapshot.participants.length, configuredSigns: snapshot.signs.filter(sign => signConfigurationErrors(sign).length === 0).length,
+  return { participants: snapshot.participants.length, configuredSigns: snapshot.signs.filter(sign => sign.category === 'lsp' && signConfigurationErrors(sign).length === 0).length,
     samples: snapshot.samples.length, pending: snapshot.samples.filter(sample => sample.reviewStatus === 'pending').length,
     bySign: Object.fromEntries(snapshot.signs.map(sign => [sign.id, snapshot.samples.filter(sample => sample.labelId === sign.id).length])),
     byParticipant: Object.fromEntries(snapshot.participants.map(person => [person.id, snapshot.samples.filter(sample => sample.participantId === person.id).length])) };

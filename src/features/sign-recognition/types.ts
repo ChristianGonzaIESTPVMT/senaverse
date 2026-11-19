@@ -6,8 +6,10 @@ export type HandDetector = Pick<HandLandmarker, 'detectForVideo' | 'close'>;
 export type DetectionDelegate = 'GPU' | 'CPU';
 export type InitializedHandDetector = { detector: HandDetector; delegate: DetectionDelegate };
 export type HandDetectionStatus = 'idle' | 'loading' | 'searching' | 'detected' | 'lost' | 'out-of-frame' | 'error';
-export type HandDetectionState = { status: HandDetectionStatus; handCount: number; missingHands?: number };
-export type HandDetectionSession = { stop: () => void; redraw: () => void; resetDiagnostics: () => void };
+export type HandFailurePhase = 'initialization' | 'capture' | 'inference' | 'render' | 'worker';
+export type HandDetectionFailure = { phase: HandFailurePhase; detail: string };
+export type HandDetectionState = { status: HandDetectionStatus; handCount: number; missingHands?: number; error?: HandDetectionFailure };
+export type HandDetectionSession = { stop: () => void; redraw: () => void; resetDiagnostics: () => void; readDiagnostics: () => HandDiagnosticSnapshot };
 
 export const HAND_DETECTION_MESSAGES: Record<HandDetectionStatus, string> = {
   idle: 'Activa tu cámara para detectar tus manos',
@@ -20,6 +22,7 @@ export const HAND_DETECTION_MESSAGES: Record<HandDetectionStatus, string> = {
 };
 
 export function handDetectionMessage(state: HandDetectionState) {
+  if (state.status === 'error' && state.error && state.error.phase !== 'initialization') return 'Se interrumpió el seguimiento de manos. Reintenta el detector.';
   return state.status === 'detected'
     ? `${state.handCount} ${state.handCount === 1 ? 'mano detectada' : 'manos detectadas'}${state.missingHands ? ' · otra mano sin seguimiento temporalmente' : ''}`
     : HAND_DETECTION_MESSAGES[state.status];
@@ -32,6 +35,7 @@ export type HandInferenceBackend = {
   delegate: DetectionDelegate;
   infer: (frame: CapturedHandFrame, timestamp: number) => Promise<InferenceOutput>;
   close: () => void;
+  diagnostics?: () => { mismatchedResponses: number };
 };
 export type BackendOptions = { profile: HandDetectionProfile };
 export type HandCaptureConfiguration = {
@@ -79,4 +83,30 @@ export type HandDiagnosticSnapshot = {
   configuredCameraFps: number | null;
   cameraFpsSource: 'video-callback' | 'playback-quality' | 'sampled';
   profile: HandDetectionProfile;
+  acceptedFps: number | null;
+  inferenceCount: number;
+  acceptedFrames: number;
+  emptyModelFrames: number;
+  emptyAcceptedFrames: number;
+  rawHandCount: number | null;
+  handednessScores: { label: string; score: number }[];
+  detectionRecoveries: number;
+  lastTrackingEvent: 'none' | 'detection' | 'loss' | 'recovery';
+  staleByAge: number;
+  staleByOrder: number;
+  pausedResults: number;
+  expiredCaptures: number;
+  skippedCameraFrames: number;
+  supersededFrames: number;
+  throttledFrames: number;
+  mismatchedResponses: number;
+  freshnessExpirations: number;
+  visualHolds: number;
+  canvasDraws: number;
+  failures: number;
+  lastError: HandDetectionFailure | null;
+  trackingStatus: HandDetectionStatus;
+  visualState: 'none' | 'live' | 'held';
+  lossReason: 'model-empty' | 'result-gap' | 'partial' | null;
+  lastAcceptedAgeMs: number | null;
 };

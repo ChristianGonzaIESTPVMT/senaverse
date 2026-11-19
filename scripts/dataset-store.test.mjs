@@ -3,7 +3,9 @@ import { afterEach, test } from 'node:test';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { DatasetStore, datasetStatistics } from '../src/features/sign-recognition/dataset/datasetStore.ts';
 import { parseDatasetJSON, serializeDataset } from '../src/features/sign-recognition/dataset/datasetExport.ts';
-import { sampleFixture, signFixture } from './fixtures/dataset.mjs';
+import { createInitialSignCatalog, createNegativeExampleCategory } from '../src/features/sign-recognition/dataset/signCatalog.ts';
+import { calculateQuality } from '../src/features/sign-recognition/dataset/datasetValidation.ts';
+import { legacyCatalogFixture, sampleFixture, signFixture } from './fixtures/dataset.mjs';
 
 const stores = [];
 afterEach(async () => { await Promise.all(stores.splice(0).map(store => store.close())); });
@@ -11,10 +13,11 @@ function database(factory = new IDBFactory(), name = 'test-dataset') { const sto
 async function prepared(store) { const participant = await store.createParticipant(); await store.consentParticipant(participant.id); await store.saveSign(signFixture); return participant; }
 const exportedAt = '2026-11-17T14:00:00.000Z';
 
-test('IndexedDB initializes ten empty slots and persists anonymous participants across connections', async () => {
+test('IndexedDB initializes ten LSP entries plus the independent negative category and persists participants', async () => {
   const factory = new IDBFactory(); const store = database(factory);
   const empty = await store.snapshot();
-  assert.deepEqual(datasetStatistics(empty), { participants: 0, configuredSigns: 0, samples: 0, pending: 0, bySign: Object.fromEntries(empty.signs.map(sign => [sign.id, 0])), byParticipant: {} });
+  assert.equal(empty.signs.length, 11);
+  assert.deepEqual(datasetStatistics(empty), { participants: 0, configuredSigns: 10, samples: 0, pending: 0, bySign: Object.fromEntries(empty.signs.map(sign => [sign.id, 0])), byParticipant: {} });
   const [first, second] = await Promise.all([store.createParticipant(), store.createParticipant()]);
   assert.deepEqual([first.id, second.id], ['P001', 'P002']);
   assert.equal(first.consentedAt, null);
@@ -118,7 +121,97 @@ test('invalid imports are rejected before mutating an existing dataset', async (
 
 test('snapshots retain each original label definition when the catalog metadata changes', async () => {
   const store = database(); await prepared(store); await store.saveSample(sampleFixture());
-  await store.saveSign({ ...signFixture, name: 'Etiqueta revisada por operador' });
-  assert.equal((await store.snapshot()).signs[0].name, 'Etiqueta revisada por operador');
+  await store.saveSign({ ...signFixture, durationMs: 1800 });
+  assert.equal((await store.snapshot()).signs[0].durationMs, 1800);
   assert.equal((await store.getSample('sample-test')).captureMetadata.labelSnapshot.name, signFixture.name);
+  assert.equal((await store.getSample('sample-test')).captureMetadata.labelSnapshot.durationMs, 1500);
+});
+
+test('each catalog duration persists independently across connections without changing stable identity or source', async () => {
+  const factory = new IDBFactory(); const store = database(factory);
+  const initial = createInitialSignCatalog();
+  for (const [index, sign] of initial.entries()) await store.saveSign({ ...sign, durationMs: 1000 + index * 100 });
+  await store.close();
+  const reloaded = await database(factory).snapshot();
+  for (const [index, sign] of initial.entries()) {
+    assert.deepEqual(reloaded.signs.find(item => item.id === sign.id), { ...sign, durationMs: 1000 + index * 100 });
+  }
+  for (const patch of [{ name: 'Otra seña' }, { type: 'dynamic' }, { expectedHands: 2 }, { validationStatus: 'validated' }, { sourceReference: { ...initial[0].sourceReference, page: 99 } }, { id: 'LSP-999' }]) {
+    await assert.rejects(store.saveSign({ ...initial[0], ...patch }));
+  }
+});
+
+async function legacyDocumentFixture(store) {
+  await prepared(store);
+  const signs = legacyCatalogFixture();
+  signs[0] = { ...signs[0], name: 'Etiqueta anterior sin correspondencia', description: 'Solo para prueba de compatibilidad.', instructions: 'Secuencia sintética de prueba, no piloto.', validationStatus: 'validated' };
+  const sample = sampleFixture('sample-historical', signs[0]);
+  for (const key of ['qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored']) delete sample.captureMetadata[key];
+  for (const frame of sample.frames) delete frame.sourceTimestamps;
+  sample.qualityMetrics = calculateQuality(sample.frames, sample.durationMs, signs[0].expectedHands);
+  sample.reviewStatus = 'accepted';
+  return { ...await store.document('backup', exportedAt), signs, samples: [sample], collectedAt: sample.recordedAt };
+}
+
+test('a v1 legacy backup imports without relabeling, rewriting metrics, deleting or fabricating samples', async () => {
+  const legacy = await legacyDocumentFixture(database());
+  const parsed = parseDatasetJSON(serializeDataset(legacy));
+  const destination = database(new IDBFactory(), 'legacy-restore');
+  await destination.replace(parsed);
+  const restored = await destination.document('backup', exportedAt);
+  assert.equal(restored.signs.length, 21);
+  assert.deepEqual(restored.signs.filter(sign => sign.id.startsWith('sign-')), legacy.signs);
+  assert.deepEqual(restored.samples, legacy.samples);
+  assert.equal(restored.samples[0].labelId, 'sign-01');
+  assert.equal(restored.samples[0].captureMetadata.labelSnapshot.validationStatus, 'validated');
+  assert.equal(restored.signs.filter(sign => sign.category === 'lsp').every(sign => sign.validationStatus === 'pending'), true);
+  assert.equal(parseDatasetJSON(serializeDataset(restored)).samples.length, 1);
+});
+
+test('opening a real v1 store adds the new catalog atomically and idempotently while preserving old data', async () => {
+  const factory = new IDBFactory(); const store = database(factory);
+  const legacy = await legacyDocumentFixture(store);
+  await store.replace(legacy); await store.close();
+  // Simulate the actual pre-update IndexedDB catalog, entirely in the isolated test database.
+  const db = await new Promise((resolve, reject) => { const open = factory.open('test-dataset', 1); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(['signs'], 'readwrite');
+    for (const sign of [...createInitialSignCatalog(), createNegativeExampleCategory()]) tx.objectStore('signs').delete(sign.id);
+    tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+  }); db.close();
+  const migrated = database(factory);
+  const after = await migrated.document('backup', exportedAt);
+  assert.equal(after.signs.length, 21);
+  assert.deepEqual(after.signs.filter(sign => sign.id.startsWith('sign-')), legacy.signs);
+  assert.deepEqual(after.samples, legacy.samples);
+  assert.deepEqual(after.participants, legacy.participants);
+  await migrated.saveSign({ ...after.signs.find(sign => sign.id === 'LSP-008'), durationMs: 3500 });
+  await migrated.close();
+  const reopened = await database(factory).document('backup', exportedAt);
+  assert.equal(reopened.signs.length, 21);
+  assert.equal(reopened.signs.find(sign => sign.id === 'LSP-008').durationMs, 3500);
+  assert.deepEqual(reopened.samples, legacy.samples);
+});
+
+test('one-hand, two-hand and negative sequences all round-trip with source metadata and timestamps intact', async () => {
+  const source = database(); await prepared(source);
+  for (const sign of [createInitialSignCatalog()[5], createInitialSignCatalog()[7], createNegativeExampleCategory()]) {
+    await source.saveSample(sampleFixture(`sample-${sign.id}`, sign));
+  }
+  const doc = await source.document('backup', exportedAt);
+  const destination = database(new IDBFactory(), 'mixed-captures');
+  await destination.replace(parseDatasetJSON(serializeDataset(doc)));
+  assert.deepEqual(await destination.document('backup', exportedAt), doc);
+  assert.equal(datasetStatistics(await destination.snapshot()).configuredSigns, 10);
+  for (const corrupt of [
+    value => { value.signs.pop(); },
+    value => { value.signs[0].sourceReference.page = 134; },
+    value => { value.signs[0].validationStatus = 'validated'; },
+    value => { value.samples[0].frames[0].sourceTimestamps.capturedAtMs += 100; },
+    value => { value.samples[0].frames[1].sourceTimestamps.inferenceTimestampMs = value.samples[0].frames[0].sourceTimestamps.inferenceTimestampMs; },
+  ]) {
+    const changed = structuredClone(doc); corrupt(changed);
+    await assert.rejects(destination.replace(changed));
+    assert.deepEqual(await destination.document('backup', exportedAt), doc);
+  }
 });

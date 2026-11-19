@@ -2,15 +2,19 @@ import type { Category } from '@mediapipe/tasks-vision';
 import type { HandCaptureConfiguration } from '../types';
 import { MAX_RESULT_AGE_MS } from '../config.ts';
 
+export type SignSourceReference = { title: string; publisher: string; year: number; page: number; repositoryUrl: string };
 export type DatasetSign = {
-  id: string; name: string; description: string; type: 'static' | 'dynamic'; expectedHands: 1 | 2;
-  durationMs: number; instructions: string; referenceUrl: string; validationStatus: 'unconfigured' | 'pending' | 'validated';
+  id: string; name: string; description: string; type: 'static' | 'dynamic'; expectedHands: 0 | 1 | 2;
+  durationMs: number; instructions: string; referenceUrl: string; validationStatus: 'unconfigured' | 'pending' | 'validated' | 'not-applicable';
+  /** Absent on legacy labels: their identity and linguistic status must be preserved. */
+  category?: 'lsp' | 'negative'; sourceReference?: SignSourceReference;
 };
 export type DatasetParticipant = { id: string; createdAt: string; consentedAt: string | null; consentVersion: number | null };
 export type DatasetPoint = { x: number; y: number; z: number };
 export type DatasetHand = { handedness: Category[]; landmarks: DatasetPoint[]; worldLandmarks?: DatasetPoint[] };
-export type DatasetFrame = { timestampMs: number; handCount: number; hands: DatasetHand[] };
-export type CaptureIncident = { timestampMs: number; type: 'hand-count-mismatch' | 'result-gap' | 'invalid-result'; };
+export type DatasetFrame = { timestampMs: number; handCount: number; hands: DatasetHand[];
+  sourceTimestamps?: { capturedAtMs: number; inferenceTimestampMs: number; receivedAtMs: number } };
+export type CaptureIncident = { timestampMs: number; type: 'hand-count-mismatch' | 'result-gap' | 'invalid-result' | 'duplicate-timestamp' | 'out-of-order-timestamp'; };
 export type QualityMetrics = {
   frameCount: number; validLandmarkFrames: number; expectedHandFrames: number; expectedHandsRatio: number;
   observedDurationMs: number; averageFps: number; minimumHands: number; maximumHands: number;
@@ -27,6 +31,11 @@ export type DatasetCaptureMetadata = {
   consentVersion: number;
   requestedDurationMs: number;
   completed: true;
+  /** Optional additions keep historical samples and their quality metrics unchanged. */
+  qualityPolicyVersion?: 2;
+  recordingStartedAtMs?: number;
+  coordinates?: 'mediapipe-original';
+  visualMirrored?: true;
 };
 export type DatasetSample = {
   sampleId: string; labelId: string; participantId: string; repetition: number; recordedAt: string;

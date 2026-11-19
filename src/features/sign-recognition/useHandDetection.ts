@@ -20,7 +20,7 @@ export function useHandDetection(videoRef: RefObject<HTMLVideoElement | null>, c
     if (!active || !video || !canvas) return;
 
     const session = startHandDetection({ video, canvas, profile,
-      onState: next => setState(previous => previous.status === next.status && previous.handCount === next.handCount && previous.missingHands === next.missingHands ? previous : next),
+      onState: next => setState(previous => previous.status === next.status && previous.handCount === next.handCount && previous.missingHands === next.missingHands && previous.error === next.error ? previous : next),
       onResult: result => { resultRef.current = result; },
       onDiagnostics: diagnosticsEnabled ? setDiagnostics : undefined,
       onFreshInference: hasFreshListener ? event => freshListener.current?.(event) : undefined,

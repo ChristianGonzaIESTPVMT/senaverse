@@ -109,7 +109,7 @@
 .hand-diagnostics { margin-top: 20px; padding: 15px; border: 1px dashed light-dark(#b7a4d4, var(--color-line)); border-radius: 13px; background: light-dark(#faf7ff, var(--color-card)); font-size: 12px; }
 .hand-diagnostics summary { cursor: pointer; color: light-dark(#5a3688, var(--color-primary)); font-size: 13px; font-weight: 850; }
 .hand-diagnostics label { display: grid; gap: 6px; margin-top: 14px; font-weight: 800; }
-.hand-diagnostics select { width: 100%; padding: 8px; border: 1px solid light-dark(#d6c7ec, var(--color-line)); border-radius: 8px; background: light-dark(#fff, var(--color-card)); color: light-dark(#4c3468, var(--color-text-secondary)); font: inherit; }
+.hand-diagnostics select, .hand-diagnostics input { width: 100%; padding: 8px; border: 1px solid light-dark(#d6c7ec, var(--color-line)); border-radius: 8px; background: light-dark(#fff, var(--color-card)); color: light-dark(#4c3468, var(--color-text-secondary)); font: inherit; }
 .hand-diagnostics p { color: light-dark(#70617d, var(--color-text-secondary)); font-size: 11px; line-height: 1.5; }
 .hand-diagnostics dl { margin: 15px 0; }
 .hand-diagnostics dl > div { display: flex; justify-content: space-between; gap: 14px; padding: 5px 0; border-bottom: 1px solid light-dark(#e9e0f4, var(--color-line)); }

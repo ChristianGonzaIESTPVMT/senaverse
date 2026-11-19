@@ -3,6 +3,7 @@ import type { PracticeCameraSessionState } from '../../../components/PracticeCam
 import type { FreshHandInference } from '../types';
 import { CAPTURE_DEFAULTS } from './datasetTypes';
 import { DatasetCapture, type CaptureSelection } from './datasetCapture';
+import { expectedHandsMatch } from './signCatalog';
 
 export function useDatasetCapture() {
   const [capture] = useState(() => new DatasetCapture());
@@ -43,7 +44,7 @@ export function useDatasetCapture() {
     try {
       const latest = fresh.current;
       if (camera.cameraStatus !== 'active' || !latest || performance.now() - latest.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs
-        || latest.result.landmarks.length !== selection.sign.expectedHands) throw new Error('Activa la cámara y coloca las manos esperadas dentro del encuadre.');
+        || !expectedHandsMatch(selection.sign, latest.result.landmarks.length)) throw new Error('Activa la cámara y coloca las manos esperadas dentro del encuadre.');
       capture.start(selection); updateView();
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo iniciar la captura.'); }
   }, [capture, camera.cameraStatus, updateView]);

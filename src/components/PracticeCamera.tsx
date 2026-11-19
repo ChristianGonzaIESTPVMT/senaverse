@@ -13,10 +13,11 @@ const cameraErrors: Record<string, string> = {
   NotAllowedError: 'El permiso de cámara está desactivado. Puedes habilitarlo en tu navegador y volver a intentarlo.',
   SecurityError: 'El navegador ha bloqueado el acceso a la cámara. Revisa los permisos del sitio.',
   NotFoundError: 'No se encontró una cámara conectada a este dispositivo.',
-  NotReadableError: 'No se pudo acceder a la cámara. Comprueba si otra aplicación la está utilizando.',
+  NotReadableError: 'No se pudo abrir la cámara seleccionada. Puede estar ocupada, desconectada o deshabilitada en el sistema. Revisa qué cámara está elegida en el navegador y cierra otras aplicaciones que la estén utilizando.',
 };
 
-export function PracticeCamera({ disabled = false, onFreshInference, onSessionState }: { disabled?: boolean;
+export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', onFreshInference, onSessionState }: { disabled?: boolean;
+  disabledReason?: string;
   onFreshInference?: (event: FreshHandInference) => void;
   onSessionState?: (state: PracticeCameraSessionState) => void;
 }) {
@@ -122,13 +123,13 @@ export function PracticeCamera({ disabled = false, onFreshInference, onSessionSt
         {!isActive && <div className="practice-camera-placeholder">
           <CameraOff size={43} strokeWidth={1.5} aria-hidden="true" />
           <strong>{isRequesting ? 'Esperando tu autorización' : 'La cámara está desactivada'}</strong>
-          <p>{disabled ? 'Selecciona primero una seña para practicar.' : isRequesting ? 'Responde a la solicitud de permisos de tu navegador.' : 'Actívala cuando estés listo para practicar.'}</p>
+          <p id="practice-camera-help">{disabled ? disabledReason : isRequesting ? 'Responde a la solicitud de permisos de tu navegador.' : 'Actívala cuando estés listo para practicar.'}</p>
         </div>}
       </div>
       <div className={`practice-recognition-state${detection.state.status === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" aria-atomic="true"><ScanLine size={20} aria-hidden="true" /><span>{handDetectionMessage(detection.state)}</span></div>
       {isActive && detection.state.status === 'error' && <button className="button button-outline practice-detector-retry" type="button" onClick={detection.retry}>Reintentar detector</button>}
       {error && <p className="practice-camera-error" role="alert">{error}</p>}
-      <button className="button button-primary practice-camera-button" type="button" disabled={disabled} onClick={() => { if (isActive || isRequesting) stopCamera(); else void startCamera(); }}>
+      <button className="button button-primary practice-camera-button" type="button" disabled={disabled} aria-describedby={!isActive ? 'practice-camera-help' : undefined} onClick={() => { if (isActive || isRequesting) stopCamera(); else void startCamera(); }}>
         {isActive || isRequesting ? <CameraOff size={19} aria-hidden="true" /> : <Camera size={19} aria-hidden="true" />}
         {buttonLabels[status]}
       </button>

@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, test } from 'node:test';
 import { CAMERA_VIDEO_CONSTRAINTS, HAND_LANDMARKER_OPTIONS, MAX_DETECTION_FPS, getHandLandmarkerAssets, getHandLandmarkerOptions } from '../src/features/sign-recognition/config.ts';
 import { HandTrackingContinuity } from '../src/features/sign-recognition/trackingContinuity.ts';
-import { HandPerformanceMetrics } from '../src/features/sign-recognition/performanceMetrics.ts';
+import { createHandDiagnosticReport, HandPerformanceMetrics } from '../src/features/sign-recognition/performanceMetrics.ts';
+import { DatasetCapture } from '../src/features/sign-recognition/dataset/datasetCapture.ts';
+import { participantFixture, signFixture } from './fixtures/dataset.mjs';
 import { connectHandWorker, getProcessingSize } from '../src/features/sign-recognition/inferenceBackend.ts';
 import { createHandFrameScheduler } from '../src/features/sign-recognition/detectionSession.ts';
 import { HAND_CONNECTIONS, drawHandLandmarks, getCoverGeometry } from '../src/features/sign-recognition/drawHandLandmarks.ts';
@@ -246,7 +248,8 @@ test('a brief empty result retains only real old points with an explicit loss st
   assert.equal(lost.state.status, 'lost');
   assert.equal(lost.state.handCount, 0);
   assert.equal(lost.opacity, .45);
-  assert.equal(continuity.view(121).result, null);
+  assert.equal(continuity.view(121).result, valid);
+  assert.equal(continuity.view(130).result, null);
   assert.equal(continuity.view(350).state.status, 'out-of-frame');
 });
 
@@ -263,13 +266,15 @@ test('a partial two-to-one hand loss draws the fresh detected hand without inven
   assert.equal(continuity.observe(result(0), 390, 400).state.status, 'lost');
 });
 
-test('no landmarks are fabricated before detection, or after the age limit during a stalled stream', () => {
+test('a stalled stream exposes loss and a bounded faded hold, never a continued detection', () => {
   const continuity = new HandTrackingContinuity();
   assert.equal(continuity.observe(result(0), 0, 0).result, null);
   assert.equal(continuity.view(1000).state.status, 'searching');
   continuity.observe(result(1), 1000, 1010);
-  assert.equal(continuity.view(1121).result, null);
+  assert.equal(continuity.view(1121).opacity, .45);
+  assert.equal(continuity.view(1121).state.handCount, 0);
   assert.equal(continuity.view(1121).state.status, 'lost');
+  assert.equal(continuity.view(1200).result, null);
 });
 
 test('metrics measure actual event counts, latency and count-based recovery without initial invented FPS', () => {
@@ -308,17 +313,155 @@ test('only one inference is active and completion immediately captures the newes
   assert.ok(fixture.detections[1].timestamp > fixture.detections[0].timestamp);
 });
 
-test('a capture overtaken by a new frame is closed and never sent for inference', async () => {
+test('a recent bitmap is not discarded merely because a camera frame arrives during asynchronous capture', async () => {
   let completeCapture, captureCount = 0, closed = 0;
   const fixture = sessionFixture(undefined, { captureFrame: video => ++captureCount === 1
-    ? new Promise(resolve => { completeCapture = () => resolve({ width: 640, height: 480, close() { closed++; } }); })
+    ? new Promise(resolve => { completeCapture = () => resolve({ width: 640, height: 480, mediaTime: 0, close() { closed++; } }); })
     : Promise.resolve({ width: 640, height: 480, mediaTime: video.currentTime, close() {} }) });
   await flush();
   fixture.tick(0); fixture.tick(40, .04);
   completeCapture(); await flush();
   assert.equal(closed, 1);
-  assert.equal(fixture.detections.length, 1);
-  assert.equal(fixture.detections[0].input.mediaTime, .04);
+  assert.equal(fixture.detections.length, 2);
+  assert.equal(fixture.detections[0].input.mediaTime, 0);
+  assert.equal(fixture.detections[1].input.mediaTime, .04);
+  assert.equal(fixture.session.readDiagnostics().expiredCaptures, 0);
+});
+
+test('110 ms latency does not blank the overlay at 120 ms; held points expire and fresh recovery replaces them', () => {
+  const continuity = new HandTrackingContinuity();
+  const first = result(1);
+  continuity.observe(first, 0, 110);
+  assert.equal(continuity.view(119).state.status, 'detected');
+  const held = continuity.view(120);
+  assert.equal(held.state.status, 'lost');
+  assert.equal(held.state.handCount, 0);
+  assert.equal(held.result, first);
+  assert.equal(held.opacity, .45);
+  assert.equal(held.lossReason, 'result-gap');
+  assert.equal(continuity.view(199).result, first);
+  assert.equal(continuity.view(200).result, null);
+  const recovered = result(1); recovered.landmarks[0][0].x = .7;
+  const view = continuity.observe(recovered, 210, 220);
+  assert.equal(view.result, recovered);
+  assert.equal(view.opacity, 1);
+  assert.equal(view.state.status, 'detected');
+});
+
+test('an expired bitmap is closed before inference and its age is attributed to capture, not the model', async () => {
+  let finish, closed = 0;
+  const fixture = sessionFixture(undefined, { captureFrame: () => new Promise(resolve => { finish = () => resolve({ width: 640, height: 480, close() { closed++; } }); }) });
+  await flush(); fixture.tick(0);
+  fixture.setTime(121); finish(); await flush();
+  assert.equal(closed, 1);
+  assert.equal(fixture.detections.length, 0);
+  const snapshot = fixture.session.readDiagnostics();
+  assert.equal(snapshot.expiredCaptures, 1);
+  assert.equal(snapshot.inferenceCount, 0);
+  assert.equal(snapshot.emptyModelFrames, 0);
+});
+
+test('unchanged redraws do not clear the Canvas; resize and real results still repaint', async () => {
+  const fixture = sessionFixture();
+  await flush(); fixture.setResult(result(1)); fixture.tick(0); await flush();
+  const clears = () => fixture.calls.filter(call => call.method === 'clearRect').length;
+  const before = clears();
+  fixture.session.redraw(); fixture.session.redraw();
+  assert.equal(clears(), before);
+  fixture.bounds.width = 320;
+  fixture.session.redraw();
+  assert.equal(clears(), before + 1);
+  fixture.setTime(120); fixture.session.redraw();
+  const snapshot = fixture.session.readDiagnostics();
+  assert.equal(snapshot.visualState, 'held');
+  assert.equal(snapshot.handCount, 0);
+  assert.equal(snapshot.freshnessExpirations, 1);
+  assert.equal(snapshot.visualHolds, 1);
+  fixture.session.redraw();
+  assert.equal(fixture.session.readDiagnostics().visualHolds, 1);
+});
+
+test('diagnostics distinguish raw empty model frames, discarded late results, loss, recovery and handedness scores', async () => {
+  const fixture = sessionFixture();
+  await flush();
+  const detected = result(2);
+  detected.handedness = [[{ categoryName: 'Left', score: .97 }], [{ categoryName: 'Right', score: .92 }]];
+  fixture.setResult(detected); fixture.tick(0); await flush();
+  fixture.setResult(result(0)); fixture.tick(40, .04); await flush();
+  fixture.setResult(detected); fixture.tick(80, .08); await flush();
+  let snapshot = fixture.session.readDiagnostics();
+  assert.equal(snapshot.inferenceCount, 3);
+  assert.equal(snapshot.acceptedFrames, 3);
+  assert.equal(snapshot.emptyModelFrames, 1);
+  assert.equal(snapshot.emptyAcceptedFrames, 1);
+  assert.equal(snapshot.detectionLosses, 1);
+  assert.equal(snapshot.detectionRecoveries, 1);
+  assert.equal(snapshot.lastTrackingEvent, 'recovery');
+  assert.deepEqual(snapshot.handednessScores, [{ label: 'Left', score: .97 }, { label: 'Right', score: .92 }]);
+  let finish;
+  fixture.backend.infer = () => new Promise(resolve => { finish = () => resolve({ result: result(0), inferenceMs: 130 }); });
+  fixture.tick(120, .12); await flush(); fixture.setTime(251); finish(); await flush();
+  snapshot = fixture.session.readDiagnostics();
+  assert.equal(snapshot.inferenceCount, 4);
+  assert.equal(snapshot.acceptedFrames, 3);
+  assert.equal(snapshot.emptyModelFrames, 2);
+  assert.equal(snapshot.emptyAcceptedFrames, 1);
+  assert.equal(snapshot.staleByAge, 1);
+  assert.equal(snapshot.rawHandCount, 0);
+});
+
+test('capture and initialization failures retain their phase/details in the last diagnostic snapshot', async () => {
+  const failures = [];
+  const fixture = sessionFixture(undefined, { onDiagnostics: snapshot => failures.push(snapshot), captureFrame: async () => { throw new Error('bitmap failed'); } });
+  await flush(); fixture.tick(0); await flush();
+  assert.equal(fixture.states.at(-1).error.phase, 'capture');
+  assert.match(handDetectionMessage(fixture.states.at(-1)), /Se interrumpió el seguimiento/);
+  assert.equal(failures.at(-1).lastError.detail, 'bitmap failed');
+  assert.equal(failures.at(-1).failures, 1);
+  const init = sessionFixture(async () => { throw new Error('WASM load failed'); }, { onDiagnostics: snapshot => failures.push(snapshot) });
+  await flush();
+  assert.equal(init.states.at(-1).error.phase, 'initialization');
+  assert.match(handDetectionMessage(init.states.at(-1)), /No se pudo inicializar/);
+  assert.equal(failures.at(-1).lastError.detail, 'WASM load failed');
+});
+
+test('held landmarks and stale results never enter a Dataset Studio sequence; real empty frames record a loss', async () => {
+  let fixture;
+  const recorder = new DatasetCapture({ now: () => time, isoNow: () => '2026-11-19T12:00:00.000Z', id: () => 'sample-integrity' });
+  let time = 0;
+  recorder.start({ participant: participantFixture, sign: { ...signFixture, durationMs: 500 }, sessionConsent: true, repetition: 1 });
+  fixture = sessionFixture(undefined, { onFreshInference: event => recorder.accept(event) });
+  await flush();
+  time = 3000; fixture.setResult(result(1)); fixture.tick(time, 3); await flush();
+  time = 3040; fixture.setResult(result(0)); fixture.tick(time, 3.04); await flush();
+  time = 3070; fixture.setTime(time); fixture.session.redraw(); fixture.session.redraw();
+  assert.equal(fixture.session.readDiagnostics().visualState, 'held');
+  let finish;
+  fixture.backend.infer = () => new Promise(resolve => { finish = () => resolve({ result: result(1), inferenceMs: 130 }); });
+  time = 3100; fixture.tick(time, 3.1); await flush();
+  time = 3231; fixture.setTime(time); finish(); await flush();
+  time = 3620; recorder.advance();
+  const sample = recorder.view().draft;
+  assert.deepEqual(sample.frames.map(frame => [frame.timestampMs, frame.handCount]), [[0, 1], [40, 0]]);
+  assert.deepEqual(sample.frames[1].hands, []);
+  assert.ok(sample.incidents.some(incident => incident.type === 'hand-count-mismatch'));
+  assert.equal(sample.qualityMetrics.sufficient, false);
+});
+
+test('diagnostic reports keep raw counters and single-variable profiles without assuming physical results', () => {
+  const fixture = sessionFixture();
+  const snapshot = fixture.session.readDiagnostics();
+  const report = createHandDiagnosticReport(snapshot, { scenario: null, expectedHands: null, observedFalsePositives: null }, '2026-11-19T12:00:00.000Z');
+  assert.equal(report.context.observedFalsePositives, null);
+  assert.equal(report.configuration.minHandDetectionConfidence, .5);
+  assert.equal(report.configuration.minHandPresenceConfidence, .5);
+  assert.equal(report.configuration.minTrackingConfidence, .5);
+  assert.equal('landmarks' in report, false);
+  assert.equal(report.snapshot.acceptedFrames, 0);
+  assert.equal(report.source, 'runtime-counters');
+  assert.match(report.confidenceNote, /scores de lateralidad/);
+  report.snapshot.acceptedFrames = 100;
+  assert.equal(snapshot.acceptedFrames, 0);
 });
 
 test('late results and results arriving after stop cannot repaint an obsolete hand', async () => {
@@ -377,6 +520,7 @@ test('worker transport rejects overlapping requests and ignores responses for a 
   await assert.rejects(backend.infer({ close() { rejectedFrameClosed++; } }, 11), /ocupado/);
   assert.equal(rejectedFrameClosed, 1);
   fixture.emit({ type: 'result', id: 90, timestamp: 9, result: result(0), inferenceMs: 1 });
+  assert.equal(backend.diagnostics().mismatchedResponses, 1);
   assert.equal(fixture.messages.filter(entry => entry.message.type === 'frame').length, 1);
   assert.equal(fixture.messages.at(-1).transfer[0], frame);
   fixture.emit({ type: 'result', id: 1, timestamp: 10, result: result(1), inferenceMs: 4 });
@@ -401,6 +545,16 @@ test('worker initialization failure terminates the failed worker and exposes the
   const fixture = workerFixture();
   fixture.emit({ type: 'error', message: 'WASM unavailable' });
   await assert.rejects(fixture.ready, /WASM unavailable/);
+  assert.equal(fixture.terminated(), 1);
+});
+
+test('a Worker inference failure preserves its stage and detail and terminates the in-flight task', async () => {
+  const fixture = workerFixture();
+  fixture.emit({ type: 'ready', delegate: 'GPU' });
+  const backend = await fixture.ready;
+  const pending = backend.infer({ close() {} }, 10);
+  fixture.emit({ type: 'error', phase: 'inference', message: 'WebGL context lost' });
+  await assert.rejects(pending, error => error.phase === 'inference' && error.message === 'WebGL context lost');
   assert.equal(fixture.terminated(), 1);
 });
 

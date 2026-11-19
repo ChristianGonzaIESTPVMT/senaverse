@@ -1,6 +1,7 @@
 import { getHandLandmarkerAssets, PROCESSING_SIZE } from './config.ts';
 import type { BackendOptions, CapturedHandFrame, HandInferenceBackend, InferenceOutput } from './types.ts';
 import type { HandWorkerRequest, HandWorkerResponse } from './workerProtocol.ts';
+import { detectionError } from './detectionErrors.ts';
 
 export function closeCapturedFrame(frame: CapturedHandFrame) {
   frame.close();
@@ -29,10 +30,11 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
     let ready = false;
     let terminated = false;
     let requestId = 0;
+    let mismatchedResponses = 0;
     let pending: { id: number; timestamp: number; resolve: (output: InferenceOutput) => void; reject: (reason: Error) => void } | null = null;
     let disposalTimer: ReturnType<typeof setTimeout> | null = null;
     let inferenceTimer: ReturnType<typeof setTimeout> | null = null;
-    const initializationTimer = setTimeout(() => fail(new Error('El Worker no respondió al inicializar.')), 20000);
+    const initializationTimer = setTimeout(() => fail(detectionError('initialization', 'El Worker no respondió al inicializar.')), 20000);
     const post = (message: HandWorkerRequest, transfer: Transferable[] = []) => worker.postMessage(message, transfer);
     const terminate = () => {
       if (terminated) return;
@@ -65,11 +67,11 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
       const message = event.data;
       if (message.type === 'disposed') { terminate(); return; }
       if (closed) return;
-      if (message.type === 'error') { fail(new Error(message.message)); return; }
+      if (message.type === 'error') { fail(detectionError(message.phase ?? (ready ? 'inference' : 'initialization'), message.message)); return; }
       if (message.type === 'ready') {
         ready = true;
         clearTimeout(initializationTimer);
-        resolve({ kind: 'worker', delegate: message.delegate, close,
+        resolve({ kind: 'worker', delegate: message.delegate, close, diagnostics: () => ({ mismatchedResponses }),
           infer: (frame, timestamp) => new Promise((resolveFrame, rejectFrame) => {
             if (closed || pending || !Number.isFinite(timestamp)) {
               closeCapturedFrame(frame);
@@ -79,7 +81,7 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
             const id = ++requestId;
             pending = { id, timestamp, resolve: resolveFrame, reject: rejectFrame };
             try {
-              inferenceTimer = setTimeout(() => fail(new Error('El Worker no respondió a la inferencia.')), 2000);
+              inferenceTimer = setTimeout(() => fail(detectionError('inference', 'El Worker no respondió a la inferencia.')), 2000);
               post({ type: 'frame', id, timestamp, frame: frame as ImageBitmap }, [frame as ImageBitmap]);
             } catch (error) {
               if (inferenceTimer !== null) clearTimeout(inferenceTimer);
@@ -92,10 +94,10 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
         if (inferenceTimer !== null) clearTimeout(inferenceTimer);
         pending = null;
         completed.resolve({ result: message.result, inferenceMs: message.inferenceMs });
-      }
+      } else if (message.type === 'result') mismatchedResponses++;
     };
-    worker.onerror = () => fail(new Error('El Worker de detección no está disponible.'));
-    worker.onmessageerror = () => fail(new Error('No se pudo transferir el resultado de detección.'));
+    worker.onerror = event => fail(detectionError(ready ? 'worker' : 'initialization', event?.message || 'El Worker de detección no está disponible.'));
+    worker.onmessageerror = () => fail(detectionError('worker', 'No se pudo transferir el resultado de detección.'));
     signal.addEventListener('abort', onAbort, { once: true });
     if (signal.aborted) { onAbort(); return; }
     try { post({ type: 'init', profile: options.profile, assets }); }

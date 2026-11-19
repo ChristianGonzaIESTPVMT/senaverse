@@ -3,18 +3,24 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { MODEL_METADATA } from '../src/features/sign-recognition/dataset/datasetTypes.ts';
-import { createInitialSignCatalog, signConfigurationErrors } from '../src/features/sign-recognition/dataset/signCatalog.ts';
-import { calculateQuality, workerResultFrame } from '../src/features/sign-recognition/dataset/datasetValidation.ts';
+import { createInitialSignCatalog, createNegativeExampleCategory, signConfigurationErrors } from '../src/features/sign-recognition/dataset/signCatalog.ts';
+import { calculateQuality, sampleCanBeSaved, sampleReviewWarnings, workerResultFrame } from '../src/features/sign-recognition/dataset/datasetValidation.ts';
 import { captureFixture, inferenceFixture, participantFixture, sampleFixture, signFixture } from './fixtures/dataset.mjs';
 
 const selection = () => ({ participant: structuredClone(participantFixture), sign: structuredClone(signFixture), sessionConsent: true, repetition: 1 });
 
-test('ten configurable slots start empty and unvalidated; durations and instructions are checked', () => {
+test('ten stable LSP entries start pending review; durations and instructions are checked', () => {
   const signs = createInitialSignCatalog();
   assert.equal(signs.length, 10);
   assert.equal(new Set(signs.map(sign => sign.id)).size, 10);
-  assert.ok(signs.every(sign => !sign.name && sign.validationStatus === 'unconfigured'));
-  assert.ok(signConfigurationErrors(signs[0]).length > 0);
+  assert.ok(signs.every(sign => sign.name && sign.validationStatus === 'pending' && signConfigurationErrors(sign).length === 0));
+  assert.deepEqual(signs.map(sign => [sign.id, sign.name, sign.type, sign.expectedHands, sign.durationMs, sign.sourceReference.page]), [
+    ['LSP-001', 'Uno', 'static', 1, 1500, 73], ['LSP-002', 'Dos', 'static', 1, 1500, 73], ['LSP-003', 'Tres', 'static', 1, 1500, 73],
+    ['LSP-004', 'Cuatro', 'static', 1, 1500, 73], ['LSP-005', 'Cinco', 'static', 1, 1500, 73], ['LSP-006', 'Sí', 'dynamic', 1, 2500, 134],
+    ['LSP-007', 'Nada', 'dynamic', 1, 2500, 134], ['LSP-008', 'Mucho', 'dynamic', 2, 3000, 134], ['LSP-009', 'Solo', 'dynamic', 1, 2500, 135], ['LSP-010', 'Con', 'dynamic', 2, 3000, 135],
+  ]);
+  assert.ok(signs.every(sign => sign.sourceReference.publisher === 'Ministerio de Educación del Perú' && sign.sourceReference.year === 2015
+    && sign.sourceReference.repositoryUrl === 'https://repositorio.minedu.gob.pe/handle/20.500.12799/5545' && sign.referenceUrl === sign.sourceReference.repositoryUrl));
   assert.deepEqual(signConfigurationErrors(signFixture), []);
   assert.ok(signConfigurationErrors({ ...signFixture, durationMs: 50 }).length > 0);
   assert.ok(signConfigurationErrors({ ...signFixture, referenceUrl: 'javascript:alert(1)' }).length > 0);
@@ -24,7 +30,7 @@ test('recording requires explicit session consent and a configured label', () =>
   const { capture } = captureFixture();
   assert.throws(() => capture.start({ ...selection(), sessionConsent: false }), /consentimiento/);
   assert.throws(() => capture.start({ ...selection(), participant: { ...participantFixture, consentedAt: null } }), /consentimiento/);
-  assert.throws(() => capture.start({ ...selection(), sign: createInitialSignCatalog()[0] }), /nombre/);
+  assert.throws(() => capture.start({ ...selection(), sign: { ...signFixture, name: '' } }), /nombre/);
   assert.equal(capture.view().phase, 'idle');
 });
 
@@ -68,7 +74,7 @@ test('zero-hand Worker results remain observations and expose real losses in qua
   fixture.tick(4620);
   const sample = fixture.capture.view().draft;
   assert.equal(sample.frames.length, 3);
-  assert.deepEqual(sample.frames[1], { timestampMs: 50, handCount: 0, hands: [] });
+  assert.deepEqual(sample.frames[1], { timestampMs: 50, handCount: 0, hands: [], sourceTimestamps: { capturedAtMs: 3050, inferenceTimestampMs: 3051, receivedAtMs: 3060 } });
   assert.equal(sample.qualityMetrics.expectedHandsRatio, 2 / 3);
   assert.equal(sample.qualityMetrics.trackingLosses, 1);
   assert.ok(sample.incidents.some(item => item.type === 'hand-count-mismatch'));
@@ -99,7 +105,7 @@ test('missing world coordinates are not invented and malformed landmark arrays a
 });
 
 test('static/dynamic custom durations preserve the measured timeline and never assume 30 FPS', () => {
-  const sample = sampleFixture('sample-dynamic', { ...signFixture, type: 'dynamic', durationMs: 2500 }, 5);
+  const sample = sampleFixture('sample-dynamic', { ...createInitialSignCatalog()[5], durationMs: 2500 }, 5);
   assert.equal(sample.durationMs, 2500);
   assert.equal(sample.qualityMetrics.averageFps, 5);
   assert.ok(sample.qualityMetrics.warnings.some(warning => warning.includes('frecuencia')));
@@ -107,6 +113,57 @@ test('static/dynamic custom durations preserve the measured timeline and never a
   const sufficient = sampleFixture();
   assert.ok(Math.abs(sufficient.qualityMetrics.averageFps - 30) < .00001);
   assert.equal(sufficient.qualityMetrics.sufficient, true);
+});
+
+test('one- and two-hand catalog captures preserve the full real sequence and original Worker timestamps', () => {
+  for (const index of [0, 2, 5, 7, 9]) {
+    const sign = createInitialSignCatalog()[index];
+    const sample = sampleFixture(`sample-${sign.id}`, sign);
+    assert.equal(sample.qualityMetrics.sufficient, true);
+    assert.equal(sample.captureMetadata.labelSnapshot.id, sign.id);
+    assert.ok(sample.frames.length >= Math.floor(sign.durationMs * 30 / 1000));
+    assert.ok(sign.durationMs - sample.frames.at(-1).timestampMs <= 1000 / 30 + 1e-7);
+    assert.ok(sample.frames.every(frame => frame.hands.length === sign.expectedHands && frame.sourceTimestamps.capturedAtMs === frame.timestampMs + 3000));
+    assert.equal(sample.captureMetadata.recordingStartedAtMs, 3000);
+    assert.equal(sample.captureMetadata.coordinates, 'mediapipe-original');
+    assert.equal(sample.captureMetadata.configuration.inputMirrored, false);
+    assert.equal(sample.captureMetadata.visualMirrored, true);
+    assert.equal(sample.frames[0].hands[0].landmarks[0].x, .2);
+    assert.equal(sample.frames[0].hands[0].handedness[0].categoryName, 'Left');
+  }
+});
+
+test('missing required hands, repeated timestamps and interrupted coverage warn without inventing frames', () => {
+  const fixture = captureFixture(); const sign = createInitialSignCatalog()[7];
+  fixture.capture.start({ ...selection(), sign });
+  assert.equal(fixture.feed(inferenceFixture(3000, 2)), true);
+  assert.equal(fixture.feed(inferenceFixture(3000, 2)), false);
+  assert.equal(fixture.feed(inferenceFixture(3050, 1)), true);
+  fixture.tick(3400);
+  assert.equal(fixture.feed(inferenceFixture(3450, 2)), true);
+  fixture.tick(6120);
+  const sample = fixture.capture.view().draft;
+  const warnings = sampleReviewWarnings(sample).join(' ');
+  assert.equal(sample.frames.length, 3);
+  assert.match(warnings, /mano necesaria/);
+  assert.match(warnings, /timestamps repetidos/);
+  assert.match(warnings, /pérdidas significativas/);
+  assert.match(warnings, /duración real observada es insuficiente/);
+  assert.equal(sample.qualityMetrics.sufficient, false);
+  const incomplete = { ...sample, captureMetadata: { ...sample.captureMetadata, completed: false } };
+  assert.match(sampleReviewWarnings(incomplete).join(' '), /incompleta/);
+  assert.equal(sampleCanBeSaved(incomplete), false);
+});
+
+test('negative examples are an independent technical category and can record real zero-hand observations', () => {
+  const sign = createNegativeExampleCategory();
+  assert.equal(sign.id, 'NEG-001');
+  assert.equal(sign.validationStatus, 'not-applicable');
+  assert.equal(createInitialSignCatalog().some(item => item.id === sign.id), false);
+  const sample = sampleFixture('sample-negative', sign);
+  assert.ok(sample.frames.every(frame => frame.handCount === 0 && frame.hands.length === 0));
+  assert.equal(sampleCanBeSaved(sample), true);
+  assert.equal(sample.qualityMetrics.sufficient, true);
 });
 
 test('cancellation and no-data recordings never create a completed draft', () => {

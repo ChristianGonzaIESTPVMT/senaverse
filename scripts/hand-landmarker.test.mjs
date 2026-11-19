@@ -63,6 +63,11 @@ test('a GPU initialization failure falls back to CPU with identical thresholds',
   for (const item of creation) for (const key of ['minHandDetectionConfidence', 'minHandPresenceConfidence', 'minTrackingConfidence']) assert.equal(item.options[key], .5);
 });
 
+test('failure of both delegates preserves GPU and CPU evidence instead of a generic initialization error', async () => {
+  configureRuntime(options => { throw new Error(options.baseOptions.delegate === 'GPU' ? 'GPU context unavailable' : 'CPU WASM unavailable'); });
+  await assert.rejects(createHandLandmarker(controller().signal), error => /GPU: GPU context unavailable/.test(error.message) && /CPU: CPU WASM unavailable/.test(error.message));
+});
+
 test('initializations remain serialized across rapid remounts', async () => {
   let resolveFirst;
   let enteredFirst;
@@ -120,6 +125,28 @@ test('module-worker loader restores its cached WASM factory before CPU fallback'
   assert.equal(actual.detector, detector);
   assert.equal(calls[0].moduleLoader, true);
   assert.ok(calls.filter(item => item.type === 'create').every(item => item.options.minTrackingConfidence === .4));
+});
+
+test('the actual Worker handler sends the initialization phase and underlying failure to the interface', async () => {
+  const previousSelf = globalThis.self;
+  const previousCanvas = globalThis.OffscreenCanvas;
+  let receive;
+  const response = new Promise(resolve => { receive = resolve; });
+  const scope = { onmessage: null, postMessage: message => receive(message), close() {} };
+  globalThis.self = scope;
+  globalThis.OffscreenCanvas = class {};
+  configureRuntime(() => { throw new Error('model graph failed'); });
+  try {
+    await server.ssrLoadModule('/src/features/sign-recognition/handDetection.worker.ts?initialization-failure');
+    scope.onmessage({ data: { type: 'init', profile: 'baseline', assets: { model: '/models/hand_landmarker.task', wasm: '/mediapipe/wasm' } } });
+    const failure = await response;
+    assert.equal(failure.type, 'error');
+    assert.equal(failure.phase, 'initialization');
+    assert.match(failure.message, /GPU: model graph failed; CPU: model graph failed/);
+  } finally {
+    if (previousSelf === undefined) delete globalThis.self; else globalThis.self = previousSelf;
+    if (previousCanvas === undefined) delete globalThis.OffscreenCanvas; else globalThis.OffscreenCanvas = previousCanvas;
+  }
 });
 
 test('worker handler enforces increasing timestamps, closes bitmaps and disposes its detector', async () => {

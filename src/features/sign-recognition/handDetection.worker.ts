@@ -1,6 +1,7 @@
 import { createHandLandmarker, closeHandLandmarker } from './handLandmarker';
 import type { InitializedHandDetector } from './types';
 import type { HandWorkerRequest, HandWorkerResponse } from './workerProtocol';
+import { detectionFailure } from './detectionErrors';
 
 // No DOM, image storage or network destinations: frames stay in this dedicated worker.
 const scope = self as unknown as {
@@ -35,8 +36,8 @@ scope.onmessage = event => {
       if (disposed) { closeHandLandmarker(instance.detector); return; }
       initialized = instance;
       scope.postMessage({ type: 'ready', delegate: instance.delegate });
-    }).catch(() => {
-      if (!disposed) scope.postMessage({ type: 'error', message: 'No se pudo inicializar MediaPipe en el Worker.' });
+    }).catch(error => {
+      if (!disposed) scope.postMessage({ type: 'error', phase: 'initialization', message: detectionFailure(error, 'initialization').detail });
     });
     return;
   }
@@ -47,7 +48,7 @@ scope.onmessage = event => {
     const started = performance.now();
     const result = initialized.detector.detectForVideo(message.frame, message.timestamp);
     scope.postMessage({ type: 'result', id: message.id, timestamp: message.timestamp, result, inferenceMs: performance.now() - started });
-  } catch {
-    if (!disposed) scope.postMessage({ type: 'error', message: 'Se detuvo la inferencia de manos.' });
+  } catch (error) {
+    if (!disposed) scope.postMessage({ type: 'error', phase: 'inference', message: detectionFailure(error, 'inference').detail });
   } finally { message.frame.close(); }
 };

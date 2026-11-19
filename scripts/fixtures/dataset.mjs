@@ -3,7 +3,11 @@ import { DatasetCapture } from '../../src/features/sign-recognition/dataset/data
 import { getHandLandmarkerOptions } from '../../src/features/sign-recognition/config.ts';
 
 export const participantFixture = { id: 'P001', createdAt: '2026-11-17T12:00:00.000Z', consentedAt: '2026-11-17T12:00:01.000Z', consentVersion: 1 };
-export const signFixture = { ...createInitialSignCatalog()[0], name: 'Etiqueta de prueba', description: 'Metadatos sintéticos para pruebas.', instructions: 'Ejemplo sintético, no una seña validada.', validationStatus: 'pending' };
+export const signFixture = { ...createInitialSignCatalog()[0], description: 'Metadatos sintéticos para pruebas.', instructions: 'Ejemplo sintético, no una seña validada.', validationStatus: 'pending' };
+export function legacyCatalogFixture() {
+  return Array.from({ length: 10 }, (_, index) => ({ id: `sign-${String(index + 1).padStart(2, '0')}`, name: '', description: '', type: 'static', expectedHands: 1,
+    durationMs: 1500, instructions: '', referenceUrl: '', validationStatus: 'unconfigured' }));
+}
 export const captureConfigurationFixture = { ...getHandLandmarkerOptions(), delegate: 'GPU', profile: 'baseline', processingWidth: 640, processingHeight: 480, cameraWidth: 640, cameraHeight: 480, cameraFrameRate: 29.97, inputMirrored: false };
 export function inferenceFixture(at, count = 1, delay = 10) {
   const points = () => Array.from({ length: 21 }, (_, i) => ({ x: .2 + i / 100, y: .3 + i / 100, z: -i / 1000 }));

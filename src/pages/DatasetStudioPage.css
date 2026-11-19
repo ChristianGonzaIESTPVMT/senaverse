@@ -55,6 +55,10 @@
 .dataset-validation-label { display: block; color: light-dark(#9a7a42, var(--color-warning)); font-size: 11px; font-weight: 850; line-height: 1.5; }
 .dataset-validation-label.is-validated { color: light-dark(#49825a, var(--color-success)); }
 .dataset-configure { width: 100%; margin-top: 15px; font-size: 12px; }
+.dataset-legacy-review { margin-bottom: 23px; }
+.dataset-legacy-review summary { cursor: pointer; font-weight: 850; }
+.dataset-legacy-review table { width: 100%; border-collapse: collapse; text-align: left; }
+.dataset-legacy-review th, .dataset-legacy-review td { padding: 8px; border-bottom: 1px solid var(--line); }
 .dataset-local-note { display: flex; gap: 11px; align-items: flex-start; padding: 0 7px; color: light-dark(#9a85ac, var(--color-text-muted)); }
 .dataset-local-note svg { flex-shrink: 0; margin-top: 2px; }
 .dataset-local-note p { margin: 0; font-size: 12px; line-height: 1.65; }

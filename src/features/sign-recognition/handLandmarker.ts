@@ -1,5 +1,6 @@
 import { getHandLandmarkerAssets, getHandLandmarkerOptions, type HandDetectionProfile } from './config.ts';
 import type { DetectionDelegate, HandDetector, InitializedHandDetector } from './types.ts';
+import { detectionFailure } from './detectionErrors.ts';
 
 // Serialize initialization, including GPU fallback, across remounts and cancelled requests.
 let initializationQueue: Promise<void> = Promise.resolve();
@@ -42,15 +43,20 @@ export function createHandLandmarker(signal: AbortSignal, options: Initializatio
         ...(options.createCanvas ? { canvas: options.createCanvas() } : {}),
         baseOptions: { modelAssetPath: assets.model, delegate: 'GPU' },
       });
-    } catch {
+    } catch (gpuError) {
       signal.throwIfAborted();
       delegate = 'CPU';
       prepareFactory();
-      detector = await HandLandmarker.createFromOptions(files, {
-        ...getHandLandmarkerOptions(options.profile),
-        ...(options.createCanvas ? { canvas: options.createCanvas() } : {}),
-        baseOptions: { modelAssetPath: assets.model, delegate: 'CPU' },
-      });
+      try {
+        detector = await HandLandmarker.createFromOptions(files, {
+          ...getHandLandmarkerOptions(options.profile),
+          ...(options.createCanvas ? { canvas: options.createCanvas() } : {}),
+          baseOptions: { modelAssetPath: assets.model, delegate: 'CPU' },
+        });
+      } catch (cpuError) {
+        signal.throwIfAborted();
+        throw new Error(`GPU: ${detectionFailure(gpuError, 'initialization').detail.slice(0, 450)}; CPU: ${detectionFailure(cpuError, 'initialization').detail.slice(0, 450)}`, { cause: cpuError });
+      }
     }
 
     if (signal.aborted) {

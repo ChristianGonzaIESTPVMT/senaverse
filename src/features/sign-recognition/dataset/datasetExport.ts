@@ -1,10 +1,10 @@
 import { getHandLandmarkerOptions, HAND_DETECTION_PROFILES } from '../config.ts';
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MAX_IMPORT_BYTES, MAX_RECORDING_MS, MIN_RECORDING_MS, MODEL_METADATA, type DatasetDocument, type DatasetSample, type DatasetSign, type ModelMetadata } from './datasetTypes.ts';
 import { calculateQuality, sameQuality, sampleCanBeSaved } from './datasetValidation.ts';
-import { createInitialSignCatalog, isSafeReference, signConfigurationErrors } from './signCatalog.ts';
+import { createDatasetCatalog, isLegacySignId, isSafeReference, NEGATIVE_CATEGORY_ID, signConfigurationErrors } from './signCatalog.ts';
 
 type ObjectValue = Record<string, unknown>;
-const signIds = new Set(createInitialSignCatalog().map(sign => sign.id));
+const signIds = new Set([...createDatasetCatalog().map(sign => sign.id), ...Array.from({ length: 10 }, (_, index) => `sign-${String(index + 1).padStart(2, '0')}`)]);
 function check(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(`JSON inválido: ${message}`); }
 function object(value: unknown, keys: string[], path: string): ObjectValue {
   check(!!value && typeof value === 'object' && !Array.isArray(value), path);
@@ -21,13 +21,20 @@ function choice(value: unknown, choices: string[]): value is string { return typ
 function array(value: unknown, max: number, path: string): asserts value is unknown[] { check(Array.isArray(value) && value.length <= max, path); }
 
 export function validateSign(value: unknown): asserts value is DatasetSign {
-  const sign = object(value, ['id', 'name', 'description', 'type', 'expectedHands', 'durationMs', 'instructions', 'referenceUrl', 'validationStatus'], 'seña');
+  const sign = object(value, ['id', 'name', 'description', 'type', 'expectedHands', 'durationMs', 'instructions', 'referenceUrl', 'validationStatus', 'category', 'sourceReference'], 'seña');
   check(typeof sign.id === 'string' && signIds.has(sign.id), 'ID de espacio de seña.');
   check(string(sign.name, 120) && string(sign.description) && string(sign.instructions) && string(sign.referenceUrl, 1000), 'textos de la seña.');
-  check(choice(sign.type, ['static', 'dynamic']) && integer(sign.expectedHands, 1, 2), 'tipo o manos de la seña.');
-  check(number(sign.durationMs, MIN_RECORDING_MS, MAX_RECORDING_MS) && choice(sign.validationStatus, ['unconfigured', 'pending', 'validated']), 'duración o estado de la seña.');
+  check(choice(sign.type, ['static', 'dynamic']) && integer(sign.expectedHands, sign.category === 'negative' ? 0 : 1, 2), 'tipo o manos de la seña.');
+  check(number(sign.durationMs, MIN_RECORDING_MS, MAX_RECORDING_MS) && choice(sign.validationStatus, ['unconfigured', 'pending', 'validated', 'not-applicable']), 'duración o estado de la seña.');
+  if (isLegacySignId(sign.id)) check(sign.category === undefined && sign.sourceReference === undefined && sign.validationStatus !== 'not-applicable', 'la etiqueta anterior debe conservar su categoría original.');
+  else check(sign.category === (sign.id === NEGATIVE_CATEGORY_ID ? 'negative' : 'lsp'), 'categoría del catálogo.');
+  if (sign.sourceReference !== undefined) {
+    const source = object(sign.sourceReference, ['title', 'publisher', 'year', 'page', 'repositoryUrl'], 'referencia documental');
+    check(string(source.title) && string(source.publisher, 200) && integer(source.year, 1900, 2100) && integer(source.page, 1, 10000)
+      && string(source.repositoryUrl, 1000) && isSafeReference(source.repositoryUrl), 'fuente o página del documento.');
+  }
   check(isSafeReference(sign.referenceUrl), 'referencia audiovisual.');
-  if (sign.validationStatus !== 'unconfigured') check(signConfigurationErrors(sign as unknown as DatasetSign).length === 0, 'metadatos incompletos de una seña configurada.');
+  if (sign.validationStatus !== 'unconfigured' || sign.category !== undefined) check(signConfigurationErrors(sign as unknown as DatasetSign).length === 0, 'identidad, fuente, estado pendiente o metadatos de la etiqueta.');
 }
 
 function validateModel(value: unknown): asserts value is ModelMetadata {
@@ -49,9 +56,14 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
   array(sample.frames, 1000, 'fotogramas');
   let previous = -Infinity;
   for (const value of sample.frames) {
-    const frame = object(value, ['timestampMs', 'handCount', 'hands'], 'fotograma');
+    const frame = object(value, ['timestampMs', 'handCount', 'hands', 'sourceTimestamps'], 'fotograma');
     check(number(frame.timestampMs, 0, sample.durationMs) && frame.timestampMs < sample.durationMs && frame.timestampMs > previous, 'timestamps repetidos, desordenados o fuera del intervalo.');
     previous = frame.timestampMs;
+    if (frame.sourceTimestamps !== undefined) {
+      const timestamps = object(frame.sourceTimestamps, ['capturedAtMs', 'inferenceTimestampMs', 'receivedAtMs'], 'timestamps originales');
+      check(number(timestamps.capturedAtMs) && number(timestamps.inferenceTimestampMs) && number(timestamps.receivedAtMs)
+        && timestamps.capturedAtMs <= timestamps.inferenceTimestampMs && timestamps.inferenceTimestampMs <= timestamps.receivedAtMs, 'orden de timestamps originales.');
+    }
     array(frame.hands, 2, 'manos');
     check(integer(frame.handCount, 0, 2) && frame.handCount === frame.hands.length, 'recuento de manos.');
     for (const value of frame.hands) {
@@ -68,13 +80,24 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
   array(sample.incidents, 1000, 'incidencias');
   for (const value of sample.incidents) {
     const incident = object(value, ['timestampMs', 'type'], 'incidencia');
-    check(number(incident.timestampMs, 0, sample.durationMs) && choice(incident.type, ['hand-count-mismatch', 'result-gap', 'invalid-result']), 'incidencia de captura.');
+    check(number(incident.timestampMs, 0, sample.durationMs) && choice(incident.type, ['hand-count-mismatch', 'result-gap', 'invalid-result', 'duplicate-timestamp', 'out-of-order-timestamp']), 'incidencia de captura.');
   }
-  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed'], 'metadatos');
+  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed', 'qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored'], 'metadatos');
   validateModel(metadata.model); validateSign(metadata.labelSnapshot);
   check(metadata.labelSnapshot.id === sample.labelId && metadata.labelSnapshot.validationStatus !== 'unconfigured', 'etiqueta original.');
   check(metadata.completed === true && date(metadata.consentedAt) && metadata.consentVersion === CONSENT_VERSION
     && metadata.requestedDurationMs === sample.durationMs && metadata.labelSnapshot.durationMs === sample.durationMs, 'captura incompleta o sin consentimiento.');
+  if (metadata.qualityPolicyVersion !== undefined) {
+    check(metadata.qualityPolicyVersion === 2 && number(metadata.recordingStartedAtMs) && metadata.coordinates === 'mediapipe-original' && metadata.visualMirrored === true, 'política de calidad o coordenadas originales.');
+    let previousInference = -Infinity;
+    for (const frame of sample.frames as DatasetSample['frames']) {
+      const timestamps = frame.sourceTimestamps;
+      check(timestamps && Math.abs(timestamps.capturedAtMs - metadata.recordingStartedAtMs - frame.timestampMs) < 1e-7
+        && timestamps.inferenceTimestampMs > previousInference, 'timestamps originales no coherentes con la secuencia.');
+      previousInference = timestamps.inferenceTimestampMs;
+    }
+  } else check(metadata.recordingStartedAtMs === undefined && metadata.coordinates === undefined && metadata.visualMirrored === undefined
+    && (sample.frames as DatasetSample['frames']).every(frame => frame.sourceTimestamps === undefined), 'metadatos temporales sin versión de política.');
   const configuration = object(metadata.configuration, ['delegate', 'profile', 'runningMode', 'numHands', 'minHandDetectionConfidence', 'minHandPresenceConfidence', 'minTrackingConfidence', 'processingWidth', 'processingHeight', 'cameraWidth', 'cameraHeight', 'cameraFrameRate', 'inputMirrored'], 'configuración de captura');
   check(choice(configuration.delegate, ['GPU', 'CPU']) && typeof configuration.profile === 'string' && Object.hasOwn(HAND_DETECTION_PROFILES, configuration.profile), 'delegado o perfil.');
   check(configuration.runningMode === 'VIDEO' && configuration.numHands === 2 && configuration.inputMirrored === false, 'modo de captura.');
@@ -83,7 +106,8 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
   const thresholds = getHandLandmarkerOptions(configuration.profile as keyof typeof HAND_DETECTION_PROFILES);
   for (const key of ['minHandDetectionConfidence', 'minHandPresenceConfidence', 'minTrackingConfidence'] as const) check(configuration[key] === thresholds[key], 'umbrales no coherentes con el perfil.');
   const quality = object(sample.qualityMetrics, ['frameCount', 'validLandmarkFrames', 'expectedHandFrames', 'expectedHandsRatio', 'observedDurationMs', 'averageFps', 'minimumHands', 'maximumHands', 'trackingLosses', 'warnings', 'sufficient'], 'calidad');
-  const calculated = calculateQuality(sample.frames as DatasetSample['frames'], sample.durationMs, metadata.labelSnapshot.expectedHands);
+  const calculated = calculateQuality(sample.frames as DatasetSample['frames'], sample.durationMs, metadata.labelSnapshot.expectedHands,
+    metadata.qualityPolicyVersion === 2 ? { incidents: sample.incidents as DatasetSample['incidents'], completed: metadata.completed, requestedDurationMs: metadata.requestedDurationMs } : undefined);
   check(sameQuality(calculated, quality as unknown as DatasetSample['qualityMetrics']), 'métricas de calidad que no coinciden con la secuencia.');
   check(sampleCanBeSaved(sample as unknown as DatasetSample), 'la muestra no contiene suficientes datos reales para guardarse.');
   check(sample.reviewStatus !== 'accepted' || calculated.sufficient, 'una muestra de calidad insuficiente no puede figurar como aceptada.');
@@ -97,9 +121,12 @@ export function validateDatasetDocument(value: unknown): asserts value is Datase
   check(Object.entries(CAPTURE_DEFAULTS).every(([key, value]) => defaults[key] === value), 'configuración del esquema no compatible.');
   validateModel(doc.mediaPipeModel);
   check(Object.entries(MODEL_METADATA).every(([key, value]) => (doc.mediaPipeModel as unknown as ObjectValue)[key] === value), 'el respaldo usa otra versión del modelo o del SDK.');
-  array(doc.signs, 10, 'catálogo'); check(doc.signs.length === 10, 'el catálogo necesita diez espacios.');
+  array(doc.signs, 21, 'catálogo');
   doc.signs.forEach(validateSign);
-  check(new Set(doc.signs.map(sign => (sign as DatasetSign).id)).size === 10, 'IDs de señas duplicados.');
+  const catalogIds = new Set(doc.signs.map(sign => (sign as DatasetSign).id));
+  check(catalogIds.size === doc.signs.length, 'IDs de señas duplicados.');
+  const legacyCatalog = doc.signs.length === 10 && doc.signs.every(sign => isLegacySignId((sign as DatasetSign).id));
+  check(legacyCatalog || createDatasetCatalog().every(sign => catalogIds.has(sign.id)), 'faltan entradas estables LSP o la categoría técnica independiente.');
   array(doc.participants, 10000, 'participantes');
   const participantIds = new Set<string>();
   for (const value of doc.participants) {

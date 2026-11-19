@@ -3,7 +3,8 @@ import { clearHandCanvas, drawHandLandmarks } from './drawHandLandmarks.ts';
 import { captureHandFrame, closeCapturedFrame, createHandInferenceBackend } from './inferenceBackend.ts';
 import { HandPerformanceMetrics } from './performanceMetrics.ts';
 import { HandTrackingContinuity } from './trackingContinuity.ts';
-import type { BackendOptions, CapturedHandFrame, FreshHandInference, HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot, HandInferenceBackend } from './types.ts';
+import { detectionFailure } from './detectionErrors.ts';
+import type { BackendOptions, CapturedHandFrame, FreshHandInference, HandDetectionResult, HandDetectionSession, HandDetectionState, HandDiagnosticSnapshot, HandFailurePhase, HandInferenceBackend } from './types.ts';
 
 type FrameMetadata = { mediaTime: number; presentedFrames?: number };
 type FrameCallback = (timestamp: number, metadata: FrameMetadata) => void;
@@ -67,16 +68,29 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
   let busy = false;
   let stopped = false;
   let cameraFrameRate: number | null = null;
+  let lastFreshAt: number | null = null;
+  let lastVisual: HandDiagnosticSnapshot['visualState'] = 'none';
+  let lastTrackingStatus: HandDetectionState['status'] = 'searching';
+  let rendered: { result: HandDetectionResult | null; opacity: number; geometry: string } | null = null;
 
-  function publishDiagnostics() {
-    if (!onDiagnostics || stopped) return;
+  function readDiagnostics(): HandDiagnosticSnapshot {
     const stream = video.srcObject as MediaStream | null;
     const settings = stream?.getVideoTracks?.()[0]?.getSettings?.() ?? {};
-    onDiagnostics({ ...metrics.snapshot(scheduler.now()), profile,
+    const now = scheduler.now();
+    const view = continuity.view(now);
+    return { ...metrics.snapshot(now), profile,
       delegate: backend?.delegate ?? null, backend: backend?.kind ?? null,
       processingWidth, processingHeight, cameraWidth: settings.width ?? null, cameraHeight: settings.height ?? null,
       configuredCameraFps: settings.frameRate ?? null, cameraFpsSource: scheduler.source ?? 'sampled',
-      handCount: continuity.view(scheduler.now()).state.handCount });
+      handCount: view.state.handCount, mismatchedResponses: backend?.diagnostics?.().mismatchedResponses ?? 0,
+      trackingStatus: metrics.lastError ? 'error' : !backend ? 'loading' : view.state.status,
+      visualState: metrics.lastError ? 'none' : view.result ? view.opacity < 1 ? 'held' : 'live' : 'none',
+      lossReason: view.lossReason, lastAcceptedAgeMs: lastFreshAt === null ? null : Math.max(0, now - lastFreshAt) };
+  }
+
+  function publishDiagnostics() {
+    if (!onDiagnostics || stopped) return;
+    onDiagnostics(readDiagnostics());
   }
 
   function stop() {
@@ -92,10 +106,14 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
     clearHandCanvas(canvas);
   }
 
-  function fail() {
+  function fail(error: unknown, phase: HandFailurePhase) {
     if (stopped) return;
+    const failure = detectionFailure(error, phase);
+    metrics.failures++;
+    metrics.lastError = failure;
+    publishDiagnostics();
     stop();
-    onState({ status: 'error', handCount: 0 });
+    onState({ status: 'error', handCount: 0, error: failure });
   }
 
   function redraw() {
@@ -103,20 +121,34 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
     try {
       if (visualTimer !== null) clearTimeout(visualTimer);
       const view = continuity.view(scheduler.now());
-      drawHandLandmarks(canvas, video, view.result, view.opacity);
+      const visual = view.result ? view.opacity < 1 ? 'held' : 'live' : 'none';
+      if (lastTrackingStatus === 'detected' && view.state.handCount === 0 && view.lossReason === 'result-gap') metrics.freshnessExpirations++;
+      if (visual === 'held' && lastVisual !== 'held') metrics.visualHolds++;
+      lastVisual = visual; lastTrackingStatus = view.state.status;
+      const bounds = canvas.getBoundingClientRect();
+      const geometry = `${bounds.width}/${bounds.height}/${canvas.width}/${canvas.height}/${video.videoWidth}/${video.videoHeight}/${globalThis.devicePixelRatio || 1}`;
+      if (!rendered || rendered.result !== view.result || rendered.opacity !== view.opacity || rendered.geometry !== geometry) {
+        drawHandLandmarks(canvas, video, view.result, view.opacity);
+        metrics.canvasDraws++;
+        rendered = { result: view.result, opacity: view.opacity, geometry: `${bounds.width}/${bounds.height}/${canvas.width}/${canvas.height}/${video.videoWidth}/${video.videoHeight}/${globalThis.devicePixelRatio || 1}` };
+      }
       onState(view.state);
       onResult(view.state.status === 'detected' ? view.result : null);
       visualTimer = view.nextChangeMs === null ? null : setTimeout(redraw, Math.max(1, view.nextChangeMs));
-    } catch { fail(); }
+    } catch (error) { fail(error, 'render'); }
   }
 
-  async function processFrame(token: number, capturedAt: number) {
+  async function processFrame() {
     let ownedFrame: CapturedHandFrame | null = null;
     busy = true;
+    let phase: HandFailurePhase = 'capture';
+    // Timestamp the bitmap request itself, not an earlier video callback.
+    const capturedAt = scheduler.now();
     try {
       ownedFrame = await captureFrame(video);
-      if (stopped || token !== latestFrameToken || video.paused || scheduler.now() - capturedAt > MAX_RESULT_AGE_MS) {
+      if (stopped || video.paused || scheduler.now() - capturedAt > MAX_RESULT_AGE_MS) {
         metrics.droppedFrames++;
+        if (!stopped && !video.paused) metrics.expiredCaptures++;
         return;
       }
       processingWidth = ownedFrame.width; processingHeight = ownedFrame.height;
@@ -124,25 +156,30 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
       lastTimestamp = timestamp;
       const transferred = ownedFrame;
       ownedFrame = null;
+      phase = 'inference';
       const output = await backend!.infer(transferred, timestamp);
       if (stopped) return;
       const completedAt = scheduler.now();
       const latency = Math.max(0, completedAt - capturedAt);
-      metrics.inference(completedAt, latency, output.inferenceMs);
+      metrics.inference(completedAt, latency, output.inferenceMs, output.result);
       if (timestamp <= lastAcceptedTimestamp || latency > MAX_RESULT_AGE_MS || video.paused) {
         metrics.staleResults++;
+        if (timestamp <= lastAcceptedTimestamp) metrics.staleByOrder++;
+        else if (latency > MAX_RESULT_AGE_MS) metrics.staleByAge++;
+        else metrics.pausedResults++;
         return;
       }
       lastAcceptedTimestamp = timestamp;
+      lastFreshAt = capturedAt;
       onFreshInference?.({ source: 'worker', inferenceTimestampMs: timestamp, capturedAtMs: capturedAt,
         receivedAtMs: completedAt, result: output.result,
         configuration: { ...getHandLandmarkerOptions(profile), delegate: backend!.delegate, profile,
           processingWidth, processingHeight, cameraWidth: video.videoWidth, cameraHeight: video.videoHeight,
           cameraFrameRate, inputMirrored: false } });
-      metrics.hands(output.result.landmarks.length, capturedAt);
+      metrics.accepted(completedAt, output.result.landmarks.length, capturedAt);
       continuity.observe(output.result, capturedAt, completedAt);
       redraw();
-    } catch { fail(); }
+    } catch (error) { fail(error, phase); }
     finally {
       if (ownedFrame) closeCapturedFrame(ownedFrame);
       busy = false;
@@ -157,9 +194,9 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
     const now = scheduler.now();
     if (now - lastCaptureAt < 1000 / MAX_DETECTION_FPS - 0.5) return;
     lastStartedToken = latestFrameToken;
-    if (now - lastObservedAt > MAX_RESULT_AGE_MS) { metrics.droppedFrames++; return; }
+    if (now - lastObservedAt > MAX_RESULT_AGE_MS) { metrics.droppedFrames++; metrics.expiredCaptures++; return; }
     lastCaptureAt = now;
-    void processFrame(latestFrameToken, lastObservedAt);
+    void processFrame();
   }
 
   function observeFrame(_timestamp: number, metadata: FrameMetadata) {
@@ -175,9 +212,11 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
     const now = scheduler.now();
     metrics.cameraFrame(now, advance);
     metrics.droppedFrames += advance - 1;
-    if (latestFrameToken > lastStartedToken) metrics.droppedFrames++;
+    metrics.skippedCameraFrames += advance - 1;
+    if (latestFrameToken > lastStartedToken) { metrics.droppedFrames++; metrics.supersededFrames++; }
     latestFrameToken++;
     lastObservedAt = now;
+    if (!busy && now - lastCaptureAt < 1000 / MAX_DETECTION_FPS - 0.5) metrics.throttledFrames++;
     processNewestFrame();
   }
 
@@ -190,7 +229,7 @@ export function startHandDetection({ video, canvas, onState, onResult, onDiagnos
     onState({ status: 'searching', handCount: 0 });
     publishDiagnostics();
     frameId = scheduler.request(observeFrame);
-  }).catch(fail);
+  }).catch(error => fail(error, 'initialization'));
 
-  return { stop, redraw, resetDiagnostics: () => { metrics = new HandPerformanceMetrics(scheduler.now()); publishDiagnostics(); } };
+  return { stop, redraw, readDiagnostics, resetDiagnostics: () => { metrics = new HandPerformanceMetrics(scheduler.now(), continuity.view(scheduler.now()).state.handCount); publishDiagnostics(); } };
 }

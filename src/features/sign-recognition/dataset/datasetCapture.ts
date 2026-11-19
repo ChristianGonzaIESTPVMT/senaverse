@@ -1,5 +1,5 @@
 import type { FreshHandInference } from '../types';
-import { signConfigurationErrors } from './signCatalog.ts';
+import { expectedHandsMatch, signConfigurationErrors } from './signCatalog.ts';
 import { calculateQuality, workerResultFrame } from './datasetValidation.ts';
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MODEL_METADATA, type CaptureIncident, type DatasetFrame, type DatasetParticipant, type DatasetSample, type DatasetSign } from './datasetTypes.ts';
 
@@ -64,8 +64,13 @@ export class DatasetCapture {
     const now = this.clock.now();
     if (event.source !== 'worker' || ![event.capturedAtMs, event.receivedAtMs, event.inferenceTimestampMs].every(Number.isFinite)
       || event.capturedAtMs < this.startAt || event.capturedAtMs >= this.endAt || event.inferenceTimestampMs < event.capturedAtMs || event.receivedAtMs < event.inferenceTimestampMs
-      || event.receivedAtMs > now + 1 || now - event.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs
-      || event.inferenceTimestampMs <= this.lastInferenceTimestamp || event.capturedAtMs <= this.lastCapturedAt) return false;
+      || event.receivedAtMs > now + 1 || now - event.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs) return false;
+    if (event.inferenceTimestampMs <= this.lastInferenceTimestamp || event.capturedAtMs <= this.lastCapturedAt) {
+      const duplicate = event.inferenceTimestampMs === this.lastInferenceTimestamp || event.capturedAtMs === this.lastCapturedAt;
+      this.incidents.push({ timestampMs: event.capturedAtMs - this.startAt, type: duplicate ? 'duplicate-timestamp' : 'out-of-order-timestamp' });
+      this.warning = duplicate ? 'Se rechazó un resultado con timestamp repetido.' : 'Se rechazó un resultado con timestamp desordenado.';
+      return false;
+    }
     const frame = workerResultFrame(event.result, event.capturedAtMs - this.startAt);
     if (!frame) {
       this.incidents.push({ timestampMs: event.capturedAtMs - this.startAt, type: 'invalid-result' });
@@ -73,10 +78,11 @@ export class DatasetCapture {
       return false;
     }
     const previousCount = this.frames.at(-1)?.handCount;
-    if (frame.handCount !== this.selection.sign.expectedHands && previousCount !== frame.handCount) {
+    if (!expectedHandsMatch(this.selection.sign, frame.handCount) && previousCount !== frame.handCount) {
       this.incidents.push({ timestampMs: frame.timestampMs, type: 'hand-count-mismatch' });
       this.warning = 'No se detectan todas las manos esperadas. La incidencia quedará registrada.';
-    } else if (frame.handCount === this.selection.sign.expectedHands) this.warning = '';
+    } else if (expectedHandsMatch(this.selection.sign, frame.handCount)) this.warning = '';
+    frame.sourceTimestamps = { capturedAtMs: event.capturedAtMs, inferenceTimestampMs: event.inferenceTimestampMs, receivedAtMs: event.receivedAtMs };
     this.configuration ??= structuredClone(event.configuration);
     this.lastInferenceTimestamp = event.inferenceTimestampMs;
     this.lastCapturedAt = event.capturedAtMs;
@@ -91,9 +97,11 @@ export class DatasetCapture {
     const { participant, sign, repetition } = this.selection;
     this.draft = { sampleId: this.clock.id(), labelId: sign.id, participantId: participant.id, repetition,
       recordedAt: this.recordedAt, durationMs: this.endAt - this.startAt, frames: this.frames, incidents: this.incidents,
-      qualityMetrics: calculateQuality(this.frames, this.endAt - this.startAt, sign.expectedHands), reviewStatus: 'pending',
+      qualityMetrics: calculateQuality(this.frames, this.endAt - this.startAt, sign.expectedHands,
+        { incidents: this.incidents, completed: true, requestedDurationMs: sign.durationMs }), reviewStatus: 'pending',
       captureMetadata: { configuration: this.configuration, model: structuredClone(MODEL_METADATA), labelSnapshot: sign,
-        consentedAt: participant.consentedAt!, consentVersion: CONSENT_VERSION, requestedDurationMs: sign.durationMs, completed: true } };
+        consentedAt: participant.consentedAt!, consentVersion: CONSENT_VERSION, requestedDurationMs: sign.durationMs, completed: true,
+        qualityPolicyVersion: 2, recordingStartedAtMs: this.startAt, coordinates: 'mediapipe-original', visualMirrored: true } };
     this.phase = 'review';
   }
 
