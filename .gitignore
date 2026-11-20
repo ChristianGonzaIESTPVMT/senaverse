@@ -14,8 +14,15 @@ dist-ssr
 public/mediapipe/wasm/
 *.local
 
-# Local datasets
+# Local training data and outputs
 /ml/datasets/
+/ml/.venv/
+/ml/artifacts/
+/ml/reports/local/
+/ml/.cache/
+__pycache__/
+*.py[cod]
+*.tmp
 
 # Editor directories and files
 .vscode/*
