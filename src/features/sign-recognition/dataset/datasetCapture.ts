@@ -1,12 +1,13 @@
 import type { FreshHandInference } from '../types';
 import { expectedHandsMatch, signConfigurationErrors } from './signCatalog.ts';
 import { calculateQuality, workerResultFrame } from './datasetValidation.ts';
+import type { CountdownSeconds } from './countdownPreferences';
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MODEL_METADATA, type CaptureIncident, type DatasetFrame, type DatasetParticipant, type DatasetSample, type DatasetSign } from './datasetTypes.ts';
 
 export type DatasetCapturePhase = 'idle' | 'countdown' | 'recording' | 'finishing' | 'review';
 export type CaptureSelection = { participant: DatasetParticipant; sign: DatasetSign; repetition: number; sessionConsent: boolean };
 type Clock = { now: () => number; isoNow: () => string; id: () => string };
-export type DatasetCaptureView = { phase: DatasetCapturePhase; countdown: number; elapsedMs: number; frameCount: number; warning: string; draft: DatasetSample | null };
+export type DatasetCaptureView = { phase: DatasetCapturePhase; countdownRemainingMs: number; elapsedMs: number; frameCount: number; warning: string; draft: DatasetSample | null };
 
 /** Collects only the fresh-inference channel. It has no camera, model or persistence of its own. */
 export class DatasetCapture {
@@ -27,7 +28,7 @@ export class DatasetCapture {
 
   constructor(clock: Clock = { now: () => performance.now(), isoNow: () => new Date().toISOString(), id: () => `sample-${crypto.randomUUID()}` }) { this.clock = clock; }
 
-  start(selection: CaptureSelection) {
+  start(selection: CaptureSelection, countdownSeconds: CountdownSeconds = 0) {
     if (this.phase !== 'idle') throw new Error('Revisa o descarta la captura anterior antes de iniciar otra.');
     if (!selection.sessionConsent || !selection.participant.consentedAt || selection.participant.consentVersion !== CONSENT_VERSION) throw new Error('Confirma el consentimiento de esta persona para la sesión.');
     const errors = signConfigurationErrors(selection.sign);
@@ -35,10 +36,11 @@ export class DatasetCapture {
     this.selection = structuredClone(selection);
     this.frames = []; this.incidents = []; this.configuration = null; this.draft = null; this.warning = '';
     this.lastInferenceTimestamp = -Infinity; this.lastCapturedAt = -Infinity; this.gapActive = false;
-    this.startAt = this.clock.now() + CAPTURE_DEFAULTS.countdownMs;
+    const delayMs = countdownSeconds * 1000;
+    this.startAt = this.clock.now() + delayMs;
     this.endAt = this.startAt + selection.sign.durationMs;
-    this.recordedAt = new Date(Date.parse(this.clock.isoNow()) + CAPTURE_DEFAULTS.countdownMs).toISOString();
-    this.phase = 'countdown';
+    this.recordedAt = new Date(Date.parse(this.clock.isoNow()) + delayMs).toISOString();
+    this.phase = delayMs ? 'countdown' : 'recording';
   }
 
   advance() {
@@ -96,8 +98,8 @@ export class DatasetCapture {
     if (!this.configuration || this.frames.length === 0) { this.cancel('No se recibieron resultados frescos; no se creó ninguna muestra.'); return; }
     const { participant, sign, repetition } = this.selection;
     this.draft = { sampleId: this.clock.id(), labelId: sign.id, participantId: participant.id, repetition,
-      recordedAt: this.recordedAt, durationMs: this.endAt - this.startAt, frames: this.frames, incidents: this.incidents,
-      qualityMetrics: calculateQuality(this.frames, this.endAt - this.startAt, sign.expectedHands,
+      recordedAt: this.recordedAt, durationMs: sign.durationMs, frames: this.frames, incidents: this.incidents,
+      qualityMetrics: calculateQuality(this.frames, sign.durationMs, sign.expectedHands,
         { incidents: this.incidents, completed: true, requestedDurationMs: sign.durationMs }), reviewStatus: 'pending',
       captureMetadata: { configuration: this.configuration, model: structuredClone(MODEL_METADATA), labelSnapshot: sign,
         consentedAt: participant.consentedAt!, consentVersion: CONSENT_VERSION, requestedDurationMs: sign.durationMs, completed: true,
@@ -111,8 +113,10 @@ export class DatasetCapture {
   }
 
   view(): DatasetCaptureView {
-    return { phase: this.phase, countdown: this.phase === 'countdown' ? Math.max(0, Math.ceil((this.startAt - this.clock.now()) / 1000)) : 0,
-      elapsedMs: ['recording', 'finishing', 'review'].includes(this.phase) ? Math.max(0, Math.min(this.endAt, this.clock.now()) - this.startAt) : 0,
+    const now = this.clock.now();
+    return { phase: this.phase,
+      countdownRemainingMs: this.phase === 'countdown' ? Math.max(0, this.startAt - now) : 0,
+      elapsedMs: ['recording', 'finishing', 'review'].includes(this.phase) ? Math.max(0, Math.min(this.endAt, now) - this.startAt) : 0,
       frameCount: this.frames.length, warning: this.warning, draft: this.draft };
   }
 }

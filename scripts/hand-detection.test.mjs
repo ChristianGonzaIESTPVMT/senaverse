@@ -426,21 +426,20 @@ test('capture and initialization failures retain their phase/details in the last
 });
 
 test('held landmarks and stale results never enter a Dataset Studio sequence; real empty frames record a loss', async () => {
-  let fixture;
   const recorder = new DatasetCapture({ now: () => time, isoNow: () => '2026-11-19T12:00:00.000Z', id: () => 'sample-integrity' });
   let time = 0;
   recorder.start({ participant: participantFixture, sign: { ...signFixture, durationMs: 500 }, sessionConsent: true, repetition: 1 });
-  fixture = sessionFixture(undefined, { onFreshInference: event => recorder.accept(event) });
+  const fixture = sessionFixture(undefined, { onFreshInference: event => recorder.accept(event) });
   await flush();
-  time = 3000; fixture.setResult(result(1)); fixture.tick(time, 3); await flush();
-  time = 3040; fixture.setResult(result(0)); fixture.tick(time, 3.04); await flush();
-  time = 3070; fixture.setTime(time); fixture.session.redraw(); fixture.session.redraw();
+  fixture.setResult(result(1)); fixture.tick(time); await flush();
+  time = 40; fixture.setResult(result(0)); fixture.tick(time, .04); await flush();
+  time = 70; fixture.setTime(time); fixture.session.redraw(); fixture.session.redraw();
   assert.equal(fixture.session.readDiagnostics().visualState, 'held');
   let finish;
   fixture.backend.infer = () => new Promise(resolve => { finish = () => resolve({ result: result(1), inferenceMs: 130 }); });
-  time = 3100; fixture.tick(time, 3.1); await flush();
-  time = 3231; fixture.setTime(time); finish(); await flush();
-  time = 3620; recorder.advance();
+  time = 100; fixture.tick(time, .1); await flush();
+  time = 231; fixture.setTime(time); finish(); await flush();
+  time = 620; recorder.advance();
   const sample = recorder.view().draft;
   assert.deepEqual(sample.frames.map(frame => [frame.timestampMs, frame.handCount]), [[0, 1], [40, 0]]);
   assert.deepEqual(sample.frames[1].hands, []);

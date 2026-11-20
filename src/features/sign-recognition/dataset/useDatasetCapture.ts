@@ -2,8 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PracticeCameraSessionState } from '../../../components/PracticeCamera';
 import type { FreshHandInference } from '../types';
 import { CAPTURE_DEFAULTS } from './datasetTypes';
-import { DatasetCapture, type CaptureSelection } from './datasetCapture';
+import { DatasetCapture, type CaptureSelection, type DatasetCaptureView } from './datasetCapture';
 import { expectedHandsMatch } from './signCatalog';
+import type { CountdownSeconds } from './countdownPreferences';
+
+function isSessionReady({ cameraStatus, detector }: PracticeCameraSessionState) {
+  return cameraStatus === 'active' && !['idle', 'loading', 'error'].includes(detector.status);
+}
 
 export function useDatasetCapture() {
   const [capture] = useState(() => new DatasetCapture());
@@ -11,17 +16,28 @@ export function useDatasetCapture() {
   const [camera, setCamera] = useState<PracticeCameraSessionState>({ cameraStatus: 'idle', detector: { status: 'idle', handCount: 0 } });
   const [error, setError] = useState('');
   const fresh = useRef<FreshHandInference | null>(null);
+  const sessionReady = isSessionReady(camera);
+  const active = isCapturing(view.phase);
 
   const updateView = useCallback(() => {
     const next = capture.advance();
-    setView(previous => previous.phase === next.phase && previous.countdown === next.countdown && previous.elapsedMs === next.elapsedMs
+    setView(previous => previous.phase === next.phase && previous.countdownRemainingMs === next.countdownRemainingMs && previous.elapsedMs === next.elapsedMs
       && previous.frameCount === next.frameCount && previous.warning === next.warning && previous.draft === next.draft ? previous : next);
+    return next;
   }, [capture]);
   useEffect(() => {
-    if (!['countdown', 'recording', 'finishing'].includes(view.phase)) return;
-    const timer = setInterval(updateView, 100);
-    return () => clearInterval(timer);
-  }, [updateView, view.phase]);
+    if (!active) return;
+    let timer: ReturnType<typeof setTimeout>;
+    function schedule(next: DatasetCaptureView) {
+      if (!isCapturing(next.phase)) return;
+      const remaining = next.countdownRemainingMs;
+      // Wake on each displayed second and on the capture deadline.
+      const delay = next.phase === 'countdown' ? remaining % 1000 || Math.min(remaining, 1000) : 100;
+      timer = setTimeout(() => schedule(updateView()), Math.ceil(delay));
+    }
+    schedule(capture.view());
+    return () => clearTimeout(timer);
+  }, [active, capture, updateView]);
   useEffect(() => () => { capture.cancel(); }, [capture]);
 
   const onFreshInference = useCallback((event: FreshHandInference) => {
@@ -31,24 +47,29 @@ export function useDatasetCapture() {
   }, [capture, updateView]);
   const onSessionState = useCallback((state: PracticeCameraSessionState) => {
     setCamera(state);
-    if (['countdown', 'recording', 'finishing'].includes(capture.view().phase)
-      && (state.cameraStatus !== 'active' || ['idle', 'loading', 'error'].includes(state.detector.status))) {
+    if (isSessionReady(state)) return;
+    fresh.current = null;
+    if (isCapturing(capture.view().phase)) {
       capture.cancel('Se interrumpió la cámara o el detector. La captura incompleta no se guardó.');
-      fresh.current = null;
       updateView();
     }
   }, [capture, updateView]);
 
-  const start = useCallback((selection: CaptureSelection) => {
+  const start = useCallback((selection: CaptureSelection, countdownSeconds: CountdownSeconds) => {
     setError('');
     try {
       const latest = fresh.current;
-      if (camera.cameraStatus !== 'active' || !latest || performance.now() - latest.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs
-        || !expectedHandsMatch(selection.sign, latest.result.landmarks.length)) throw new Error('Activa la cámara y coloca las manos esperadas dentro del encuadre.');
-      capture.start(selection); updateView();
+      if (!sessionReady) throw new Error('Activa la cámara y espera a que el detector esté listo.');
+      if (countdownSeconds === 0 && (!latest || performance.now() - latest.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs
+        || !expectedHandsMatch(selection.sign, latest.result.landmarks.length))) throw new Error('Coloca las manos esperadas dentro del encuadre y espera una detección reciente.');
+      capture.start(selection, countdownSeconds); updateView();
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo iniciar la captura.'); }
-  }, [capture, camera.cameraStatus, updateView]);
+  }, [capture, sessionReady, updateView]);
   const cancel = useCallback(() => { capture.cancel(); setError(''); updateView(); }, [capture, updateView]);
 
-  return { view, camera, error, start, cancel, onFreshInference, onSessionState };
+  return { view, camera, sessionReady, error, start, cancel, onFreshInference, onSessionState };
+}
+
+function isCapturing(phase: DatasetCaptureView['phase']) {
+  return phase === 'countdown' || phase === 'recording' || phase === 'finishing';
 }

@@ -20,13 +20,13 @@ export function captureFixture(sampleId = 'sample-test') {
   let now = 0;
   const capture = new DatasetCapture({ now: () => now, isoNow: () => '2026-11-17T12:01:00.000Z', id: () => sampleId });
   const tick = value => { now = value; return capture.advance(); };
-  const feed = event => { now = event.receivedAtMs; return capture.accept(event); };
+  const feed = event => { now = Math.max(now, event.receivedAtMs); return capture.accept(event); };
   return { capture, tick, feed };
 }
 export function sampleFixture(sampleId = 'sample-test', sign = signFixture, fps = 30) {
   const fixture = captureFixture(sampleId);
   fixture.capture.start({ participant: participantFixture, sign, sessionConsent: true, repetition: 1 });
-  for (let elapsed = 0; elapsed < sign.durationMs; elapsed += 1000 / fps) fixture.feed(inferenceFixture(3000 + elapsed, sign.expectedHands));
-  fixture.tick(3000 + sign.durationMs + 120);
+  for (let elapsed = 0; elapsed < sign.durationMs; elapsed += 1000 / fps) fixture.feed(inferenceFixture(elapsed, sign.expectedHands));
+  fixture.tick(sign.durationMs + 120);
   return structuredClone(fixture.capture.view().draft);
 }

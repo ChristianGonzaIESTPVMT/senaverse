@@ -49,10 +49,11 @@ function validatePoint(value: unknown) {
 }
 
 export function validateDatasetSample(value: unknown): asserts value is DatasetSample {
-  const sample = object(value, ['sampleId', 'labelId', 'participantId', 'repetition', 'recordedAt', 'durationMs', 'frames', 'incidents', 'qualityMetrics', 'captureMetadata', 'reviewStatus'], 'muestra');
+  const sample = object(value, ['sampleId', 'labelId', 'participantId', 'repetition', 'recordedAt', 'durationMs', 'frames', 'incidents', 'qualityMetrics', 'captureMetadata', 'reviewStatus', 'operatorReviewed'], 'muestra');
   check(id(sample.sampleId) && id(sample.labelId) && string(sample.participantId, 7) && /^P\d{3,6}$/.test(sample.participantId), 'identificadores de la muestra.');
   check(integer(sample.repetition, 1, 1000000) && date(sample.recordedAt) && number(sample.durationMs, MIN_RECORDING_MS, MAX_RECORDING_MS), 'repetición, fecha o duración.');
   check(choice(sample.reviewStatus, ['pending', 'accepted', 'rejected']), 'estado de revisión.');
+  check(sample.operatorReviewed === undefined || typeof sample.operatorReviewed === 'boolean', 'revisión por operador.');
   array(sample.frames, 1000, 'fotogramas');
   let previous = -Infinity;
   for (const value of sample.frames) {

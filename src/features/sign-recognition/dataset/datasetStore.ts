@@ -1,5 +1,6 @@
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, DATASET_DATABASE_NAME, MODEL_METADATA, type DatasetDocument, type DatasetMeta, type DatasetParticipant, type DatasetSample, type DatasetSign, type DatasetSnapshot, type SampleSummary } from './datasetTypes.ts';
 import { validateDatasetDocument, validateDatasetSample, validateSign } from './datasetExport.ts';
+import { isOperatorReviewed, type SampleReviewAction } from './datasetTypes.ts';
 import { catalogAdditions, createDatasetCatalog, signConfigurationErrors } from './signCatalog.ts';
 
 const STORES = ['meta', 'participants', 'signs', 'samples', 'sequences'];
@@ -118,6 +119,7 @@ export class DatasetStore {
       if (await request(samples.get(sample.sampleId))) throw new Error('Esta muestra ya está guardada.');
       const previous = await request<SampleSummary[]>(samples.index('participantLabel').getAll([sample.participantId, sample.labelId]));
       const saved = { ...structuredClone(sample), repetition: Math.max(0, ...previous.map(item => item.repetition)) + 1, reviewStatus: 'pending' as const };
+      delete saved.operatorReviewed;
       const { frames, ...summary } = saved;
       samples.add(summary); tx.objectStore('sequences').add({ sampleId: saved.sampleId, frames });
       return saved;
@@ -134,12 +136,31 @@ export class DatasetStore {
   }
 
   async reviewSample(id: string, status: 'accepted' | 'rejected') {
+    const result = await this.updateSampleReviews([id], status === 'accepted' ? 'accept' : 'reject');
+    if (result.missingIds.length) throw new Error('La muestra ya no existe.');
+    if (result.insufficient) throw new Error('Una muestra de calidad insuficiente debe repetirse o mantenerse pendiente.');
+  }
+
+  async updateSampleReviews(ids: readonly string[], action: SampleReviewAction) {
     return transaction(await this.open(), ['samples'], 'readwrite', async tx => {
       const store = tx.objectStore('samples');
-      const sample = await request<SampleSummary | undefined>(store.get(id));
-      if (!sample) throw new Error('La muestra ya no existe.');
-      if (status === 'accepted' && !sample.qualityMetrics.sufficient) throw new Error('Una muestra de calidad insuficiente debe repetirse o mantenerse pendiente.');
-      store.put({ ...sample, reviewStatus: status });
+      const updated: SampleSummary[] = [];
+      const missingIds: string[] = [];
+      let insufficient = 0, unchanged = 0;
+      const uniqueIds = [...new Set(ids)];
+      const samples = await Promise.all(uniqueIds.map(id => request<SampleSummary | undefined>(store.get(id))));
+      for (const [index, sample] of samples.entries()) {
+        if (!sample) { missingIds.push(uniqueIds[index]); continue; }
+        if (action === 'accept' && !sample.qualityMetrics.sufficient) { insufficient++; continue; }
+        const wasReviewed = isOperatorReviewed(sample);
+        const operatorReviewed = action === 'mark' ? true : action === 'unmark' ? false : wasReviewed;
+        const reviewStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : sample.reviewStatus;
+        if (operatorReviewed === wasReviewed && reviewStatus === sample.reviewStatus) { unchanged++; continue; }
+        const next = { ...sample, operatorReviewed, reviewStatus };
+        store.put(next);
+        updated.push(next);
+      }
+      return { updated, missingIds, insufficient, unchanged };
     });
   }
 
@@ -196,7 +217,7 @@ export class DatasetStore {
 
 export function datasetStatistics(snapshot: DatasetSnapshot) {
   return { participants: snapshot.participants.length, configuredSigns: snapshot.signs.filter(sign => sign.category === 'lsp' && signConfigurationErrors(sign).length === 0).length,
-    samples: snapshot.samples.length, pending: snapshot.samples.filter(sample => sample.reviewStatus === 'pending').length,
+    samples: snapshot.samples.length, pending: snapshot.samples.filter(sample => !isOperatorReviewed(sample)).length,
     bySign: Object.fromEntries(snapshot.signs.map(sign => [sign.id, snapshot.samples.filter(sample => sample.labelId === sign.id).length])),
     byParticipant: Object.fromEntries(snapshot.participants.map(person => [person.id, snapshot.samples.filter(sample => sample.participantId === person.id).length])) };
 }

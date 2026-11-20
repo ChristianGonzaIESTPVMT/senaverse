@@ -3,9 +3,10 @@ import { afterEach, test } from 'node:test';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { DatasetStore, datasetStatistics } from '../src/features/sign-recognition/dataset/datasetStore.ts';
 import { parseDatasetJSON, serializeDataset } from '../src/features/sign-recognition/dataset/datasetExport.ts';
+import { isOperatorReviewed } from '../src/features/sign-recognition/dataset/datasetTypes.ts';
 import { createInitialSignCatalog, createNegativeExampleCategory } from '../src/features/sign-recognition/dataset/signCatalog.ts';
 import { calculateQuality } from '../src/features/sign-recognition/dataset/datasetValidation.ts';
-import { legacyCatalogFixture, sampleFixture, signFixture } from './fixtures/dataset.mjs';
+import { captureFixture, inferenceFixture, legacyCatalogFixture, sampleFixture, signFixture } from './fixtures/dataset.mjs';
 
 const stores = [];
 afterEach(async () => { await Promise.all(stores.splice(0).map(store => store.close())); });
@@ -53,6 +54,88 @@ test('quality review is explicit and insufficient captures cannot be marked acce
   await assert.rejects(store.reviewSample(weak.sampleId, 'accepted'), /calidad insuficiente/);
   await store.reviewSample(weak.sampleId, 'rejected');
   assert.equal((await store.getSample(weak.sampleId)).reviewStatus, 'rejected');
+});
+
+test('saving after a countdown preserves the existing sample, its review, and the dataset metadata', async () => {
+  const store = database();
+  await prepared(store);
+  const first = await store.saveSample(sampleFixture('sample-previous'));
+  await store.reviewSample(first.sampleId, 'accepted');
+  const before = await store.getSample(first.sampleId);
+  const { meta, participants: [participant], signs } = await store.snapshot();
+
+  const { capture, feed, tick } = captureFixture('sample-countdown');
+  capture.start({ sign: signFixture, participant, repetition: 2, sessionConsent: true }, 3);
+  assert.equal(feed(inferenceFixture(2995, 0)), false);
+  for (let offset = 0; offset < signFixture.durationMs; offset += 40) {
+    assert.equal(feed(inferenceFixture(3000 + offset)), true);
+  }
+  const { draft } = tick(3000 + signFixture.durationMs + 120);
+  await store.saveSample(draft);
+
+  const after = await store.snapshot();
+  assert.deepEqual(after.meta, meta);
+  assert.deepEqual(after.signs, signs);
+  assert.deepEqual(await store.getSample(first.sampleId), before);
+  assert.deepEqual(await store.getSample(draft.sampleId), draft);
+});
+
+test('bulk review and acceptance persist independently and preserve complete existing samples in JSON', async () => {
+  const factory = new IDBFactory();
+  const store = database(factory);
+  await prepared(store);
+  const good = await store.saveSample(sampleFixture('bulk-good'));
+  const weak = await store.saveSample(sampleFixture('bulk-weak', signFixture, 5));
+  const legacy = await store.saveSample(sampleFixture('bulk-legacy'));
+  const document = await store.document('backup', exportedAt);
+  document.samples.find(sample => sample.sampleId === legacy.sampleId).reviewStatus = 'accepted';
+  await store.replace(document);
+  assert.equal(isOperatorReviewed(await store.getSample(legacy.sampleId)), true);
+  const ids = [good.sampleId, weak.sampleId, legacy.sampleId];
+  const marked = await store.updateSampleReviews([...ids, good.sampleId], 'mark');
+  assert.deepEqual(marked.updated.map(sample => sample.sampleId), ids.slice(0, 2));
+  assert.equal(marked.unchanged, 1);
+  assert.equal((await store.getSample(weak.sampleId)).reviewStatus, 'pending');
+  assert.equal(datasetStatistics(await store.snapshot()).pending, 0);
+
+  const accepted = await store.updateSampleReviews([good.sampleId, weak.sampleId, 'missing'], 'accept');
+  assert.deepEqual(accepted.updated.map(sample => sample.sampleId), [good.sampleId]);
+  assert.equal(accepted.insufficient, 1);
+  assert.deepEqual(accepted.missingIds, ['missing']);
+  await store.updateSampleReviews([good.sampleId, legacy.sampleId], 'unmark');
+  await store.updateSampleReviews([weak.sampleId], 'reject');
+  await store.close();
+
+  const reopened = database(factory);
+  const exported = parseDatasetJSON(serializeDataset(await reopened.document('backup', exportedAt)));
+  for (const before of document.samples) {
+    const after = exported.samples.find(sample => sample.sampleId === before.sampleId);
+    assert.deepEqual(after, {
+      ...before,
+      operatorReviewed: after.sampleId === weak.sampleId,
+      reviewStatus: after.sampleId === weak.sampleId ? 'rejected' : 'accepted',
+    });
+  }
+  assert.equal(datasetStatistics(await reopened.snapshot()).pending, 2);
+  await reopened.reviewSample(good.sampleId, 'rejected');
+  assert.equal(isOperatorReviewed(await reopened.getSample(good.sampleId)), false);
+  assert.equal((await reopened.getSample(good.sampleId)).reviewStatus, 'rejected');
+});
+
+test('a failed bulk write rolls back every review flag', async () => {
+  const store = database();
+  await prepared(store);
+  const first = await store.saveSample(sampleFixture('batch-first'));
+  const second = await store.saveSample(sampleFixture('batch-second'));
+  const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) {
+    if (this.name === 'samples' && value.sampleId === second.sampleId) throw new DOMException('Storage full', 'QuotaExceededError');
+    return original.call(this, value, ...args);
+  };
+  try { await assert.rejects(store.updateSampleReviews([first.sampleId, second.sampleId], 'mark'), { name: 'QuotaExceededError' }); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert.deepEqual(await store.getSample(first.sampleId), first);
+  assert.deepEqual(await store.getSample(second.sampleId), second);
 });
 
 test('deleting a sample or participant atomically removes corresponding sequences', async () => {

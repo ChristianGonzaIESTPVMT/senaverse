@@ -41,8 +41,15 @@ export type DatasetSample = {
   sampleId: string; labelId: string; participantId: string; repetition: number; recordedAt: string;
   durationMs: number; frames: DatasetFrame[]; incidents: CaptureIncident[]; qualityMetrics: QualityMetrics;
   captureMetadata: DatasetCaptureMetadata; reviewStatus: 'pending' | 'accepted' | 'rejected';
+  operatorReviewed?: boolean;
 };
 export type SampleSummary = Omit<DatasetSample, 'frames'>;
+export type SampleReviewAction = 'mark' | 'unmark' | 'accept' | 'reject';
+
+export function isOperatorReviewed(sample: Pick<SampleSummary, 'operatorReviewed' | 'reviewStatus'>) {
+  // Older versions displayed accepted samples as reviewed by the operator.
+  return sample.operatorReviewed ?? (sample.reviewStatus === 'accepted');
+}
 export type CaptureDefaults = { staticDurationMs: number; dynamicDurationMs: number; countdownMs: number;
   minimumFps: number; minimumFrames: number; minimumExpectedHandsRatio: number; minimumCoverageRatio: number; maxFreshAgeMs: number;
   timestamps: 'milliseconds-relative-to-recording-start'; inputMirrored: false };
@@ -59,7 +66,8 @@ export const MODEL_METADATA: ModelMetadata = {
   modelVersion: '1', quantization: 'float16', sha256: 'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1',
 };
 export const CAPTURE_DEFAULTS: CaptureDefaults = {
-  staticDurationMs: 1500, dynamicDurationMs: 2500, countdownMs: 3000,
+  staticDurationMs: 1500, dynamicDurationMs: 2500,
+  countdownMs: 3000, // Legacy v1 dataset metadata preserved for backup compatibility.
   minimumFps: 10, minimumFrames: 8, minimumExpectedHandsRatio: 0.8, minimumCoverageRatio: 0.7,
   maxFreshAgeMs: MAX_RESULT_AGE_MS, timestamps: 'milliseconds-relative-to-recording-start', inputMirrored: false,
 };
