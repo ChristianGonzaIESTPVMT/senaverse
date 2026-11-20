@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, ScanLine } from 'lucide-react';
 import { useHandDetection } from '../features/sign-recognition/useHandDetection';
-import { handDetectionMessage, type FreshHandInference, type HandDetectionState } from '../features/sign-recognition/types';
+import { handDetectionMessage, type FreshHandInference, type HandDetectionState, type HandDiagnosticSnapshot } from '../features/sign-recognition/types';
 import { CAMERA_VIDEO_CONSTRAINTS, DEFAULT_HAND_PROFILE, type HandDetectionProfile } from '../features/sign-recognition/config';
 
 const HandDiagnostics = import.meta.env.DEV ? lazy(() => import('../features/sign-recognition/HandDiagnostics')) : null;
@@ -16,10 +16,11 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'No se pudo abrir la cámara seleccionada. Puede estar ocupada, desconectada o deshabilitada en el sistema. Revisa qué cámara está elegida en el navegador y cierra otras aplicaciones que la estén utilizando.',
 };
 
-export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', onFreshInference, onSessionState }: { disabled?: boolean;
+export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', onFreshInference, onSessionState, onDiagnostics }: { disabled?: boolean;
   disabledReason?: string;
   onFreshInference?: (event: FreshHandInference) => void;
   onSessionState?: (state: PracticeCameraSessionState) => void;
+  onDiagnostics?: (snapshot: HandDiagnosticSnapshot | null) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,11 +31,12 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
   const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(() => import.meta.env.DEV && typeof window !== 'undefined'
     && (import.meta.env.VITE_HAND_DEBUG === 'true' || new URLSearchParams(window.location.search).get('handDebug') === '1'));
   const [profile, setProfile] = useState<HandDetectionProfile>(DEFAULT_HAND_PROFILE);
-  const detection = useHandDetection(videoRef, canvasRef, status === 'active', { profile, diagnosticsEnabled, onFreshInference });
+  const detection = useHandDetection(videoRef, canvasRef, status === 'active', { profile, diagnosticsEnabled: diagnosticsEnabled || !!onDiagnostics, onFreshInference });
   const detectorStatus = detection.state.status;
   const detectedHands = detection.state.handCount;
   const missingHands = detection.state.missingHands;
   useEffect(() => { onSessionState?.({ cameraStatus: status, detector: { status: detectorStatus, handCount: detectedHands, ...(missingHands ? { missingHands } : {}) } }); }, [onSessionState, status, detectorStatus, detectedHands, missingHands]);
+  useEffect(() => { onDiagnostics?.(status === 'active' ? detection.diagnostics : null); }, [onDiagnostics, detection.diagnostics, status]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -134,7 +136,7 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
         {buttonLabels[status]}
       </button>
       <p className="practice-camera-privacy">Tu cámara se procesa localmente en este dispositivo.</p>
-      {diagnosticsEnabled && HandDiagnostics && <Suspense fallback={null}><HandDiagnostics snapshot={detection.diagnostics} profile={profile} onProfile={setProfile} onReset={detection.resetDiagnostics} onDisable={() => { setDiagnosticsEnabled(false); setProfile(DEFAULT_HAND_PROFILE); }} /></Suspense>}
+      {!onDiagnostics && diagnosticsEnabled && HandDiagnostics && <Suspense fallback={null}><HandDiagnostics snapshot={detection.diagnostics} profile={profile} onProfile={setProfile} onReset={detection.resetDiagnostics} onDisable={() => { setDiagnosticsEnabled(false); setProfile(DEFAULT_HAND_PROFILE); }} /></Suspense>}
     </section>
   );
 }

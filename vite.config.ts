@@ -1,9 +1,10 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { recognitionModelPlugin } from './scripts/vite-recognition-model.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), recognitionModelPlugin()],
   worker: { format: 'es' },
   server: {
     fs: {

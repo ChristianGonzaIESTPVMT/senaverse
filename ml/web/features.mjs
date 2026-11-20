@@ -223,13 +223,16 @@ function windowEndingAt(frames, last, aspect, config) {
   while (first > 0 && frames[first].timestampMs > end - config.windowMs) first--;
   const tracked = trackFrames(frames.slice(first, last + 1), aspect, config);
   const sequence = resample(tracked, end, config);
-  if (sequence.filter(slots => slots.some(Boolean)).length / sequence.length < config.minPresenceRatio) return noHands();
+  const handCounts = [0, 0, 0];
+  for (const slots of sequence) handCounts[Number(!!slots[0]) + Number(!!slots[1])]++;
+  if (1 - handCounts[0] / sequence.length < config.minPresenceRatio) return { ...noHands(), handCounts };
   const firstHand = describeHand(sequence.map(slots => slots[0]), config);
   const secondHand = describeHand(sequence.map(slots => slots[1]), config);
   return {
     features: [...firstHand.vector, ...secondHand.vector, ...describePair(sequence, config)],
     reason: null,
     motion: firstHand.motion + secondHand.motion,
+    handCounts,
   };
 }
 
@@ -292,6 +295,9 @@ export function createLiveWindow(config = FEATURE_CONFIG) {
 
   return {
     reset,
+    summary() {
+      return { frames: frames.length, spanMs: frames.length ? Math.min(config.windowMs, lastCaptured - frames[0].timestampMs) : 0 };
+    },
     push(event, nowMs = performance.now()) {
       const { source, capturedAtMs, inferenceTimestampMs, receivedAtMs, configuration, result } = event ?? {};
       if (source !== 'worker' || ![capturedAtMs, inferenceTimestampMs, receivedAtMs, nowMs].every(Number.isFinite)

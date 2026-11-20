@@ -1,0 +1,62 @@
+.recognition-lab { min-height: 100vh; background: var(--color-page); color: var(--color-text); }
+.recognition-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px max(5vw, 18px); border-bottom: 1px solid var(--color-line); background: var(--color-sidebar); }
+.recognition-topbar > div { display: flex; align-items: center; gap: 16px; }
+.recognition-back { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-size: .875rem; font-weight: 750; }
+.recognition-content { width: min(1140px, calc(100% - 40px)); margin-inline: auto; padding-block: clamp(24px, 5vw, 56px); }
+.recognition-intro { display: flex; align-items: start; justify-content: space-between; gap: 14px; margin-bottom: 24px; }
+.recognition-intro h1 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.7rem); line-height: 1.12; letter-spacing: -.035em; }
+.recognition-intro p { margin: 8px 0 0; color: var(--color-text-secondary); }
+.recognition-version { padding: 7px 11px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-card); color: var(--color-primary); font-size: .78rem; font-weight: 800; white-space: nowrap; }
+.recognition-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.recognition-result { display: grid; gap: 13px; }
+.recognition-result h3 { margin: 1px 0 0; font-size: .92rem; }
+.recognition-mode, .recognition-settings { min-width: 0; margin: 0; padding: 0; border: 0; }
+.recognition-mode legend, .recognition-target label { font-size: .8rem; font-weight: 800; color: var(--color-text-secondary); }
+.recognition-mode div { display: flex; gap: 8px; padding-top: 5px; }
+.recognition-mode label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--color-line); border-radius: 10px; cursor: pointer; }
+.recognition-mode label:has(:checked) { background: var(--color-surface); border-color: var(--color-line-strong); }
+.recognition-mode input { margin: 0; accent-color: var(--color-primary); }
+.recognition-target { display: grid; gap: 5px; }
+.recognition-target select { width: 100%; padding: 8px; border: 1px solid var(--color-line-strong); border-radius: 8px; color: var(--color-text); background: var(--color-card); font: inherit; }
+.recognition-target p, .recognition-reason, .recognition-empty { margin: 0; color: var(--color-text-secondary); font-size: .82rem; }
+.recognition-state { padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); font-weight: 850; }
+.recognition-state[data-state='recognized'] { border-color: var(--color-success-line); background: var(--color-success-bg); color: var(--color-success); }
+.recognition-state:is([data-state='tracking'], [data-state='unknown']) { border-color: var(--color-warning-line); background: var(--color-warning-bg); color: var(--color-warning); }
+.recognition-predictions, .recognition-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.recognition-predictions > div, .recognition-metrics > div { padding: 10px; border: 1px solid var(--color-line); border-radius: 10px; }
+.recognition-predictions dt, .recognition-metrics dt { color: var(--color-text-secondary); font-size: .8rem; }
+.recognition-predictions dd, .recognition-metrics dd { margin: 3px 0 0; font-weight: 850; overflow-wrap: anywhere; }
+.recognition-predictions dd { font-size: 1.25rem; }
+.recognition-buffer { display: grid; grid-template-columns: 1fr auto; gap: 5px; align-items: center; color: var(--color-text-secondary); font-size: .75rem; }
+.recognition-buffer progress { grid-column: 1 / -1; width: 100%; height: 10px; accent-color: var(--color-primary); }
+.recognition-scores { display: grid; gap: 5px; list-style: none; padding: 0; margin: 0; font-size: .87rem; }
+.recognition-scores li { display: grid; grid-template-columns: 72px 1fr 47px; gap: 8px; align-items: center; }
+.recognition-scores meter { width: 100%; }
+.recognition-scores meter::-webkit-meter-optimum-value { background: var(--color-primary); }
+.recognition-scores strong { text-align: end; font-variant-numeric: tabular-nums; }
+.recognition-reset { justify-self: start; }
+.recognition-diagnostics { margin-top: 20px; }
+.recognition-diagnostics summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; font-weight: 850; list-style: none; }
+.recognition-diagnostics summary::-webkit-details-marker { display: none; }
+.recognition-diagnostics[open] summary svg { transform: rotate(180deg); }
+.recognition-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; }
+.recognition-settings { margin-top: 18px; }
+.recognition-settings legend { font-weight: 800; }
+.recognition-settings > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 22px; margin: 10px 0 14px; }
+.recognition-settings label { display: grid; grid-template-columns: 1fr auto; gap: 5px; align-content: start; font-size: .8rem; }
+.recognition-settings input { width: 100%; grid-column: 1 / -1; margin: 0; accent-color: var(--color-primary); }
+.recognition-settings output { font-weight: 800; text-align: right; }
+.recognition-message { padding: 12px; margin: 0 0 15px; border: 1px solid var(--color-line); border-radius: 10px; }
+.recognition-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--color-error); border-color: var(--color-error-line); background: var(--color-error-bg); }
+.recognition-error p { margin: 0; }
+@media (max-width: 800px) {
+  .recognition-grid { grid-template-columns: 1fr; }
+  .recognition-intro { flex-direction: column; }
+  .recognition-metrics, .recognition-settings > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 460px) {
+  .recognition-content { width: calc(100% - 24px); }
+  .recognition-topbar { flex-wrap: wrap; }
+  .recognition-settings > div { grid-template-columns: 1fr; }
+  .recognition-buffer { grid-template-columns: 1fr; }
+}

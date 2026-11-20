@@ -30,6 +30,8 @@ import './pages/CameraPage.css';
 import './pages/SituationsPage.css';
 
 const DatasetStudioPage = import.meta.env.VITE_ENABLE_DATA_COLLECTION === 'true' ? lazy(() => import('./pages/DatasetStudioPage')) : null;
+const RecognitionLabPage = import.meta.env.DEV && import.meta.env.MODE === 'development' && import.meta.env.VITE_ENABLE_RECOGNITION_LAB === 'true'
+  ? lazy(() => import('./pages/RecognitionLabPage')) : null;
 
 function StudentApp() {
   const situationProgress = useSituationProgress();
@@ -42,6 +44,7 @@ function StudentApp() {
     <BrowserRouter>
       <Routes>
         {DatasetStudioPage && <Route path="/herramientas/dataset" element={<Suspense fallback={<p role="status">Abriendo Dataset Studio…</p>}><DatasetStudioPage /></Suspense>} />}
+        {RecognitionLabPage && <Route path="/herramientas/reconocimiento" element={<Suspense fallback={<p role="status">Abriendo el laboratorio…</p>}><RecognitionLabPage /></Suspense>} />}
         <Route path="/" element={<StudentLayout><DashboardPage completed={completed} lastLessonId={learning.activity.lastLessonId}/></StudentLayout>} />
         <Route path="/panel" element={<Navigate to="/" replace />} />
         <Route path="/presentacion" element={<HomePage />} />
