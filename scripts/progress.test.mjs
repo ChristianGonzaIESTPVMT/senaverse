@@ -1,11 +1,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { units, totalLessons } from '../src/data/curriculum.ts';
+import { getLessonLocation, units, totalLessons } from '../src/data/curriculum.ts';
+import { questionFields } from '../src/data/lessonPlan.ts';
 import { situations } from '../src/data/situations.ts';
 import { emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, summarizeProgress } from '../src/data/progress.ts';
 
 const timestamp = '2026-11-16T15:30:00.000Z';
-const complete = (state, lessonId) => recordProgressEvent(state, { type: 'lesson', lessonId }, timestamp);
+function complete(state, lessonId) {
+  const plan = getLessonLocation(lessonId)?.lesson.plan;
+  if (!plan) return recordProgressEvent(state, { type: 'lesson', lessonId }, timestamp);
+  state = recordProgressEvent(state, { type: 'lesson-start', lessonId }, timestamp);
+  for (const step of plan.steps) {
+    const questions = step.kind === 'practice' ? step.alternative : step.questions;
+    const answers = questions && Object.fromEntries(questions.map(({ id, activity }) => [
+      id, Object.fromEntries(questionFields(activity).map(item => [item.id, item.correctId])),
+    ]));
+    const input = answers ? { method: step.kind === 'practice' ? 'alternative' : 'answers', answers } : { method: 'read' };
+    state = recordProgressEvent(state, { type: 'lesson-step', lessonId, stepId: step.id, input }, timestamp);
+  }
+  return recordProgressEvent(state, { type: 'lesson-finish', lessonId }, timestamp);
+}
 
 test('a new student has no invented completions, XP, activities or badges', () => {
   const summary = summarizeProgress(restoreProgress(null));

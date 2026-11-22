@@ -6,16 +6,23 @@ import { loadEducationModel } from '../features/sign-recognition/educationModel'
 import { useRecognition } from '../features/sign-recognition/useRecognition';
 import { RECOGNITION_STATES } from '../features/sign-recognition/liveRecognition';
 import type { RecognitionConfirmation } from '../features/sign-recognition/recognitionResult';
+import type { LessonReference } from '../data/lessonPlan';
 
 const PracticePreview = memo(PracticeCamera);
 
-export function RecognitionPractice({ initialSign = '', onConfirmed }: {
+export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
   initialSign?: string;
   onConfirmed?: (event: RecognitionConfirmation) => void;
+  guided?: { targetId: string; instruction: string; reference: LessonReference; onAccept: (signId: string) => void };
 }) {
-  const initial = resolvePracticeSign(initialSign);
+  const initial = resolvePracticeSign(guided?.targetId ?? initialSign);
+  const [confirmedMatch, setConfirmedMatch] = useState<string | null>(null);
   const recognition = useRecognition(loadEducationModel, {
-    initialMode: initial ? { type: 'directed', targetId: initial.id } : { type: 'free' }, onConfirmed,
+    initialMode: initial ? { type: 'directed', targetId: initial.id } : { type: 'free' },
+    onConfirmed(event) {
+      onConfirmed?.(event);
+      if (event.outcome === 'matched' && event.signId === guided?.targetId) setConfirmedMatch(event.signId);
+    },
   });
   const [showLandmarks, setShowLandmarks] = useState(false);
   const [showUnavailable, setShowUnavailable] = useState(() => !!initialSign && !initial);
@@ -32,7 +39,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed }: {
   }
 
   return <section aria-label="Práctica con reconocimiento">
-    <div className="practice-panel practice-selection">
+    {!guided && <div className="practice-panel practice-selection">
       <div className="practice-select-field">
         <label htmlFor={id}>Modo de práctica</label>
         <select id={id} ref={selectRef} value={targetId} onChange={event => selectTarget(event.target.value)}>
@@ -46,7 +53,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed }: {
         <span className="practice-demo-label">Reconocimiento experimental</span>
         <p>Procesamiento local de diez señas de LSP.</p>
       </div>
-    </div>
+    </div>}
     {showUnavailable && <p className="practice-feedback" role="status">La seña del enlace está fuera del catálogo de reconocimiento. Elige una de las diez disponibles.</p>}
     {modelState.status === 'loading' && <p className="practice-feedback" role="status">Cargando el reconocimiento…</p>}
     {modelState.status === 'error' && <div className="practice-recognition-error">
@@ -72,21 +79,30 @@ export function RecognitionPractice({ initialSign = '', onConfirmed }: {
               {result.confirmation?.outcome === 'different' && <p>El modelo confirmó una seña distinta de la elegida.</p>}
             </>}
           </div>
-          <button type="button" className="button button-outline" onClick={recognition.reset} disabled={!cameraActive || modelState.status !== 'ready'}>
+          <button type="button" className="button button-outline" onClick={() => {
+            setConfirmedMatch(null);
+            recognition.reset();
+          }} disabled={!cameraActive || modelState.status !== 'ready'}>
             <RotateCcw size={17} aria-hidden="true" /> Reintentar práctica
           </button>
+          {guided && confirmedMatch === guided.targetId && <>
+            <p>Coincidencia experimental disponible para registrar en este intento.</p>
+            <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>Guardar práctica y continuar</button>
+          </>}
         </section>
         <section className="practice-panel practice-recognition-result">
           <h2>{reference ? `Cómo hacer «${reference.name}»` : 'Cómo practicar'}</h2>
           {reference ? <>
-            <p>{reference.instructions}</p>
-            {reference.sourceReference && <a className="practice-reference-link" href={`${mineduGuidePdf}#page=${reference.sourceReference.page}`}
+            <p>{guided?.instruction ?? reference.instructions}</p>
+            {guided ? <a className="practice-reference-link" href={guided.reference.url} target="_blank" rel="noopener noreferrer">
+              <BookOpen size={18} aria-hidden="true" /> {guided.reference.title} (nueva pestaña)
+            </a> : reference.sourceReference && <a className="practice-reference-link" href={`${mineduGuidePdf}#page=${reference.sourceReference.page}`}
               target="_blank" rel="noopener noreferrer"><BookOpen size={18} aria-hidden="true" /> Ver la guía ilustrada del MINEDU, pág. {reference.sourceReference.page} (nueva pestaña)</a>}
           </> : <p>Mantén las posturas estáticas hasta la confirmación. Para las señas dinámicas, realiza el movimiento completo.</p>}
         </section>
       </div>
     </div>
-    <details className="practice-panel practice-catalog">
+    {!guided && <details className="practice-panel practice-catalog">
       <summary>Consultar las diez señas compatibles</summary>
       <ul>{recognitionSigns.map(sign => <li key={sign.id}>
         <button type="button" className="button button-outline" aria-pressed={targetId === sign.id} onClick={() => {
@@ -94,6 +110,6 @@ export function RecognitionPractice({ initialSign = '', onConfirmed }: {
           selectRef.current?.focus();
         }}>{sign.name}</button>
       </li>)}</ul>
-    </details>
+    </details>}
   </section>;
 }

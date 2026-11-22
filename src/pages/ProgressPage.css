@@ -203,3 +203,4 @@ body:has(.progress-dialog[open]) { overflow: hidden; }
   .app-shell:has(.progress-page) .app-example-xp svg { width: 17px; height: 17px; }
   .app-shell:has(.progress-page) .app-avatar { width: 35px; height: 35px; font-size: 16px; }
 }
+.progress-statistic dd small { display: block; margin-top: 3px; font-size: .75rem; font-weight: 700; color: var(--color-text-secondary); }

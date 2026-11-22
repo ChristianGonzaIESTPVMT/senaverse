@@ -1,3 +1,6 @@
+import type { LessonPlan } from './lessonPlan.ts';
+import { numbersLesson } from './numbersLesson.ts';
+
 type ActivityOption = { id: string; label: string };
 type ActivityBase = { question: string; success: string };
 export type LessonActivity = ActivityBase & (
@@ -5,23 +8,23 @@ export type LessonActivity = ActivityBase & (
   | { type: 'association'; options: ActivityOption[]; pairs: { id: string; label: string; answerId: string }[] }
 );
 
+type LegacyLessonContent = {
+  heading: string;
+  explanation: string;
+  concepts?: { title: string; description: string; example: string }[];
+  activity: LessonActivity;
+  signId?: string;
+  practiceSignId?: string;
+  videoSrc?: string;
+  thumbnailSrc?: string;
+  captionsSrc?: string;
+};
 export type Lesson = {
   id: string;
   title: string;
   duration: string;
   description: string;
-  content: {
-    heading: string;
-    explanation: string;
-    concepts?: { title: string; description: string; example: string }[];
-    activity: LessonActivity;
-    signId?: string;
-    practiceSignId?: string;
-    videoSrc?: string;
-    thumbnailSrc?: string;
-    captionsSrc?: string;
-  };
-};
+} & ({ content: LegacyLessonContent; plan?: never } | { plan: LessonPlan; content?: never });
 export type Unit = { id: number; title: string; subtitle: string; illustration: 'greetings' | 'alphabet' | 'everyday'; lessons: Lesson[] };
 
 /** Contenido DEMOSTRATIVO: validar materiales y señas con especialistas en LSP antes de publicar. */
@@ -133,17 +136,8 @@ export const units: Unit[] = [
       },
       {
         id: 'numeros', title: 'Números básicos', duration: '9 min',
-        description: 'Identifica cantidades y prepara su práctica visual.',
-        content: {
-          heading: 'Expresa cantidades en contexto',
-          explanation: 'Los números aparecen al contar objetos, indicar una cantidad o realizar una compra. Empieza por identificar la cantidad que deseas expresar y consulta la demostración de LSP correspondiente.',
-          signId: 'dos',
-          activity: {
-            type: 'identify', question: 'Llevas una botella para ti y otra para tu compañero. ¿Qué cantidad necesitas expresar?',
-            options: [{ id: 'uno', label: 'Uno' }, { id: 'dos', label: 'Dos' }, { id: 'tres', label: 'Tres' }],
-            correctId: 'dos', success: '¡Correcto! Una botella para cada persona suma dos botellas.',
-          },
-        },
+        description: 'Aprende los números del uno al cinco en LSP y practícalos con o sin cámara.',
+        plan: numbersLesson,
       },
       {
         id: 'dactilologia', title: 'Dactilología en contexto', duration: '10 min',

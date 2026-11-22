@@ -97,7 +97,11 @@ export function ProgressPage() {
           </div>
         </section>
         <dl className="progress-statistics">{statistics.map(({ label, value, icon: Icon }) => <div className="progress-statistic" key={label}>
-          <Icon size={35} strokeWidth={1.9} aria-hidden="true" /><dt>{label}</dt><dd>{value.toLocaleString('es-PE')}</dd>
+          <Icon size={35} strokeWidth={1.9} aria-hidden="true" /><dt>{label}</dt>
+          <dd>{value.toLocaleString('es-PE')}
+            {label === 'Prácticas realizadas' && (summary.lessonCameraPractices > 0 || summary.lessonAlternatives > 0) &&
+              <small>En Aprender, {summary.lessonCameraPractices} con cámara y {summary.lessonAlternatives} sin cámara.</small>}
+          </dd>
         </div>)}</dl>
       </div>
 

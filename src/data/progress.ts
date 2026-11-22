@@ -2,6 +2,7 @@ import { getLessonLocation, initialCompletedLessonIds, totalLessons, units } fro
 import { libraryEntries } from './library.ts';
 import { situations } from './situations.ts';
 import { minigames } from './minigames.ts';
+import { nextStudyStep, restoreStudyRun, submitStudyStep, type StudyInput, type StudyRun } from './lessonStudy.ts';
 
 export const PROGRESS_KEY = 'senaverse-student-progress-v1';
 export const LEGACY_PROGRESS_KEY = 'senaverse-demo-completed-v1';
@@ -10,20 +11,23 @@ export const EXPLORER_SIGN_COUNT = 3;
 export const CONSISTENCY_UNIT_COUNT = 2;
 
 type Recognition = { recognized: true; confidence: number };
-export type ProgressEvent =
+type ActivityEvent =
   | { type: 'lesson'; lessonId: string }
   | { type: 'camera'; sessionId: string; signId: string; result: Recognition }
   | { type: 'situation-scene'; situationId: string; sceneId: string; result: Recognition }
   | { type: 'minigame'; runId: string; gameId: string; score: number; maxScore: number; completed: true };
+type StudyEvent = { type: 'lesson-start' | 'lesson-finish'; lessonId: string }
+  | { type: 'lesson-step'; lessonId: string; stepId: string; input: StudyInput };
+export type ProgressEvent = ActivityEvent | StudyEvent;
 
 export type ProgressActivity = {
   id: string;
-  type: ProgressEvent['type'] | 'situation';
+  type: ActivityEvent['type'] | 'situation';
   targetId: string;
   occurredAt: string | null;
   result?: Recognition | { score: number; maxScore: number };
 };
-export type StudentProgress = { version: 1; activities: ProgressActivity[]; consultedSignIds: string[] };
+export type StudentProgress = { version: 1; activities: ProgressActivity[]; consultedSignIds: string[]; lessonStudy?: Record<string, StudyRun> };
 export const emptyProgress = (): StudentProgress => ({ version: 1, activities: [], consultedSignIds: [] });
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -79,12 +83,43 @@ function appendActivity(state: StudentProgress, activity: ProgressActivity): Stu
   return { ...state, activities };
 }
 
-/** Call only from a completed activity or a real recognition callback, never on page visits. */
+function recordStudyEvent(state: StudentProgress, event: StudyEvent, at: string): StudentProgress {
+  const plan = getLessonLocation(event.lessonId)?.lesson.plan;
+  if (!plan) return state;
+  const previous = state.lessonStudy?.[event.lessonId];
+  let run: StudyRun;
+  switch (event.type) {
+    case 'lesson-start':
+      if (previous) return state;
+      run = { startedAt: at, steps: {} };
+      break;
+    case 'lesson-step':
+      if (!previous) return state;
+      run = submitStudyStep(plan, previous, event.stepId, event.input, at);
+      if (run === previous) return state;
+      break;
+    case 'lesson-finish':
+      if (!previous || previous.completedAt || nextStudyStep(plan, previous) !== plan.steps.length) return state;
+      run = { ...previous, completedAt: at };
+      break;
+  }
+  const next = { ...state, lessonStudy: { ...state.lessonStudy, [event.lessonId]: run } };
+  return event.type === 'lesson-finish'
+    ? appendActivity(next, { id: `lesson:${event.lessonId}`, type: 'lesson', targetId: event.lessonId, occurredAt: at }) : next;
+}
+
+/** The existing completion ledger remains the source of XP for every lesson. */
 export function recordProgressEvent(state: StudentProgress, event: ProgressEvent, occurredAt = new Date().toISOString()): StudentProgress {
   if (!validTime(occurredAt)) return state;
   let candidate: unknown;
   switch (event.type) {
-    case 'lesson': candidate = { id: `lesson:${event.lessonId}`, type: event.type, targetId: event.lessonId, occurredAt }; break;
+    case 'lesson-start':
+    case 'lesson-step':
+    case 'lesson-finish': return recordStudyEvent(state, event, occurredAt);
+    case 'lesson':
+      if (getLessonLocation(event.lessonId)?.lesson.plan) return state;
+      candidate = { id: `lesson:${event.lessonId}`, type: event.type, targetId: event.lessonId, occurredAt };
+      break;
     case 'camera':
       if (!event.sessionId?.trim()) return state;
       candidate = { id: `camera:${event.sessionId}`, type: event.type, targetId: event.signId, result: event.result, occurredAt }; break;
@@ -114,6 +149,15 @@ export function restoreProgress(stored: string | null, legacy: string | null = n
         if (activity) state = appendActivity(state, activity);
       }
       for (const id of parsed.consultedSignIds) if (typeof id === 'string') state = recordSignConsultation(state, id);
+      if (record(parsed.lessonStudy)) {
+        for (const [id, value] of Object.entries(parsed.lessonStudy)) {
+          const plan = getLessonLocation(id)?.lesson.plan;
+          const run = plan && restoreStudyRun(plan, value);
+          if (!run) continue;
+          state = { ...state, lessonStudy: { ...state.lessonStudy, [id]: run } };
+          if (run.completedAt) state = appendActivity(state, { id: `lesson:${id}`, type: 'lesson', targetId: id, occurredAt: run.completedAt });
+        }
+      }
       return state;
     }
   } catch { /* Recover valid legacy completions if the new storage is damaged. */ }
@@ -130,6 +174,15 @@ export function restoreProgress(stored: string | null, legacy: string | null = n
 
 export function summarizeProgress(state: StudentProgress) {
   const completed = state.activities.filter(item => item.type === 'lesson').map(item => item.targetId);
+  let lessonCameraPractices = 0, lessonAlternatives = 0;
+  for (const run of Object.values(state.lessonStudy ?? {})) {
+    for (const step of Object.values(run.steps)) {
+      if (!step.complete) continue;
+      const method = step.attempts.at(-1)?.input.method;
+      if (method === 'camera') lessonCameraPractices++;
+      if (method === 'alternative') lessonAlternatives++;
+    }
+  }
   const unitProgress = units.map(unit => {
     const done = unit.lessons.filter(lesson => completed.includes(lesson.id)).length;
     return { unit, done, percent: unit.lessons.length ? Math.round(done / unit.lessons.length * 100) : 0 };
@@ -138,7 +191,9 @@ export function summarizeProgress(state: StudentProgress) {
     completed,
     unitProgress,
     percent: totalLessons ? Math.round(completed.length / totalLessons * 100) : 0,
-    practices: state.activities.filter(item => item.type === 'camera').length,
+    practices: state.activities.filter(item => item.type === 'camera').length + lessonCameraPractices + lessonAlternatives,
+    lessonCameraPractices,
+    lessonAlternatives,
     xp: completed.length * LESSON_XP,
     achievements: [
       { id: 'first-step', name: 'Primer paso', description: 'Completa tu primera lección.', obtained: completed.length >= 1 },

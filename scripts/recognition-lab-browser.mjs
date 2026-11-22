@@ -8,11 +8,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createServer, preview } from 'vite';
 import { simulate } from '../ml/scripts/replay_session.mjs';
 import { parseLabModel } from '../src/features/sign-recognition/labModel.ts';
+import { checkLesson } from './fixtures/lesson-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
 const mode = process.argv[3] ?? 'lab';
-assert.ok(['lab', 'student-development', 'student-production'].includes(mode));
+assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -203,7 +204,7 @@ try {
   const debug = mode === 'student-development' ? 'VITE_HAND_DEBUG=true\n' : '';
   await writeFile(join(directory, '.env.development.local'), 'VITE_ENABLE_RECOGNITION_LAB=true\nVITE_ENABLE_DATA_COLLECTION=true\n' + debug);
   const common = { envDir: directory, cacheDir: join(directory, 'vite-cache'), logLevel: 'silent' };
-  if (mode === 'student-production') server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
+  if (mode.endsWith('-production')) server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
   else {
     server = await createServer({ ...common, server: { host: '127.0.0.1', port: 0, ws: false } });
     await server.listen();
@@ -280,7 +281,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode !== 'lab') {
+  if (mode.startsWith('lesson-')) {
+    await checkLesson({ send, evaluate, requests }, origin, until, datasetPath);
+  } else if (mode !== 'lab') {
     await checkStudent({ send, evaluate, requests }, origin);
   } else {
   await send('Page.navigate', { url: origin + '/herramientas/reconocimiento' });
@@ -344,7 +347,7 @@ try {
     await Promise.race([exited, delay(2000)]);
   }
   if (server) {
-    if (mode === 'student-production') await new Promise(resolve => server.httpServer.close(resolve));
+    if (mode.endsWith('-production')) await new Promise(resolve => server.httpServer.close(resolve));
     else await server.close();
   }
   await rm(directory, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });

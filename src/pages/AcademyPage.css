@@ -185,3 +185,31 @@
   .learning-banner-stat { padding-inline: 5px; }
   .learning-banner-stat:last-child dd { font-size: 16px; }
 }
+.lesson-sequence, .lesson-sequence-stack, .lesson-sequence-questions { display: grid; gap: 16px; min-width: 0; }
+.lesson-sequence { align-content: start; }
+.lesson-sequence > .button, .lesson-sequence-questions > .button, .lesson-sequence-stack > .button { justify-self: start; }
+.lesson-sequence-outline { padding: 16px 20px; }
+.lesson-sequence-outline p { margin: 0 0 6px; }
+.lesson-sequence-outline progress { width: 100%; accent-color: var(--color-primary); }
+.lesson-sequence-outline summary { margin-top: 6px; cursor: pointer; }
+.lesson-sequence-outline ol { margin-bottom: 0; padding-inline-start: 24px; }
+.lesson-sequence-outline button { display: inline-flex; align-items: center; gap: 6px; padding: 5px; text-align: start; color: var(--color-text); }
+.lesson-sequence-outline button:disabled { color: var(--color-text-muted); }
+.lesson-sequence-outline button[aria-current="step"] { color: var(--color-primary); font-weight: 850; }
+.lesson-sequence-step { margin-top: 0; }
+.lesson-sequence-step h2:focus { outline-offset: 4px; }
+.lesson-sequence-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.lesson-sequence-stack .lesson-sequence-nav, .lesson-sequence-stack p { margin: 0; }
+.lesson-number-list { display: grid; gap: 10px; }
+.lesson-number-list > div, .lesson-result-list li { padding: 12px 14px; border: 1px solid var(--color-line); border-radius: 12px; }
+.lesson-number-list dt, .lesson-answer-fields legend { font-weight: 850; }
+.lesson-number-list dd { margin: 3px 0 0; }
+.lesson-sign-availability { color: var(--color-text-secondary); font-size: .84em; }
+.lesson-answer-fields { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.lesson-answer-fields legend { margin-bottom: 8px; padding: 0; }
+.lesson-answer-fields small { display: block; font-weight: 750; }
+.lesson-result-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.lesson-result-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+@media (max-width: 680px) {
+  .lesson-sequence-step .practice-workspace { grid-template-columns: minmax(0, 1fr); }
+}
