@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Camera, Check } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { LessonAnswerFields } from './LessonActivity';
+import { SignHandDiagram } from './SignHandDiagram';
 import { gradeAnswers, type Answers, type LessonPlan, type LessonReference, type Question, type StudyStep } from '../data/lessonPlan';
 import { nextStudyStep, type Attempt, type StepProgress, type StudyInput, type StudyRun } from '../data/lessonStudy';
 import { useStudentProgress } from '../hooks/progressContext';
@@ -183,6 +184,7 @@ export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
             const name = sign.name ?? entry?.word;
             return <div key={sign.id}>
               <dt>{name}</dt><dd>{sign.explanation ?? entry?.instructions}</dd>
+              {!step.reference && entry?.handDiagram && <dd className="lesson-question-diagram"><SignHandDiagram diagram={entry.handDiagram} /></dd>}
               <dd className="lesson-sign-availability">{entry?.recognitionClassId ? 'Reconocimiento experimental disponible' : 'Contenido de estudio'}</dd>
               {entry && <dd><Link to={getLibrarySignPath(entry.id)} state={{ lessonReturn: { lessonId, stepId: step.id } }}
                 aria-label={`Ver ficha de ${name} en Biblioteca`}>Ver ficha en Biblioteca</Link></dd>}

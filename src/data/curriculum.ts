@@ -28,7 +28,7 @@ export type Lesson = {
   duration: string;
   description: string;
 } & ({ content: LegacyLessonContent; plan?: never } | { plan: LessonPlan; content?: never });
-export type Unit = { id: number; title: string; subtitle: string; illustration: 'greetings' | 'alphabet' | 'everyday'; lessons: Lesson[] };
+export type Unit = { id: number; title: string; subtitle: string; illustration: 'greetings' | 'alphabet' | 'numbers' | 'everyday' | 'review'; lessons: Lesson[] };
 
 const previousUnits: Unit[] = [
   {
@@ -280,7 +280,7 @@ function lessons(...ids: string[]): Lesson[] {
 export const units: Unit[] = [
   { id: 1, title: 'Primeros pasos', subtitle: 'Conoce la LSP y practica la atención visual.', illustration: 'greetings',
     lessons: lessons('introduccion', 'comunicacion-visual', 'repaso-basico', 'evaluacion-inicial') },
-  { id: 2, title: 'Números básicos', subtitle: 'Identifica cantidades y estudia los números del cero al diez.', illustration: 'alphabet',
+  { id: 2, title: 'Números básicos', subtitle: 'Identifica cantidades y estudia los números del cero al diez.', illustration: 'numbers',
     lessons: lessons('numeros', 'cero', 'seis-a-diez', 'abecedario', 'dactilologia', 'repaso-alfabeto') },
   { id: 3, title: 'Saludos y cortesía', subtitle: 'Elige un saludo según el momento y practica cómo pedir disculpas.', illustration: 'greetings',
     lessons: lessons('saludos', 'cortesia') },
@@ -288,7 +288,7 @@ export const units: Unit[] = [
     lessons: lessons('expresiones', 'elecciones-y-compania') },
   { id: 5, title: 'Personas, familia y entorno', subtitle: 'Identifica vínculos familiares y lugares frecuentes.', illustration: 'everyday',
     lessons: lessons('familia', 'comunidad', 'presentaciones', 'alimentos') },
-  { id: 6, title: 'Aplicación y evaluación', subtitle: 'Usa el vocabulario estudiado en situaciones cotidianas.', illustration: 'alphabet',
+  { id: 6, title: 'Aplicación y evaluación', subtitle: 'Usa el vocabulario estudiado en situaciones cotidianas.', illustration: 'review',
     lessons: lessons('repaso-cotidiano') },
 ];
 

@@ -40,15 +40,15 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   })()`);
 
   await send('Page.navigate', { url: origin + list });
-  await result(25);
+  await result(35);
   assert.equal(modelRequests().length, 0);
   await search('MAMÁ');
   await result(1);
   assert.equal(await evaluate('document.querySelector(".library-card h2").textContent'), 'Mamá');
-  assert.match(await evaluate('document.querySelector(".library-card").textContent'), /Referencia pendiente.*Sin reconocimiento/s);
+  assert.match(await evaluate('document.querySelector(".library-card").textContent'), /Abrir lámina.*Sin reconocimiento/s);
   await clear();
   await named('.library-filters button', '123Números');
-  await result(6);
+  await result(11);
   await toggle(0);
   await result(5);
   await toggle(1);
@@ -73,7 +73,7 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   assert.equal(await evaluate('document.querySelector(".library-card h2").textContent'), 'Sí');
   await aria('Sí en favoritos');
   await reload();
-  await result(25);
+  await result(35);
   await toggle(1);
   await result(0);
   assert.deepEqual(await evaluate(`JSON.parse(localStorage.getItem('${key}')).favoriteSignIds`), []);
@@ -82,7 +82,7 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   await open('Cero');
   await dialog('Cero');
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('.library-dialog a')).some(link => link.pathname.startsWith('/camara'))`), false);
-  assert.match(await evaluate('document.querySelector(".library-dialog").textContent'), /repasar la postura/);
+  assert.match(await evaluate('document.querySelector(".library-dialog").textContent'), /repasar la seña/);
   await named('.library-dialog-save', 'Guardar en favoritos');
   await until('favorito guardado', () => evaluate(`JSON.parse(localStorage.getItem('${key}')).favoriteSignIds.includes('cero')`));
   await reload();
@@ -103,7 +103,7 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   await aria('Ver ficha de Tres en Biblioteca');
   await dialog('Tres');
   assert.equal(await evaluate(`JSON.parse(localStorage.getItem('${progressKey}')).lessonStudy.numeros.steps.inicio.complete`), true);
-  await named('.library-dialog-actions a', 'Ir a Números básicos');
+  await named('.library-dialog-actions a', 'Volver a la lección');
   await until('regreso con progreso', () => evaluate('document.querySelector("#study-step-title")?.textContent.includes("Observa")'));
   assert.match(await evaluate('document.querySelector(".lesson-sequence-outline").textContent'), /1 de 10/);
   await evaluate('document.querySelector(".theme-toggle").click()');
@@ -125,6 +125,6 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   assert.equal(await evaluate('document.querySelector(".practice-select-field select").value'), '');
   assert.equal(await evaluate('window.studentAttempts'), 0);
 
-  console.log(JSON.stringify({ catalog: 25, combinedFilters: true, profileMigration: true, deepLink: true,
+  console.log(JSON.stringify({ catalog: 35, combinedFilters: true, profileMigration: true, deepLink: true,
     keyboard: true, directedTarget: 'LSP-003', cameraOpened: false, resumeLesson: true, mobileDark: true }));
 }

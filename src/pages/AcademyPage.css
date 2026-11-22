@@ -45,6 +45,7 @@
 .learning-alphabet span:nth-child(1) { color: light-dark(#66c8e7, var(--color-info)); transform: rotate(-12deg) translateY(7px); }
 .learning-alphabet span:nth-child(2) { color: light-dark(#ffd366, var(--color-warning)); transform: rotate(2deg) translateY(-3px); }
 .learning-alphabet span:nth-child(3) { color: light-dark(#ff9c90, var(--color-error)); transform: rotate(13deg) translateY(6px); }
+.learning-review { display: grid; height: 100%; place-items: center; color: var(--color-primary); }
 .learning-family { position: relative; display: block; width: 128px; height: 106px; color: light-dark(#402d61, var(--color-text)); }
 .learning-family-house { position: absolute; top: 5px; left: 0; width: 90px; height: 87px; fill: #ffe4d3; }
 .learning-family-people { position: absolute; bottom: 0; right: -6px; width: 82px; height: 71px; fill: #87c9ed; }

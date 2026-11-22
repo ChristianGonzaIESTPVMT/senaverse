@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
 import { PROFILE_KEY, defaultProfile, restoreProfile } from '../src/data/profile.ts';
-import { emptyProgress, recordProgressEvent, PROGRESS_KEY } from '../src/data/progress.ts';
+import { emptyProgress, restoreProgress, PROGRESS_KEY } from '../src/data/progress.ts';
 import { THEME_KEY } from '../src/data/theme.ts';
 import { PHOTO_INPUT_LIMIT, PHOTO_STORED_LIMIT, decodePhoto, drawPhotoCrop, encodePhoto, imageDimensions, openPhotoFile, photoCrop, validatePhotoFile, validateStoredPhoto } from '../src/data/profilePhoto.ts';
 import { PHOTO_DB_NAME, cleanProfilePhotos, commitProfilePhoto, deleteProfilePhoto, readProfilePhoto, writeProfilePhoto } from '../src/data/profilePhotoStore.ts';
@@ -162,7 +162,7 @@ test('provider saves, reloads and replaces a photo, retaining only the latest re
 });
 
 test('returning to a preset removes the photo and reset also preserves progress and theme byte for byte', async () => {
-  const progress = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'saludos' });
+  const progress = restoreProgress(null, '["saludos"]');
   values.set(PROGRESS_KEY, JSON.stringify(progress)); values.set(THEME_KEY, 'dark'); values.set('dataset-sentinel', 'keep');
   const before = [...values.entries()];
   await context().savePhoto(photo()); const first = context().profile.photoId;
@@ -177,7 +177,7 @@ test('returning to a preset removes the photo and reset also preserves progress 
 
 test('backup v2 embeds a bounded validated photo and real progress without an internal-only reference', async () => {
   const profile = { ...defaultProfile(), photoId: 'photo-export-valid' };
-  const progress = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'saludos' });
+  const progress = restoreProgress(null, '["saludos"]');
   const backup = await createProfileBackup(profile, progress, photo());
   assert.equal(backup.schemaVersion, 2); assert.equal(backup.profile.photoId, undefined);
   assert.equal(backup.profile.avatar.kind, 'photo');

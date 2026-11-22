@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PROFILE_BIO_LIMIT, PROFILE_KEY, PROFILE_NAME_LIMIT, createProfileExport, defaultProfile, profileAvatars, restoreProfile, validatePersonalInfo } from '../src/data/profile.ts';
-import { PROGRESS_KEY, emptyProgress, recordProgressEvent, recordSignConsultation, summarizeProgress } from '../src/data/progress.ts';
+import { PROGRESS_KEY, emptyProgress, recordSignConsultation, restoreProgress, summarizeProgress } from '../src/data/progress.ts';
 
 test('a local profile starts with neutral defaults and a storage key independent of progress', () => {
   assert.deepEqual(restoreProfile(null), { version: 1, displayName: 'Estudiante', bio: '', avatarId: 'hand' });
@@ -44,7 +44,9 @@ test('every built-in avatar and valid profile survive a storage round trip', () 
 });
 
 test('JSON export uses real progress and achievements, a schema version, and excludes dataset and unknown data', () => {
-  let progress = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'introduccion' }, '2026-11-17T15:00:00Z');
+  let progress = restoreProgress(JSON.stringify({ ...emptyProgress(), activities: [
+    { id: 'lesson:introduccion', type: 'lesson', targetId: 'introduccion', occurredAt: '2026-11-17T15:00:00Z' },
+  ] }));
   for (const id of ['hola', 'gracias', 'adios']) progress = recordSignConsultation(progress, id);
   const before = JSON.stringify(progress);
   const profile = { ...defaultProfile(), displayName: 'Ana', avatarId: 'cat' };

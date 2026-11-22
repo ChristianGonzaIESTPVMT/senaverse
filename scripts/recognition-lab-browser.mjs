@@ -13,13 +13,15 @@ import { checkLibrary } from './fixtures/library-browser.mjs';
 import { checkSituations } from './fixtures/situation-browser.mjs';
 import { checkMinigames } from './fixtures/minigames-browser.mjs';
 import { checkStudentOverview } from './fixtures/student-overview-browser.mjs';
+import { checkCurriculum } from './fixtures/curriculum-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
 const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
   'library-development', 'library-production', 'situation-development', 'situation-production',
-  'minigames-development', 'minigames-production', 'progress-development', 'progress-production'].includes(mode));
+  'minigames-development', 'minigames-production', 'progress-development', 'progress-production',
+  'curriculum-development', 'curriculum-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -292,7 +294,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('progress-')) {
+  if (mode.startsWith('curriculum-')) {
+    await checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath);
+  } else if (mode.startsWith('progress-')) {
     await checkStudentOverview({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('minigames-')) {
     await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath);

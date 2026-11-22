@@ -18,11 +18,12 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
   const labelFor = (id: string) => activity.options.find(option => option.id === id)?.label;
   return <fieldset className="lesson-answer-fields" disabled={disabled}>
     <legend>{activity.question}</legend>
+    {activity.type === 'order' && <small>Usa cada acción una sola vez.</small>}
     {diagram && <div className="lesson-question-diagram"><SignHandDiagram diagram={diagram} /></div>}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
       return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
-        <span>{pair.label}{checked && <small>{correct ? 'Correcta' : `Incorrecta. Respuesta correcta: ${labelFor(pair.answerId)}`}</small>}</span>
+        <span>{pair.label}{checked && <small>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}</span>
         <select value={responses[pair.id] ?? ''} onChange={event => onResponse(pair.id, event.target.value)}>
           <option value="">Elige una respuesta</option>
           {activity.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -35,7 +36,7 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
       return <label className={`answer${selected ? ' selected' : ''}${feedback}`} key={option.id}>
         <input type="radio" name={name} value={option.id} checked={selected} onChange={() => onResponse('choice', option.id)} />
         <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>{option.label}
-        {feedback && <small>{feedback === ' right' ? 'Correcta' : `Incorrecta. Respuesta correcta: ${labelFor(activity.correctId)}`}</small>}
+        {feedback && <small>{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
       </label>;
     })}
     {checked && activity.explanation && <p className="lesson-answer-explanation">{activity.explanation}</p>}

@@ -4,8 +4,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import { units } from '../src/data/curriculum.ts';
-import { emptyProgress, recordProgressEvent, recordSignConsultation } from '../src/data/progress.ts';
+import { legacyUnitLessonIds, units } from '../src/data/curriculum.ts';
+import { emptyProgress, recordSignConsultation, restoreProgress } from '../src/data/progress.ts';
 
 const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: 'custom' });
 let ProgressPage, StudentLayout, ProgressContext, StudentProfileProvider;
@@ -37,11 +37,13 @@ test('the real progress page renders an empty student, shared navigation, dialog
 });
 
 test('historical lesson credit appears in XP, badge and history while the available curriculum stays at zero', () => {
-  const state = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'introduccion' }, '2026-11-16T15:00:00Z');
+  const state = restoreProgress(JSON.stringify({ ...emptyProgress(), activities: [
+    { id: 'lesson:introduccion', type: 'lesson', targetId: 'introduccion', occurredAt: '2026-11-16T15:00:00Z' },
+  ] }));
   const html = renderProgress(state);
   assert.match(html, />80 XP</);
   assert.match(html, /<strong>0%<\/strong>/);
-  assert.match(html, /0 de 1 lecciones funcionales/);
+  assert.match(html, /0 de 12 lecciones funcionales/);
   assert.match(html, /1 finalización anterior/);
   assert.match(html, /first-step is-obtained/);
   assert.match(html, /explorer is-locked/);
@@ -58,13 +60,15 @@ test('rendering a page never grants an achievement or adds an activity', () => {
 });
 
 test('the overview shows four recent activities and keeps older ones in history', () => {
-  let state = emptyProgress();
-  for (const lesson of units[0].lessons) state = recordProgressEvent(state, { type: 'lesson', lessonId: lesson.id }, '2026-11-16T15:00:00Z');
+  const ids = legacyUnitLessonIds[0];
+  const state = restoreProgress(JSON.stringify({ ...emptyProgress(), activities: ids.map(id => ({
+    id: `lesson:${id}`, type: 'lesson', targetId: id, occurredAt: '2026-11-16T15:00:00Z',
+  })) }));
   const html = renderProgress(state);
   const overview = html.split('<section class="progress-panel progress-recent"')[1].split('</section>')[0];
   assert.equal((overview.match(/class="progress-activity-icon"/g) ?? []).length, 4);
   const history = html.split('aria-labelledby="progress-history-title"')[1];
-  assert.equal((history.match(/class="progress-activity-icon"/g) ?? []).length, units[0].lessons.length);
+  assert.equal((history.match(/class="progress-activity-icon"/g) ?? []).length, ids.length);
 });
 
 test('Explorer displays as earned after actual distinct sign consultations', () => {

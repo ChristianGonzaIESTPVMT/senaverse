@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ArrowRight, Award, Blocks, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Gamepad2, GraduationCap, Hand, History, Layers, LockKeyhole, Star, Target, UsersRound, X, Zap } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Gamepad2, GraduationCap, Hand, Hash, History, Layers, LockKeyhole, Star, Target, UsersRound, X, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { getUnitPath } from '../data/curriculum';
@@ -13,6 +13,7 @@ import { useStudentOverview } from '../hooks/useStudentOverview';
 import './ProgressPage.css';
 
 const dayLabel = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeZone: STUDENT_TIME_ZONE });
+const unitIcons = { greetings: Hand, alphabet: Hash, numbers: Hash, everyday: UsersRound, review: ClipboardCheck };
 
 function ProgressGlyph() {
   return <span className="progress-glyph" aria-hidden="true"><i /><i /><i /></span>;
@@ -97,7 +98,7 @@ export function ProgressPage() {
         <section className="progress-panel progress-units" aria-labelledby="progress-units-title">
           <div className="progress-section-heading"><h2 id="progress-units-title"><Layers aria-hidden="true" /> Avance de mis unidades</h2></div>
           <ul className="progress-unit-list">{summary.curriculum.unitProgress.map(({ unit, count, done, percent }) => {
-            const Icon = unit.illustration === 'greetings' ? Hand : unit.illustration === 'alphabet' ? Blocks : UsersRound;
+            const Icon = unitIcons[unit.illustration];
             return <li key={unit.id}><Link to={getUnitPath(unit.id)} className={`progress-unit${percent === 100 ? ' is-complete' : ''}`}>
               <span className="progress-unit-icon"><Icon size={35} strokeWidth={1.8} aria-hidden="true" /></span>
               <div className="progress-unit-copy"><div><h3>Unidad {unit.id}: {unit.title}</h3>{percent !== null && <span className={`progress-percent${percent === 0 ? ' is-zero' : ''}`}>{percent}%</span>}</div>

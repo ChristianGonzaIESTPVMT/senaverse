@@ -24,12 +24,12 @@ export async function checkStudentOverview({ send, evaluate, requests }, origin,
   };
 
   await navigate('/');
-  await waitText('.home-banner', 'Números básicos');
-  assert.equal(await evaluate('document.querySelector(".home-continue").pathname'), lesson);
+  await waitText('.home-banner', 'Introducción a la LSP');
+  assert.equal(await evaluate('document.querySelector(".home-continue").pathname'), '/academia/unidad/1/leccion/introduccion');
   await waitText('.home-learning', '0 días');
   await navigate('/progreso');
   await waitText('.progress-page', 'Aún no hay actividades educativas fechadas');
-  await waitText('.progress-overall', '0 de 1');
+  await waitText('.progress-overall', '0 de 12');
   assert.equal(await evaluate('window.studentAttempts'), 0);
 
   await evaluate(`(() => {
@@ -57,12 +57,10 @@ export async function checkStudentOverview({ send, evaluate, requests }, origin,
   await waitText('.progress-dialog[open]', 'Fecha no disponible');
   await findClick('.progress-dialog[open] button[aria-label="Cerrar historial"]', '');
 
-  await navigate('/academia/unidad/1/leccion/introduccion');
+  await navigate('/academia/unidad/2/leccion/abecedario');
   await waitText('.learning-lesson-page', 'Material preliminar');
   assert.equal(await evaluate('document.body.textContent.includes("Marcar como completada")'), false);
-  await navigate('/');
-  await waitText('.home-banner', 'Números básicos');
-  await findClick('a.home-continue', 'Empezar a aprender');
+  await navigate(lesson);
   await step('Objetivos');
   await findClick('.lesson-sequence button', 'Comenzar lección');
   await step('Observa');

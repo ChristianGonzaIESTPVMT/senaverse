@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, House, Layers3, Play, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3, House, Layers3, Play, UsersRound } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Unit } from '../data/curriculum';
@@ -12,8 +12,9 @@ function UnitIllustration({ unit }: { unit: Unit }) {
   return (
     <div className={`learning-unit-art learning-unit-art-${unit.illustration}`} aria-hidden="true">
       {unit.illustration === 'greetings' && <HomeVisual name="welcome" />}
-      {unit.illustration === 'alphabet' && <span className="learning-alphabet"><span>A</span><span>B</span><span>C</span></span>}
+      {unit.illustration === 'numbers' && <span className="learning-alphabet"><span>1</span><span>2</span><span>3</span></span>}
       {unit.illustration === 'everyday' && <span className="learning-family"><House className="learning-family-house" strokeWidth={1.8} /><UsersRound className="learning-family-people" strokeWidth={1.8} /></span>}
+      {unit.illustration === 'review' && <span className="learning-review"><ClipboardCheck size={72} strokeWidth={1.8} /></span>}
     </div>
   );
 }
@@ -68,7 +69,7 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
 
   const { done: finishedCount, percent, unitProgress, completed: functionalCompletions } = getCurriculumProgress(progress);
   const current = functionalLessons.find(location => !!progress.lessonStudy?.[location.lesson.id] && !functionalCompletions.includes(location.lesson.id))
-    ?? functionalLessons.find(location => !functionalCompletions.includes(location.lesson.id)) ?? functionalLessons[0];
+    ?? functionalLessons.find(location => !functionalCompletions.includes(location.lesson.id));
   const last = activity.lastLessonId ? getLessonLocation(activity.lastLessonId) : undefined;
 
   return (
@@ -76,13 +77,17 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
       <header className="learning-heading"><h1>Mi ruta de aprendizaje</h1><p>Aprende Lengua de Señas Peruana paso a paso.</p></header>
       <section className="learning-banner" aria-labelledby="learning-banner-title">
         <div className="learning-banner-copy">
-          <div><h2 id="learning-banner-title">¡Continúa aprendiendo!</h2><p>Vas por buen camino. Sigue completando lecciones y fortalece tus habilidades en LSP.</p></div>
+          <div><h2 id="learning-banner-title">{current ? '¡Continúa aprendiendo!' : 'Nivel básico completado'}</h2>
+            <p>{current ? 'Completa las lecciones a tu ritmo y practica con las referencias de LSP.'
+              : 'Puedes repasar cualquier lección o repetir las evaluaciones.'}</p></div>
           <HomeVisual name="hero" />
         </div>
         <div className="learning-banner-stats">
           <div className="learning-banner-stat"><HomeVisual name="progress" /><dl><dt>Progreso general</dt><dd>{percent}%</dd></dl></div>
           <div className="learning-banner-stat"><Check size={32} aria-hidden="true" /><dl><dt>Lecciones completadas</dt><dd>{finishedCount}</dd></dl></div>
-          {current && <div className="learning-banner-stat"><Layers3 size={31} aria-hidden="true" /><dl><dt>Unidad de práctica</dt><dd>Unidad {current.unit.id}</dd></dl></div>}
+          <div className="learning-banner-stat"><Layers3 size={31} aria-hidden="true" /><dl>
+            <dt>{current ? 'Unidad de práctica' : 'Unidades completadas'}</dt><dd>{current ? `Unidad ${current.unit.id}` : unitProgress.length}</dd>
+          </dl></div>
         </div>
       </section>
       <div className="learning-banner-foot"><span>Progreso local · lecciones completadas</span>{last && <Link to={getLessonPath(last.unit.id, last.lesson.id)}>Última lección visitada · {last.lesson.title}<ArrowRight size={16} aria-hidden="true" /></Link>}</div>

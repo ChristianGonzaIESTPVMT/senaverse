@@ -11,7 +11,8 @@ import { emptyProgress, recordSignConsultation, restoreProgress, summarizeProgre
 const search = (query, options = {}) => searchLibrary({ query, category: 'all', compatible: false, ...options });
 
 test('educational entries are unique and explicitly map only the ten V1 classes', () => {
-  assert.equal(libraryEntries.length, 25);
+  assert.equal(libraryEntries.length, 35);
+  assert.equal(libraryEntries.filter(entry => entry.reference).length, 24);
   assert.equal(new Set(libraryEntries.map(entry => entry.id)).size, libraryEntries.length);
   assert.equal(libraryEntries.filter(entry => entry.recognitionClassId).length, 10);
   assert.ok(libraryEntries.every(entry => libraryCategories.some(category => category.id === entry.category)));
@@ -38,7 +39,8 @@ test('accent-insensitive search combines category, compatibility and favorites',
   assert.deepEqual(search('sí', { category: 'respuestas', compatible: true }).map(entry => entry.id), ['LSP-006']);
   assert.deepEqual(search('3', { category: 'numeros', compatible: true, favorites: ['LSP-003'] }).map(entry => entry.id), ['LSP-003']);
   assert.deepEqual(search('', { category: 'numeros', compatible: true, favorites: ['cero'] }), []);
-  assert.deepEqual(search('', { category: 'numeros' }).map(entry => entry.id).sort(), ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005', 'cero']);
+  assert.deepEqual(search('', { category: 'numeros' }).map(entry => entry.id).sort(),
+    ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005', 'cero', 'diez', 'nueve', 'ocho', 'seis', 'siete']);
 });
 
 test('numbers study and practice reuse the exact catalog instructions, reference and stable destinations', () => {

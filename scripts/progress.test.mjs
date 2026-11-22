@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { getLessonLocation, units, totalLessons } from '../src/data/curriculum.ts';
+import { functionalLessons, getLessonLocation, legacyUnitLessonIds, totalLessons } from '../src/data/curriculum.ts';
 import { questionFields } from '../src/data/lessonPlan.ts';
 import { situations } from '../src/data/situations.ts';
 import { emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, summarizeProgress } from '../src/data/progress.ts';
@@ -52,7 +52,7 @@ test('lesson completion is idempotent and shares curriculum totals and reward ru
   assert.equal(summary.completed.length, 1);
   assert.equal(summary.xp, 80);
   assert.equal(summary.percent, Math.round(100 / totalLessons));
-  assert.equal(summary.unitProgress[0].percent, Math.round(100 / units[0].lessons.length));
+  assert.equal(summary.unitProgress[0].percent, 50);
   assert.equal(summary.achievements[0].obtained, true);
   assert.equal(complete(first, 'not-a-lesson'), first);
 });
@@ -67,17 +67,17 @@ test('Explorer requires three different consulted sign cards, without awarding a
   assert.equal(summarizeProgress(state).xp, 0);
 });
 
-test('Constancia requires two fully completed units', () => {
+test('historical Constancia keeps the grouping from the previous curriculum', () => {
   let state = emptyProgress();
-  for (const lesson of units[0].lessons) state = complete(state, lesson.id);
+  for (const id of legacyUnitLessonIds[0]) state = complete(state, id);
   assert.equal(summarizeProgress(state).achievements[2].obtained, false);
-  for (const lesson of units[1].lessons) state = complete(state, lesson.id);
+  for (const id of legacyUnitLessonIds[1]) state = complete(state, id);
   assert.equal(summarizeProgress(state).achievements[2].obtained, true);
 });
 
 test('all lessons completed produces 100% with no extra activities for viewing progress', () => {
   let state = emptyProgress();
-  for (const unit of units) for (const lesson of unit.lessons) state = complete(state, lesson.id);
+  for (const { lesson } of functionalLessons) state = complete(state, lesson.id);
   assert.equal(summarizeProgress(state).percent, 100);
   assert.equal(summarizeProgress(state).xp, totalLessons * 80);
   assert.ok(summarizeProgress(state).unitProgress.every(unit => unit.percent === 100));
@@ -130,7 +130,8 @@ test('restoration discards invalid records, unverified results, fake XP and dupl
 
 test('history sorts actual dates first and retains undated legacy completions', () => {
   let state = restoreProgress(null, '["saludos"]');
-  state = recordProgressEvent(state, { type: 'lesson', lessonId: 'introduccion' }, '2026-11-15T12:00:00Z');
+  state = restoreProgress(JSON.stringify({ ...state, activities: [...state.activities,
+    { id: 'lesson:introduccion', type: 'lesson', targetId: 'introduccion', occurredAt: '2026-11-15T12:00:00Z' }] }));
   state = recordProgressEvent(state, { type: 'lesson', lessonId: 'abecedario' }, timestamp);
   assert.deepEqual(summarizeProgress(state).recent.map(item => item.targetId), ['abecedario', 'introduccion', 'saludos']);
 });

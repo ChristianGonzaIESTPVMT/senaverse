@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { getLessonLocation } from '../src/data/curriculum.ts';
+import { functionalLessons, getLessonLocation } from '../src/data/curriculum.ts';
 import { questionFields } from '../src/data/lessonPlan.ts';
 import { summarizeLearningDays } from '../src/data/learningCalendar.ts';
 import { getEducationalSign, libraryEntries } from '../src/data/library.ts';
@@ -15,8 +15,7 @@ const overview = (state, at = date) => selectStudentOverview(state, Date.parse(a
 const event = (state, type, data, at = date) => recordProgressEvent(state, { type, ...data }, at);
 const badge = (summary, id) => summary.achievements.find(item => item.id === id);
 
-function teachNumbers(state) {
-  const lessonId = 'numeros';
+function finishLesson(state, lessonId = 'numeros') {
   const { lesson: { plan } } = getLessonLocation(lessonId);
   state = event(state, 'lesson-start', { lessonId });
   for (const step of plan.steps) {
@@ -63,8 +62,8 @@ test('levels use stable XP boundaries and show the amount remaining', () => {
   assert.equal(getStudentLevel(560).number, 5);
 });
 
-test('the combined functional content earns exactly 420 XP and remains idempotent after reload and replay', () => {
-  let state = teachNumbers(emptyProgress());
+test('the original combination of Numbers, scenarios and games retains 420 XP after reload and replay', () => {
+  let state = finishLesson(emptyProgress());
   for (const situation of situations) state = finishSituation(state, situation);
   for (const game of minigames) state = play(state, game, game.id);
   assert.equal(overview(state).xp, 420);
@@ -75,8 +74,8 @@ test('the combined functional content earns exactly 420 XP and remains idempoten
   const summary = overview(restoreProgress(JSON.stringify(state)), '2026-11-23T19:00:00Z');
   assert.equal(summary.xp, 420);
   assert.equal(summary.curriculum.done, 1);
-  assert.equal(summary.curriculum.total, 1);
-  assert.equal(summary.curriculum.percent, 100);
+  assert.equal(summary.curriculum.total, 12);
+  assert.equal(summary.curriculum.percent, 8);
   assert.equal(summary.lessonSteps, 10);
   assert.equal(summary.situationInteractions, 15 + repeated.scenes.length);
   assert.equal(summary.situationStarts, 6);
@@ -89,6 +88,20 @@ test('the combined functional content earns exactly 420 XP and remains idempoten
   assert.equal(badge(summary, 'numbers').obtained, true);
   assert.equal(badge(summary, 'learner').obtainedAt, date);
   assert.equal(new Set(summary.achievements.map(item => item.id)).size, summary.achievements.length);
+});
+
+test('finishing all functional content yields 1300 XP and 100% without awarding anything for previews', () => {
+  let state = emptyProgress();
+  for (const { lesson } of functionalLessons) state = finishLesson(state, lesson.id);
+  for (const situation of situations) state = finishSituation(state, situation);
+  for (const game of minigames) state = play(state, game, game.id);
+  const summary = overview(restoreProgress(JSON.stringify(state)));
+  assert.equal(summary.xp, 1300);
+  assert.equal(summary.curriculum.percent, 100);
+  assert.equal(summary.curriculum.done, 12);
+  assert.equal(summary.evaluations.length, 12);
+  assert.equal(summary.matches, 0);
+  assert.equal(summary.historicalLessons, 0);
 });
 
 test('Lima calendar counts distinct consecutive dates across month and year boundaries, ignoring missing and future evidence', () => {
@@ -167,7 +180,7 @@ test('a credited prototype with the same ID keeps its XP and can resume the func
   assert.equal(overview(state).curriculum.done, 0);
   state = event(state, 'lesson-start', { lessonId: 'numeros' });
   assert.equal(overview(state).resumeLesson.path, '/academia/unidad/2/leccion/numeros');
-  const summary = overview(restoreProgress(JSON.stringify(teachNumbers(state))));
+  const summary = overview(restoreProgress(JSON.stringify(finishLesson(state))));
   assert.equal(summary.curriculum.done, 1);
   assert.equal(summary.historicalLessons, 1);
   assert.equal(summary.history.find(item => item.id === 'lesson-run:numeros').at, date);

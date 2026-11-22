@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
 import { PROFILE_KEY, defaultProfile } from '../src/data/profile.ts';
-import { PROGRESS_KEY, emptyProgress, recordProgressEvent, recordSignConsultation } from '../src/data/progress.ts';
+import { PROGRESS_KEY, emptyProgress, recordSignConsultation, restoreProgress } from '../src/data/progress.ts';
 import { THEME_KEY } from '../src/data/theme.ts';
 
 const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: 'custom' });
@@ -63,7 +63,9 @@ test('the profile renders exactly three main sections, existing navigation, real
 }));
 
 test('profile statistics and header XP use the same real records without mutating progress', () => withStorage({}, () => {
-  let progress = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'introduccion' }, '2026-11-17T15:00:00Z');
+  let progress = restoreProgress(JSON.stringify({ ...emptyProgress(), activities: [
+    { id: 'lesson:introduccion', type: 'lesson', targetId: 'introduccion', occurredAt: '2026-11-17T15:00:00Z' },
+  ] }));
   for (const id of ['hola', 'gracias', 'adios']) progress = recordSignConsultation(progress, id);
   const before = JSON.stringify(progress);
   const html = renderProfile(progress);
@@ -99,7 +101,7 @@ test('the actual provider validates, persists normalized changes and restores th
 }));
 
 test('reset writes only the profile key, preserving progress, legacy storage and dataset sentinels byte for byte', () => {
-  const progress = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'saludos' }, '2026-11-17T15:00:00Z');
+  const progress = restoreProgress(null, '["saludos"]');
   withStorage({
     [PROFILE_KEY]: JSON.stringify({ ...defaultProfile(), displayName: 'Ana', bio: 'Hola', avatarId: 'cat' }),
     [PROGRESS_KEY]: JSON.stringify(progress),
