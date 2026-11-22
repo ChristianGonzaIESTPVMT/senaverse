@@ -1,9 +1,10 @@
 import { lazy, Suspense, useState } from 'react';
-import { BookOpen, Camera, CheckCircle2, Hand } from 'lucide-react';
+import { Camera, CheckCircle2, Hand } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LessonAnswerFields } from './LessonActivity';
 import { getLibrarySignPath, type LibraryEntry } from '../data/library';
 import type { ChoiceExercise, SignPractice } from '../data/signExercises';
+import { SignMediaViewer } from './SignMediaViewer';
 
 const DirectedLessonPractice = lazy(() => import('./DirectedLessonPractice'));
 
@@ -34,14 +35,11 @@ export function GuidedSignPractice({ sign, exercise, returnState, titleId, pract
   return <section className="situation-practice-step" aria-labelledby={titleId}>
     <div className="situation-practice-heading">
       <h2 id={titleId}><Hand size={24} aria-hidden="true" /> Practica «{sign.word}»</h2>
-      <p>{sign.instructions ?? sign.meaning}</p>
+      {!sign.instructions && <p>{sign.meaning}</p>}
     </div>
     <div className="situation-practice-reference">
-      {sign.reference ? <a className="practice-reference-link" href={sign.reference.url} target="_blank" rel="noopener noreferrer">
-        <BookOpen size={18} aria-hidden="true" /> {sign.reference.title} (nueva pestaña)
-      </a> : <span>Referencia visual pendiente de incorporación.</span>}
+      {mode !== 'camera' && <SignMediaViewer key={sign.id} sign={sign} compact />}
       <Link to={getLibrarySignPath(sign.id)} state={returnState}>Ver ficha de {sign.word} en Biblioteca</Link>
-      {sign.validation === 'pending' && <small>Validación lingüística pendiente.</small>}
     </div>
     {practice ? <div className="situation-answer-feedback is-correct" role="status">
       <CheckCircle2 size={21} aria-hidden="true" />
@@ -60,7 +58,7 @@ export function GuidedSignPractice({ sign, exercise, returnState, titleId, pract
       {mode === 'alternative' && <AlternativePractice exercise={exercise} onComplete={onComplete} />}
       {mode === 'camera' && sign.recognitionClassId && sign.instructions && sign.reference && <div className="situation-directed-practice">
         <Suspense fallback={<p role="status">Abriendo la práctica dirigida…</p>}>
-          <DirectedLessonPractice targetId={sign.recognitionClassId} instruction={sign.instructions} reference={sign.reference}
+          <DirectedLessonPractice targetId={sign.recognitionClassId} instruction={sign.instructions}
             continueLabel="Guardar práctica con cámara" onContinue={signId => onComplete({ method: 'camera', signId })} />
         </Suspense>
       </div>}

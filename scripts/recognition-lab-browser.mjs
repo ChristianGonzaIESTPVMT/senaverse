@@ -14,6 +14,7 @@ import { checkSituations } from './fixtures/situation-browser.mjs';
 import { checkMinigames } from './fixtures/minigames-browser.mjs';
 import { checkStudentOverview } from './fixtures/student-overview-browser.mjs';
 import { checkCurriculum } from './fixtures/curriculum-browser.mjs';
+import { checkMedia, mediaFixturePlugin } from './fixtures/media-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
@@ -21,7 +22,7 @@ const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
   'library-development', 'library-production', 'situation-development', 'situation-production',
   'minigames-development', 'minigames-production', 'progress-development', 'progress-production',
-  'curriculum-development', 'curriculum-production'].includes(mode));
+  'curriculum-development', 'curriculum-production', 'media-development', 'media-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -218,7 +219,8 @@ try {
   const common = { envDir: directory, cacheDir: join(directory, 'vite-cache'), logLevel: 'silent' };
   if (mode.endsWith('-production')) server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
   else {
-    server = await createServer({ ...common, server: { host: '127.0.0.1', port: 0, ws: false } });
+    server = await createServer({ ...common, plugins: mode === 'media-development' ? [mediaFixturePlugin()] : [],
+      server: { host: '127.0.0.1', port: 0, ws: false } });
     await server.listen();
   }
   const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
@@ -248,7 +250,7 @@ try {
     window.labWorkers = [];
     window.labWorkerErrors = [];
     window.labBlockModel = true;
-    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-', 'progress-'].some(prefix => mode.startsWith(prefix))};
+    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-', 'progress-', 'media-'].some(prefix => mode.startsWith(prefix))};
     window.studentAttempts = 0;
     const fetchResource = window.fetch.bind(window);
     window.fetch = (resource, options) => (window.labBlockModel && String(resource).endsWith('/__senaverse/recognition-v1.json'))
@@ -294,7 +296,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('curriculum-')) {
+  if (mode.startsWith('media-')) {
+    await checkMedia({ send, evaluate, requests }, origin, until, mode === 'media-development');
+  } else if (mode.startsWith('curriculum-')) {
     await checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('progress-')) {
     await checkStudentOverview({ send, evaluate, requests }, origin, until, datasetPath);

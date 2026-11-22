@@ -18,9 +18,6 @@ type LegacyLessonContent = {
   activity: LessonActivity;
   signId?: string;
   practiceSignId?: string;
-  videoSrc?: string;
-  thumbnailSrc?: string;
-  captionsSrc?: string;
 };
 export type Lesson = {
   id: string;

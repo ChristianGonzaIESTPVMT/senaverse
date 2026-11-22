@@ -2,6 +2,7 @@ import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonP
 import { summarizeLearningDays } from './learningCalendar.ts';
 import { nextStudyStep } from './lessonStudy.ts';
 import { getEducationalSign } from './library.ts';
+import { hasEducationalMedia } from './educationalMedia.ts';
 import { getMinigame, getMinigamePath, minigames } from './minigames.ts';
 import { describeActivity, getProgressTotals, summarizeMinigame, LESSON_XP, EXPLORER_SIGN_COUNT, CONSISTENCY_UNIT_COUNT,
   type StudentProgress } from './progress.ts';
@@ -187,7 +188,7 @@ export function selectStudentOverview(state: StudentProgress, now: number) {
     if (!sign) continue;
     const at = state.consultedAt?.[id] ?? null;
     consults.push({ at });
-    if (sign.reference || sign.videoSrc || sign.thumbnailSrc || sign.handDiagram) withReferences.push({ at });
+    if (hasEducationalMedia(sign.media)) withReferences.push({ at });
     history.push({ id: `consult:${id}`, module: 'library', at, label: `Consultaste la ficha de ${sign.word}`, learning: false });
   }
 

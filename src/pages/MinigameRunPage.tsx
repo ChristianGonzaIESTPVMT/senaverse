@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { GuidedSignPractice } from '../components/GuidedSignPractice';
-import { SignHandDiagram } from '../components/SignHandDiagram';
+import { EducationalVisual } from '../components/SignMediaViewer';
+import { getQuizVisual } from '../data/educationalMedia';
 import { getEducationalSign, libraryCategories, numbersReference } from '../data/library';
 import { CHALLENGE_CHECKPOINT_KEY, createGameRun, gameOutcome, gameSize, POINTS_PER_SUCCESS, restoreChallenge,
   updateGameRun, type GameRun } from '../data/minigameRun';
@@ -139,11 +140,12 @@ function MemoryBoard({ run, board, move }: { run: GameRun; board: Extract<GameRu
         const matched = board.matched.includes(index);
         const visible = matched || board.open.includes(index);
         const sign = visible ? getEducationalSign(card.signId) : undefined;
+        const visual = sign && card.side === 'diagram' ? getQuizVisual(sign.media) : undefined;
         return <button className="game-memory-card" key={index} type="button" ref={index === board.open[0] ? focus : undefined}
           data-state={matched ? 'matched' : visible ? 'open' : 'hidden'} aria-disabled={matched || visible || waiting} tabIndex={matched ? -1 : undefined}
-          aria-label={sign ? `Tarjeta ${index + 1} · ${card.side === 'diagram' ? sign.handDiagram?.description : sign.word}${matched ? ' · Pareja encontrada' : ''}` : `Tarjeta ${index + 1} oculta`}
+          aria-label={sign ? `Tarjeta ${index + 1} · ${visual?.alt ?? sign.word}${matched ? ' · Pareja encontrada' : ''}` : `Tarjeta ${index + 1} oculta`}
           onClick={() => move({ type: 'flip', at: Date.now(), index })}>
-          {sign && card.side === 'diagram' && sign.handDiagram ? <SignHandDiagram diagram={sign.handDiagram} /> : sign ? sign.word : <span aria-hidden="true">?</span>}
+          {visual ? <EducationalVisual visual={visual} decorative /> : sign ? sign.word : <span aria-hidden="true">?</span>}
         </button>;
       })}
     </div>
@@ -161,10 +163,12 @@ function QuizBoard({ board, move }: { board: Extract<GameRun['board'], { rounds:
   const sign = getEducationalSign(round.signId);
   const answered = board.selected !== undefined;
   if (!sign) return null;
+  const visual = getQuizVisual(sign.media);
   return <section className="game-panel game-quiz" aria-labelledby="game-question">
     <p className="game-progress-label">Pregunta {board.step + 1} de {board.rounds.length}</p>
     <h2 id="game-question" ref={question} tabIndex={-1}>{board.kind === 'meaning-quiz' ? '¿Qué palabra corresponde a esta descripción?' : '¿Qué representa esta seña?'}</h2>
-    {board.kind === 'meaning-quiz' ? <p className="game-prompt">{sign.meaning}</p> : sign.handDiagram && <div className="game-diagram"><SignHandDiagram diagram={sign.handDiagram} /></div>}
+    {board.kind === 'meaning-quiz' ? <p className="game-prompt">{sign.meaning}</p>
+      : visual && <div className="game-diagram"><EducationalVisual key={visual.id} visual={visual} /></div>}
     <div className="game-options" role="group" aria-label="Alternativas">
       {round.options.map(id => <button className="button button-outline" key={id} type="button" aria-disabled={answered}
         data-answer={answered && id === round.signId ? 'correct' : answered && id === board.selected ? 'wrong' : undefined}

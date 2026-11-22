@@ -1,4 +1,6 @@
 import { mineduGuidePdf, recognitionSigns } from '../features/sign-recognition/recognitionCatalog.ts';
+import type { Finger, HandDiagram, MediaSource, MediaValidation, PublishableMedia, SignMedia, Usage } from './educationalMedia.ts';
+export type { Finger, HandDiagram } from './educationalMedia.ts';
 
 export const libraryCategories = [
   { id: 'saludo', label: 'Saludo' },
@@ -11,11 +13,9 @@ export const libraryCategories = [
 ] as const;
 
 export type LibraryCategory = typeof libraryCategories[number]['id'];
-export type Finger = 'thumb' | 'index' | 'middle' | 'ring' | 'little';
-export type HandDiagram = { extended: readonly Finger[]; description: string };
 const fingerNames = { thumb: 'pulgar', index: 'índice', middle: 'medio', ring: 'anular', little: 'meñique' } satisfies Record<Finger, string>;
 
-export type LibraryEntry = {
+type LibraryDefinition = {
   id: string;
   word: string;
   description: string;
@@ -23,22 +23,21 @@ export type LibraryEntry = {
   category: LibraryCategory;
   tone: 'lavender' | 'peach' | 'mint' | 'blue';
   keywords?: string[];
-  thumbnailSrc?: string;
-  videoSrc?: string;
-  captionsSrc?: string;
   instructions?: string;
   handDiagram?: HandDiagram;
   type?: 'static' | 'dynamic';
   hands?: 1 | 2;
-  source?: { title: string; publisher: string; url: string; page?: number };
+  source?: MediaSource;
   reference?: { title: string; url: string };
-  validation: 'pending' | 'validated';
+  validation: MediaValidation;
   recognitionClassId?: string;
   lesson?: { unitId: number; lessonId: string; title: string };
+  assets?: readonly PublishableMedia[];
 };
+export type LibraryEntry = Omit<LibraryDefinition, 'assets'> & { media: SignMedia };
 
 // Original entries keep their order for existing browsing and bookmarks.
-const originalEntries: Omit<LibraryEntry, 'validation'>[] = [
+const originalEntries: Omit<LibraryDefinition, 'validation'>[] = [
   { id: 'hola', word: 'Hola', description: 'Saludo básico', meaning: 'Una expresión para saludar al iniciar un encuentro.', category: 'saludo', tone: 'lavender', keywords: ['saludar', 'bienvenida'] },
   { id: 'gracias', word: 'Gracias', description: 'Expresión de gratitud', meaning: 'Una palabra para expresar agradecimiento por una acción o un gesto.', category: 'saludo', tone: 'peach', keywords: ['agradecer', 'agradecimiento'] },
   { id: 'adios', word: 'Adiós', description: 'Despedida', meaning: 'Una expresión para despedirse al terminar un encuentro.', category: 'saludo', tone: 'blue', keywords: ['despedirse', 'hasta luego'] },
@@ -107,7 +106,7 @@ const formerClassIds = new Set(legacyIds.values());
 
 const recognizedEntries = recognitionSigns
   .filter(sign => numbersGuide.has(sign.id) || recognitionDescriptions.has(sign.id))
-  .map<LibraryEntry>(sign => {
+  .map<LibraryDefinition>(sign => {
     const shared = { id: sign.id, word: sign.name, type: sign.type, hands: sign.expectedHands || undefined,
       validation: 'pending' as const, recognitionClassId: sign.id };
     const numberSign = numbersGuide.get(sign.id);
@@ -131,14 +130,14 @@ const recognizedEntries = recognitionSigns
     };
   });
 
-const zero: LibraryEntry = {
+const zero: LibraryDefinition = {
   id: 'cero', word: 'Cero', category: 'numeros', description: 'Número 0', meaning: 'Representa una cantidad nula.',
   instructions: 'En la lámina, la mano queda cerrada en un puño. Observa la posición del pulgar en el dibujo de Cero.',
   type: 'static', hands: 1, validation: 'pending', reference: numbersReference, source: numbersSource,
   tone: 'blue', keywords: ['0'], lesson: { unitId: 2, lessonId: 'cero', title: 'Cero y cantidades vacías' },
 };
 
-const additionalNumbers = ['Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'].map<LibraryEntry>((word, index) => {
+const additionalNumbers = ['Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'].map<LibraryDefinition>((word, index) => {
   const number = index + 6;
   return {
     id: word.toLowerCase(), word, category: 'numeros', tone: 'mint', hands: 1, validation: 'pending',
@@ -150,7 +149,7 @@ const additionalNumbers = ['Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'].map<Library
   };
 });
 
-const additionalSigns: Omit<LibraryEntry, 'validation'>[] = [
+const additionalSigns: Omit<LibraryDefinition, 'validation'>[] = [
   { id: 'buenos-dias', word: 'Buenos días', description: 'Saludo de la mañana', meaning: 'Un saludo al encontrarse por la mañana.',
     category: 'saludo', tone: 'lavender', ...guideSign(46, 'Sigue los dos dibujos de izquierda a derecha y fíjate en la dirección de cada flecha.', greetingsLink) },
   { id: 'buenas-noches', word: 'Buenas noches', description: 'Saludo nocturno', meaning: 'Un saludo al encontrarse por la noche.',
@@ -164,18 +163,67 @@ const additionalSigns: Omit<LibraryEntry, 'validation'>[] = [
     category: 'cotidiano', tone: 'blue', hands: 2, ...guideSign(285, 'Junta ambas manos con los dedos parcialmente flexionados y sigue el recorrido circular mostrado en la figura.', placesLink) },
 ];
 
+const figureLocations = new Map([
+  ['LSP-001', 'Figura 2 · número 1, primera fila.'], ['LSP-002', 'Figura 2 · número 2, primera fila.'],
+  ['LSP-003', 'Figura 2 · número 3, primera fila.'], ['LSP-004', 'Figura 2 · número 4, primera fila.'],
+  ['LSP-005', 'Figura 2 · número 5, primera fila.'], ['cero', 'Figura 2 · número 0, primera fila.'],
+  ['seis', 'Figura 2 · número 6, al final de la primera fila.'], ['siete', 'Figura 2 · número 7, al inicio de la segunda fila.'],
+  ['ocho', 'Figura 2 · número 8, segunda fila.'], ['nueve', 'Figura 2 · número 9, segunda fila.'],
+  ['diez', 'Figura 2 · número 10, segunda fila. Observa también la flecha.'],
+  ['LSP-006', 'Viñeta SÍ · centro a la derecha. Observa las flechas junto al puño.'],
+  ['LSP-007', 'Viñeta NADA · arriba a la derecha. Observa el rostro y el sentido del desplazamiento.'],
+  ['LSP-008', 'Viñeta MUCHO · arriba a la izquierda. Observa las marcas de movimiento de ambas manos.'],
+  ['LSP-009', 'Viñeta SOLO · arriba a la izquierda. Observa la flecha de giro.'],
+  ['LSP-010', 'Viñeta CON · abajo a la izquierda. Observa las dos flechas de acercamiento.'],
+  ['buenos-dias', 'Viñeta inferior · sigue los dos dibujos y sus flechas.'],
+  ['buenas-noches', 'Viñeta superior · sigue los dos dibujos y sus flechas.'],
+  ['disculpa', 'Viñeta DISCULPAR · arriba a la derecha.'],
+  ['familia', 'Viñeta FAMILIA · centro a la izquierda. Conserva la secuencia de las dos figuras.'],
+  ['mama', 'Viñeta MAMÁ · centro a la derecha.'],
+  ['papa', 'Viñeta PAPÁ · abajo a la izquierda.'],
+  ['casa', 'Viñeta CASA · arriba a la izquierda.'],
+  ['colegio', 'Viñeta COLEGIO · arriba a la izquierda. Sigue el dibujo y sus indicaciones.'],
+]);
+const guideUsage: Usage = { label: 'CC BY-NC-ND 2.5 Perú · consulta de la obra original',
+  url: 'https://creativecommons.org/licenses/by-nc-nd/2.5/pe/' };
+const numbersUsage: Usage = { label: 'Consulta de la cartilla original · permiso de recorte pendiente' };
+const diagramUsage: Usage = { label: 'Diagrama didáctico de SeñaVerse · figura de referencia del MINEDU' };
+
+function withMedia({ assets, ...entry }: LibraryDefinition): LibraryEntry {
+  const { id, validation, source, reference, handDiagram } = entry;
+  const locator = figureLocations.get(id);
+  const document = reference && source && {
+    id: `${id}:lamina`, signId: id, validation, kind: 'document' as const, availability: 'available' as const,
+    location: { type: 'external' as const, url: reference.url }, link: reference, source,
+    usage: reference === numbersReference ? numbersUsage : guideUsage,
+    locator: locator ?? 'Consulta la figura identificada con el nombre de la seña.', alt: `Lámina oficial con la seña «${entry.word}».`,
+  };
+  const suppliedVisual = assets?.find(asset => asset.kind !== 'video');
+  const visual = suppliedVisual ?? (handDiagram && source ? {
+    id: `${id}:diagrama`, signId: id, validation, kind: 'diagram' as const, availability: 'available' as const,
+    location: { type: 'embedded' as const, module: 'SignHandDiagram' as const },
+    diagram: handDiagram, alt: handDiagram.description, usage: diagramUsage, source, quizSafe: true as const,
+  } : {
+    id: `${id}:visual`, signId: id, validation, kind: 'visual' as const, availability: 'pending' as const,
+  });
+  const video = assets?.find(asset => asset.kind === 'video') ?? {
+    id: `${id}:video`, signId: id, validation, kind: 'video' as const, availability: 'pending' as const,
+  };
+  return { ...entry, media: { document, visual, video } };
+}
+
 /** The educational catalogue includes entries with no corresponding model class. */
-export const libraryEntries: LibraryEntry[] = [
-  ...originalEntries.map<LibraryEntry>(entry => recognizedEntries.find(sign => sign.id === legacyIds.get(entry.id))
+export const libraryEntries = [
+  ...originalEntries.map<LibraryDefinition>(entry => recognizedEntries.find(sign => sign.id === legacyIds.get(entry.id))
     ?? { ...entry, ...familyReferences.get(entry.id), validation: 'pending' }),
   ...recognizedEntries.filter(entry => !formerClassIds.has(entry.id)),
   zero,
   ...additionalNumbers,
-  ...additionalSigns.map<LibraryEntry>(entry => ({ ...entry, validation: 'pending' })),
-];
+  ...additionalSigns.map<LibraryDefinition>(entry => ({ ...entry, validation: 'pending' })),
+].map(withMedia);
 
 const byId = new Map(libraryEntries.map(entry => [entry.id, entry]));
-const byClass = new Map(recognizedEntries.map(entry => [entry.recognitionClassId, entry]));
+const byClass = new Map(libraryEntries.filter(entry => entry.recognitionClassId).map(entry => [entry.recognitionClassId, entry]));
 
 export function getEducationalSign(id: string) {
   return byId.get(legacyIds.get(id) ?? id);

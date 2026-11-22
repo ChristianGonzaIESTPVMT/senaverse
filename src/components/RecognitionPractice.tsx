@@ -1,5 +1,5 @@
 import { memo, useCallback, useId, useRef, useState } from 'react';
-import { BookOpen, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { PracticeCamera, type PracticeCameraSessionState } from './PracticeCamera';
 import { recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
 import { getEducationalSignForClass } from '../data/library';
@@ -7,7 +7,7 @@ import { loadEducationModel } from '../features/sign-recognition/educationModel'
 import { useRecognition } from '../features/sign-recognition/useRecognition';
 import { RECOGNITION_STATES } from '../features/sign-recognition/liveRecognition';
 import type { RecognitionConfirmation } from '../features/sign-recognition/recognitionResult';
-import type { LessonReference } from '../data/lessonPlan';
+import { SignMediaViewer } from './SignMediaViewer';
 
 const PracticePreview = memo(PracticeCamera);
 
@@ -15,7 +15,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   initialSign?: string;
   onConfirmed?: (event: RecognitionConfirmation) => void;
   onSave?: (signId: string) => void;
-  guided?: { targetId: string; instruction: string; reference: LessonReference; onAccept: (signId: string) => void; acceptLabel?: string };
+  guided?: { targetId: string; instruction: string; onAccept: (signId: string) => void; acceptLabel?: string };
 }) {
   const initial = resolvePracticeSign(guided?.targetId ?? initialSign);
   const [confirmedMatch, setConfirmedMatch] = useState<string | null>(null);
@@ -38,7 +38,6 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   const targetId = mode.type === 'directed' ? mode.targetId : '';
   const confirmed = result.confirmation && recognitionSignsById.get(result.confirmation.signId);
   const entry = getEducationalSignForClass(targetId || confirmed?.id || '');
-  const reference = guided?.reference ?? entry?.reference;
 
   const clearSavedPractice = useCallback(() => {
     savedAttempt.current = false;
@@ -119,13 +118,9 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
           </>}
         </section>
         <section className="practice-panel practice-recognition-result">
-          <h2>{entry ? `Cómo hacer «${entry.word}»` : 'Cómo practicar'}</h2>
-          {entry ? <>
-            <p>{guided?.instruction ?? entry.instructions}</p>
-            {reference && <a className="practice-reference-link" href={reference.url} target="_blank" rel="noopener noreferrer">
-              <BookOpen size={18} aria-hidden="true" /> {reference.title} (nueva pestaña)
-            </a>}
-          </> : <p>Mantén las posturas estáticas hasta la confirmación. Para las señas dinámicas, realiza el movimiento completo.</p>}
+          <h2>{entry ? `Referencia educativa de «${entry.word}»` : 'Cómo practicar'}</h2>
+          {entry ? <SignMediaViewer key={entry.id} sign={entry} instruction={guided?.instruction ?? entry.instructions} compact />
+            : <p>Mantén las posturas estáticas hasta la confirmación. Para las señas dinámicas, realiza el movimiento completo.</p>}
         </section>
       </div>
     </div>

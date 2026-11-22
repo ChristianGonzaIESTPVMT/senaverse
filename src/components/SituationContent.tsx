@@ -9,7 +9,7 @@ export function SituationIllustration({ situation }: { situation: Situation }) {
 
   return (
     <div className="situation-illustration" data-setting={situation.illustration} aria-hidden="true">
-      {situation.illustrationSrc ? <img src={situation.illustrationSrc} alt="" /> : <>
+      {situation.illustrationSrc ? <img src={situation.illustrationSrc} alt="" loading="lazy" decoding="async" /> : <>
         <span className="situation-art-cloud" />
         <Icon className="situation-art-setting" strokeWidth={1.5} />
         <span className="situation-art-person situation-art-person-left"><UserRound strokeWidth={1.4} /></span>

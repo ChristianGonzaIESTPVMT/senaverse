@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, CirclePlay, Clock3, Info, LibraryBig, RotateCcw, Sparkles } from 'lucide-react';
+import { useEffect } from 'react';
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, Info, LibraryBig, Sparkles } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { LessonActivity } from '../components/LessonActivity';
 import { LessonSequence } from '../components/LessonSequence';
+import { SignMediaViewer } from '../components/SignMediaViewer';
 import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Lesson, type Unit } from '../data/curriculum';
 import { getEducationalSign, getLibrarySignPath } from '../data/library';
 import { useStudentProgress } from '../hooks/progressContext';
@@ -45,7 +46,7 @@ function LessonContent({ unit, lesson, completed, onVisit }: LessonPageProps & {
       <div className="lesson-layout">
         {lesson.plan ? <LessonSequence lessonId={lesson.id} plan={lesson.plan} unitPath={getUnitPath(unit.id)}
           nextPath={next && getLessonPath(next.unit.id, next.lesson.id)} />
-          : <LegacyLesson title={lesson.title} content={lesson.content} unit={unit} />}
+          : <LegacyLesson content={lesson.content} unit={unit} />}
 
         <aside className="lesson-aside">
           <section className="white-card unit-outline learning-lesson-outline">
@@ -71,39 +72,13 @@ function LessonContent({ unit, lesson, completed, onVisit }: LessonPageProps & {
   );
 }
 
-function LegacyLesson({ title, content, unit }: { title: string; content: NonNullable<Lesson['content']>; unit: Unit }) {
-  const [mediaError, setMediaError] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
+function LegacyLesson({ content, unit }: { content: NonNullable<Lesson['content']>; unit: Unit }) {
   const sign = content.signId ? getEducationalSign(content.signId) : undefined;
-  const videoSrc = content.videoSrc ?? sign?.videoSrc;
-  const captionsSrc = content.captionsSrc ?? sign?.captionsSrc;
-
-  useEffect(() => {
-    const video = videoRef.current;
-    return () => video?.pause();
-  }, [videoSrc]);
-
-  function repeatVideo() {
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = 0;
-    void video.play().catch(() => setMediaError('No se pudo reproducir el video. Puedes volver a intentarlo desde sus controles.'));
-  }
-
   return (
     <div className="lesson-main">
-      <section className="white-card lesson-media">
-        <div className="lesson-section-top"><span>01 / OBSERVA</span><span><Clock3 size={14} aria-hidden="true" /> Recurso audiovisual</span></div>
-        {videoSrc ? <>
-          <video className="learning-lesson-video" key={videoSrc} ref={videoRef} controls playsInline preload="metadata" poster={content.thumbnailSrc ?? sign?.thumbnailSrc} aria-label={`Demostración de ${title}`} onLoadedData={() => setMediaError('')} onError={() => setMediaError('El video no se pudo cargar. Revisa el recurso e inténtalo nuevamente.')}>
-            <source src={videoSrc} />
-            {captionsSrc && <track kind="captions" src={captionsSrc} srcLang="es" label="Español" default />}
-            Tu navegador no admite la reproducción de este video.
-          </video>
-          <button className="button button-outline learning-video-repeat" type="button" onClick={repeatVideo}><RotateCcw size={17} aria-hidden="true" /> Repetir video</button>
-        </> : <div className="video-placeholder"><div className="play-circle"><CirclePlay size={31} aria-hidden="true" /></div><strong>Demostración de LSP</strong><p>El video de esta lección se incorporará después de su validación lingüística.</p></div>}
-        {mediaError && <p className="error-message" role="alert">{mediaError}</p>}
-        {!videoSrc && <div className="media-foot"><Info size={15} aria-hidden="true" /> Material audiovisual pendiente de incorporación y revisión.</div>}
+      <section className="white-card lesson-article">
+        <h2>Material visual</h2>
+        {sign ? <SignMediaViewer sign={sign} /> : <p>Referencia visual pendiente de incorporaci?n.</p>}
       </section>
 
       <section className="white-card lesson-article">

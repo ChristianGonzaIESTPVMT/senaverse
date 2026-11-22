@@ -1,10 +1,12 @@
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight, BookOpen, Brain, Puzzle, Search, Timer, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { getMinigamePath, minigames } from '../data/minigames';
 import { summarizeMinigame } from '../data/progress';
 import { useStudentProgress } from '../hooks/progressContext';
 import './MinigamesPage.css';
+
+const illustrations = { memory: Brain, 'visual-quiz': Search, 'timed-quiz': Timer, challenge: Trophy, 'meaning-quiz': Puzzle };
 
 export function MinigamesPage() {
   const { progress } = useStudentProgress();
@@ -18,10 +20,11 @@ export function MinigamesPage() {
       <section className="minigames-grid" aria-label="Minijuegos disponibles">
         {minigames.map(game => {
           const { plays, best } = summarizeMinigame(progress, game);
+          const Illustration = illustrations[game.kind];
           return (
             <article className="minigame-card" key={game.id} aria-labelledby={`minigame-${game.id}`}>
               <div className="minigame-art" data-tone={game.tone} aria-hidden="true">
-                <span className="minigame-illustration">{game.illustration}</span>
+                <Illustration className="minigame-illustration" strokeWidth={1.55} />
               </div>
               <div className="minigame-copy">
                 <h2 id={`minigame-${game.id}`}>{game.title}</h2>

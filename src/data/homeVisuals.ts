@@ -15,7 +15,7 @@ type HomeVisual = {
 export const homeVisuals: Record<HomeVisualName, HomeVisual> = {
   brand: { src: '/images/logo-senaverse.png', alt: 'SeñaVerse', fit: 'contain' },
   welcome: { alt: 'Mano saludando' },
-  hero: { alt: 'Una mano para darte la bienvenida' },
+  hero: { alt: 'Libro abierto' },
   lessons: { alt: 'Libro abierto' },
   experience: { alt: 'Estrella de experiencia' },
   progress: { alt: 'Meta de aprendizaje' },

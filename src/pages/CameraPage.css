@@ -56,12 +56,6 @@
 .camera-sign-link { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; padding: 9px 5px 12px; border: 1px solid transparent; border-radius: 17px; background: light-dark(#f2ecfd, var(--color-surface)); transition: border-color .15s, background .15s; }
 .camera-sign-link:hover { border-color: light-dark(#c9b3ee, var(--color-line)); background: light-dark(#eae0fa, var(--color-hover)); }
 .camera-sign-link strong { font-size: 15px; line-height: 1.3; font-weight: 900; }
-.practice-sign-art { position: relative; display: block; flex-shrink: 0; width: 77px; max-width: 100%; height: 77px; overflow: hidden; border-radius: 13px; background: #eee6fc; color: #7442d2; }
-.practice-sign-art img { width: 100%; height: 100%; object-fit: cover; }
-.practice-sign-person { position: absolute; right: 2px; bottom: -7px; width: 62px; height: 75px; fill: #b59ae9; }
-.practice-sign-gesture { position: absolute; left: 0; top: 17px; width: 32px; height: 35px; padding: 2px; border-radius: 9px; background: #f8f4ff; fill: #eee6fc; transform: rotate(-13deg); }
-.practice-sign-art-gracias .practice-sign-gesture { top: 33px; left: 9px; transform: rotate(0); }
-.practice-sign-art-adios .practice-sign-gesture { transform: rotate(13deg); }
 .camera-signs-note { margin: 13px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .practice-breadcrumb { margin: 2px 0 20px; font-size: 14px; flex-wrap: wrap; }
@@ -80,18 +74,11 @@
 .practice-panel-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 19px; }
 .practice-panel-heading h2 { display: flex; align-items: center; gap: 9px; font-size: 19px; }
 .practice-panel-heading h2 > svg { flex-shrink: 0; color: var(--violet); }
-.practice-sign-label { padding: 5px 10px; border-radius: 9px; background: light-dark(#eee6fc, var(--color-surface)); color: var(--violet-dark); font-size: 13px; font-weight: 850; }
-.practice-demo-video, .practice-demo-placeholder, .practice-camera-preview { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; }
-.practice-demo-video { display: block; background: #211936; object-fit: contain; }
-.practice-demo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 25px; background: radial-gradient(ellipse at 70% 10%, light-dark(#e2d4fc, var(--color-surface)), transparent 70%), light-dark(#f0eafa, var(--color-surface)); text-align: center; color: light-dark(#7652b5, var(--color-primary)); }
-.practice-demo-placeholder strong { color: var(--violet-dark); font-size: 17px; }
-.practice-demo-placeholder p { max-width: 280px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.practice-demo-meaning { margin: 15px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .practice-camera-status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 750; }
 .practice-camera-status::before { content: ''; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: light-dark(#a599b9, var(--color-highlight)); }
 .practice-camera-status.is-active { color: light-dark(#187b63, var(--color-success)); }
 .practice-camera-status.is-active::before { background: #2b9c7d; }
-.practice-camera-preview { position: relative; background: light-dark(#f1eff6, var(--color-surface)); }
+.practice-camera-preview { position: relative; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: light-dark(#f1eff6, var(--color-surface)); }
 .practice-camera-preview video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .practice-camera-preview video[hidden] { display: none; }
 .practice-hand-overlay { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); transform-origin: center; pointer-events: none; }
@@ -213,7 +200,6 @@
   .challenge-amount { gap: 11px; }
   .challenge-amount label { min-width: 0; width: 50%; padding: 15px 9px; }
   .challenge-request { gap: 15px; padding: 17px; }
-  .challenge-request > .practice-sign-art { width: 66px; height: 74px; }
   .challenge-request .practice-demo-label { font-size: 10px; }
   .challenge-finished { gap: 17px; padding: 28px 20px; }
   .challenge-finished > h2 { font-size: 25px; }
@@ -226,9 +212,9 @@
   .camera-center-aside .practice-panel { padding: 18px; }
   .practice-panel-heading h2 { font-size: 18px; }
   .practice-workspace > .practice-panel { padding: 16px; }
-  .practice-camera-placeholder, .practice-demo-placeholder { gap: 10px; padding: 18px; }
-  .practice-camera-placeholder strong, .practice-demo-placeholder strong { font-size: 15px; }
-  .practice-camera-placeholder p, .practice-demo-placeholder p { font-size: 13px; }
+  .practice-camera-placeholder { gap: 10px; padding: 18px; }
+  .practice-camera-placeholder strong strong { font-size: 15px; }
+  .practice-camera-placeholder p p { font-size: 13px; }
 }
 .camera-challenge-link { margin-top: 20px; }
 .practice-recognition-column { display: grid; align-content: start; gap: 14px; min-width: 0; }

@@ -3,7 +3,8 @@ import { ArrowRight } from 'lucide-react';
 import type { LessonActivity as Activity } from '../data/curriculum';
 import { gradeAnswers } from '../data/lessonPlan';
 import { getEducationalSign } from '../data/library';
-import { SignHandDiagram } from './SignHandDiagram';
+import { getQuizVisual } from '../data/educationalMedia';
+import { EducationalVisual } from './SignMediaViewer';
 
 const activityTitles = { choice: 'Comprueba lo aprendido', identify: 'Identifica la expresión', association: 'Relaciona los conceptos', order: 'Ordena los pasos' };
 
@@ -12,14 +13,15 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
   checked: boolean; disabled?: boolean;
 }) {
   const name = useId();
-  const diagram = activity.diagramId ? getEducationalSign(activity.diagramId)?.handDiagram : undefined;
+  const sign = activity.diagramId ? getEducationalSign(activity.diagramId) : undefined;
+  const visual = sign && getQuizVisual(sign.media);
   const rows = activity.type === 'association' ? activity.pairs : activity.type === 'order'
     ? activity.order.map((answerId, index) => ({ id: String(index), label: `Paso ${index + 1}`, answerId })) : undefined;
   const labelFor = (id: string) => activity.options.find(option => option.id === id)?.label;
   return <fieldset className="lesson-answer-fields" disabled={disabled}>
     <legend>{activity.question}</legend>
     {activity.type === 'order' && <small>Usa cada acción una sola vez.</small>}
-    {diagram && <div className="lesson-question-diagram"><SignHandDiagram diagram={diagram} /></div>}
+    {visual && <div className="lesson-question-diagram"><EducationalVisual key={visual.id} visual={visual} /></div>}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
       return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>

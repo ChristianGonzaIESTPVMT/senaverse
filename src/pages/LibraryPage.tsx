@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Hand, Heart, LayoutGrid, Search, SearchX, Soup, Sparkles, UsersRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { SignHandDiagram } from '../components/SignHandDiagram';
+import { EducationalVisual, SignMediaViewer } from '../components/SignMediaViewer';
 import { getEducationalSign, libraryCategories, searchLibrary, type LibraryCategory, type LibraryEntry } from '../data/library';
 import { getLessonLocation, getLessonPath } from '../data/curriculum';
 import { getFreePracticePath } from '../data/practice';
@@ -26,14 +26,15 @@ const extraCategories = [
 ] as const;
 
 function LibraryReference({ entry }: { entry: LibraryEntry }) {
+  const { visual, video, document } = entry.media;
   return (
     <div className="library-thumbnail library-card-reference" data-tone={entry.tone}>
-      {entry.thumbnailSrc ? <img src={entry.thumbnailSrc} alt={`Referencia de ${entry.word}`} loading="lazy" /> : <>
-        <BookOpen size={31} aria-hidden="true" />
-        {entry.reference ? <a href={entry.reference.url} target="_blank" rel="noopener noreferrer"
-          aria-label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</a>
-          : <span>{entry.videoSrc ? 'Video en la ficha' : 'Referencia pendiente'}</span>}
-      </>}
+      {visual.availability === 'available' && visual.kind !== 'sequence' ? <EducationalVisual visual={visual} decorative />
+        : <BookOpen size={31} aria-hidden="true" />}
+      {document ? <a href={document.location.url} target="_blank" rel="noopener noreferrer"
+        aria-label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</a>
+        : <span>{video.availability === 'available' ? 'Video en la ficha' : visual.availability === 'available'
+          ? 'Referencia en la ficha' : 'Referencia pendiente'}</span>}
     </div>
   );
 }
@@ -62,7 +63,6 @@ export function LibraryPage() {
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -76,11 +76,6 @@ export function LibraryPage() {
       if (!dialog.contains(document.activeElement) && document.activeElement === document.body) searchRef.current?.focus();
     }
   }, [consultSign, selected]);
-  useEffect(() => {
-    const video = videoRef.current;
-    return () => video?.pause();
-  }, [selected]);
-
   useEffect(() => {
     if (!moreOpen) return;
     function onPointerDown(event: PointerEvent) {
@@ -229,7 +224,7 @@ export function LibraryPage() {
         <button type="button" className="library-page-arrow" aria-label="Página siguiente" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}><ChevronRight size={25} aria-hidden="true" /></button>
       </nav>}
 
-      <dialog ref={dialogRef} className="library-dialog" aria-labelledby="library-dialog-title" onClose={() => videoRef.current?.pause()}
+      <dialog ref={dialogRef} className="library-dialog" aria-labelledby="library-dialog-title"
         onCancel={event => { event.preventDefault(); closeEntry(); }} onClick={event => { if (event.target === event.currentTarget) closeEntry(); }}>
         <div className="library-dialog-content">
           <button className="library-dialog-close" type="button" aria-label="Cerrar ficha" autoFocus onClick={closeEntry}><X size={24} /></button>
@@ -237,18 +232,10 @@ export function LibraryPage() {
           <h2 id="library-dialog-title">{selected?.word}</h2>
           <p className="library-dialog-description">{selected?.description}</p>
           {selected && <>
-            {selected.videoSrc ? <video key={selected.id} ref={videoRef} className="library-video" controls playsInline preload="metadata" poster={selected.thumbnailSrc} aria-label={`Video de ${selected.word} en LSP`}>
-              <source src={selected.videoSrc} />
-              {selected.captionsSrc && <track kind="captions" src={selected.captionsSrc} srcLang="es" label="Español" default />}
-              Tu navegador no admite la reproducción de este video.
-            </video> : selected.thumbnailSrc ? <img className="library-video" src={selected.thumbnailSrc} alt={`Referencia de ${selected.word}`} />
-              : selected.handDiagram && <div className="game-diagram"><SignHandDiagram diagram={selected.handDiagram} /></div>}
             <div className="library-meaning">
-              <BookOpen size={20} aria-hidden="true" />
               <div>
                 <h3>Referencia y ejecución</h3>
-                {selected.reference && <a href={selected.reference.url} target="_blank" rel="noopener noreferrer">{selected.reference.title} (nueva pestaña)</a>}
-                {selected.instructions ? <p>{selected.instructions}</p> : <p>La referencia visual y las instrucciones están pendientes de incorporación.</p>}
+                <SignMediaViewer key={selected.id} sign={selected} />
               </div>
             </div>
             <dl className="library-sign-facts">
@@ -259,9 +246,7 @@ export function LibraryPage() {
               <div><dt>Reconocimiento</dt><dd>{selected.recognitionClassId ? 'Disponible · experimental V1' : 'Sin reconocimiento automático'}</dd></div>
             </dl>
             <p>{selected.meaning}</p>
-            {selected.source && <p className="library-source">Fuente · {selected.source.publisher}. <a href={selected.source.url}
-              target="_blank" rel="noopener noreferrer">{selected.source.title}{selected.source.page && `, p. ${selected.source.page}`}</a></p>}
-              {selected.reference && !selected.recognitionClassId && <p>Usa la referencia para repasar la seña a tu ritmo.</p>}
+            {selected.media.document && !selected.recognitionClassId && <p>Usa la referencia para repasar la seña a tu ritmo.</p>}
             <div className="library-dialog-actions">
               {situationReturn && <Link className="button button-outline" to={situationReturn}>Volver a la situación</Link>}
               {minigameReturn && <Link className="button button-outline" to={minigameReturn}>Volver al desafío</Link>}

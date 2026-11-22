@@ -2,13 +2,13 @@ import { homeVisuals, type HomeVisualName } from '../data/homeVisuals';
 import './HomeVisual.css';
 
 function Placeholder({ name }: { name: HomeVisualName }) {
-  if (name === 'brand' || name === 'hero' || name === 'welcome') {
-    return <span className="home-visual-emoji">{name === 'welcome' ? '👋' : '🤟'}</span>;
+  if (name === 'brand' || name === 'welcome') {
+    return <span className="home-visual-emoji">👋</span>;
   }
 
   return (
     <svg viewBox="0 0 80 80" fill="none" stroke="#211a38" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" focusable="false">
-      {name === 'lessons' && <>
+      {(name === 'lessons' || name === 'hero') && <>
         <path d="M40 23C30 13 16 12 7 17v45c12-5 24-2 33 7 9-9 21-12 33-7V17c-9-5-23-4-33 6Z" fill="#6696ff" />
         <path d="M12 23v33c10-2 17 0 23 5V28c-7-5-15-7-23-5Z" fill="#83b2ff" stroke="none" />
         <path d="M45 28v33c6-5 13-7 23-5V23c-8-2-16 0-23 5Z" fill="#4d7aee" stroke="none" />

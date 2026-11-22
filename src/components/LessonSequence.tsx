@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Camera, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { LessonAnswerFields } from './LessonActivity';
-import { SignHandDiagram } from './SignHandDiagram';
-import { gradeAnswers, type Answers, type LessonPlan, type LessonReference, type Question, type StudyStep } from '../data/lessonPlan';
+import { MediaSourceLink, SignMediaViewer } from './SignMediaViewer';
+import { gradeAnswers, type Answers, type LessonPlan, type Question, type StudyStep } from '../data/lessonPlan';
 import { nextStudyStep, type Attempt, type StepProgress, type StudyInput, type StudyRun } from '../data/lessonStudy';
 import { useStudentProgress } from '../hooks/progressContext';
 import { recognitionSignsById } from '../features/sign-recognition/recognitionCatalog';
@@ -11,12 +11,6 @@ import { getEducationalSign, getLibrarySignPath } from '../data/library';
 
 const DirectedLessonPractice = lazy(() => import('./DirectedLessonPractice'));
 const emptyResponses: Record<string, string> = {};
-
-function Reference({ reference }: { reference: LessonReference }) {
-  return <a className="practice-reference-link" href={reference.url} target="_blank" rel="noopener noreferrer">
-    <BookOpen size={18} aria-hidden="true" /> {reference.title} (nueva pestaña)
-  </a>;
-}
 
 function Questions({ questions, method, previous, complete, submit }: {
   questions: Question[]; method: 'answers' | 'alternative'; previous?: Attempt; complete?: boolean;
@@ -54,15 +48,16 @@ function PracticeStep({ step, previous, submit }: {
   const last = previous?.attempts.at(-1);
   const [path, setPath] = useState<'choose' | 'camera' | 'alternative'>(last?.input.method === 'alternative' ? 'alternative' : 'choose');
   const supportsCamera = recognitionSignsById.has(step.targetId);
+  const sign = getEducationalSign(step.targetId);
   if (previous?.complete) {
     return <div className="lesson-sequence-stack">
       <p>{last?.input.method === 'camera' ? 'Práctica registrada con coincidencia experimental de cámara.' : 'Ejercicio alternativo sin cámara completado.'}</p>
-      <Reference reference={step.reference} />
+      {sign && <SignMediaViewer sign={sign} compact />}
     </div>;
   }
 
   return <div className="lesson-sequence-stack">
-    {path !== 'camera' && <><p>{step.instruction}</p><Reference reference={step.reference} /></>}
+    {path !== 'camera' && sign && <SignMediaViewer sign={sign} instruction={step.instruction} compact />}
     {supportsCamera && <p className="lesson-warning">Reconocimiento experimental. La revisión lingüística está pendiente. Si te cuesta obtener una coincidencia, puedes elegir el ejercicio sin cámara.</p>}
     {step.notice && <p>{step.notice}</p>}
     <div className="lesson-sequence-nav">
@@ -74,7 +69,7 @@ function PracticeStep({ step, previous, submit }: {
       </button>}
     </div>
     {path === 'camera' && <Suspense fallback={<p role="status">Preparando la práctica con cámara…</p>}>
-      <DirectedLessonPractice targetId={step.targetId} instruction={step.instruction} reference={step.reference}
+      <DirectedLessonPractice targetId={step.targetId} instruction={step.instruction}
         onContinue={signId => submit({ method: 'camera', signId }, true)} />
     </Suspense>}
     {path === 'alternative' && <Questions questions={step.alternative} method="alternative" previous={last} submit={submit} />}
@@ -169,28 +164,29 @@ export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
           <p>Tu finalización anterior sigue registrada. Puedes recorrer esta versión de la lección.</p>}</>}
       {step?.kind === 'reading' && <div className="lesson-sequence-stack">
         {step.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
-        {step.references?.map(reference => <Reference key={reference.url} reference={reference} />)}
+        {step.references?.map(reference => <MediaSourceLink key={reference.url} reference={reference} />)}
       </div>}
       {step?.kind === 'study' && <>
         <p>{step.text}</p>
         <div className="lesson-sequence-stack">{[...new Map(
           (step.reference ? [step.reference] : step.signs.flatMap(sign => {
-            const reference = getEducationalSign(sign.id)?.reference;
+            const reference = getEducationalSign(sign.id)?.media.document?.link;
             return reference ? [reference] : [];
           })).map(reference => [reference.url, reference]),
-        ).values()].map(reference => <Reference key={reference.url} reference={reference} />)}</div>
+        ).values()].map(reference => <MediaSourceLink key={reference.url} reference={reference} />)}</div>
           <dl className="lesson-number-list">{step.signs.map(sign => {
             const entry = getEducationalSign(sign.id);
             const name = sign.name ?? entry?.word;
             return <div key={sign.id}>
-              <dt>{name}</dt><dd>{sign.explanation ?? entry?.instructions}</dd>
-              {!step.reference && entry?.handDiagram && <dd className="lesson-question-diagram"><SignHandDiagram diagram={entry.handDiagram} /></dd>}
+              <dt>{name}</dt>
+              {entry && <dd><SignMediaViewer sign={entry} instruction={sign.explanation ?? entry.instructions}
+                showDocumentLink={false} compact /></dd>}
               <dd className="lesson-sign-availability">{entry?.recognitionClassId ? 'Reconocimiento experimental disponible' : 'Contenido de estudio'}</dd>
               {entry && <dd><Link to={getLibrarySignPath(entry.id)} state={{ lessonReturn: { lessonId, stepId: step.id } }}
                 aria-label={`Ver ficha de ${name} en Biblioteca`}>Ver ficha en Biblioteca</Link></dd>}
             </div>;
           })}</dl>
-        <p className="lesson-warning">Las referencias proceden del MINEDU. La revisión lingüística de las fichas de SeñaVerse está pendiente.</p>
+        <p className="lesson-warning">Validación lingüística de las fichas pendiente.</p>
       </>}
       {step?.kind === 'question' && <Questions questions={step.questions} method="answers"
         previous={result?.attempts.at(-1)} complete={result?.complete} submit={submit} />}
