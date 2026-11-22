@@ -3,7 +3,7 @@ import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRig
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { SignHandDiagram } from '../components/SignHandDiagram';
 import { getEducationalSign, libraryCategories, searchLibrary, type LibraryCategory, type LibraryEntry } from '../data/library';
-import { getLessonPath } from '../data/curriculum';
+import { getLessonLocation, getLessonPath } from '../data/curriculum';
 import { getFreePracticePath } from '../data/practice';
 import { getSituationReturnPath } from '../data/situations';
 import { getMinigameReturnPath } from '../data/minigames';
@@ -49,6 +49,9 @@ export function LibraryPage() {
   const selected = requested === null ? undefined : getEducationalSign(requested);
   const situationReturn = getSituationReturnPath(location.state?.situationReturn);
   const minigameReturn = getMinigameReturnPath(location.state?.minigameReturn);
+  const lessonState = location.state?.lessonReturn;
+  const lessonReturn = typeof lessonState?.lessonId === 'string' ? getLessonLocation(lessonState.lessonId) : undefined;
+  const lessonStep = lessonReturn?.lesson.plan?.steps.find(step => step.id === lessonState.stepId);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [compatible, setCompatible] = useState(false);
@@ -258,14 +261,17 @@ export function LibraryPage() {
             <p>{selected.meaning}</p>
             {selected.source && <p className="library-source">Fuente · {selected.source.publisher}. <a href={selected.source.url}
               target="_blank" rel="noopener noreferrer">{selected.source.title}{selected.source.page && `, p. ${selected.source.page}`}</a></p>}
-            {selected.reference && !selected.recognitionClassId && <p>Usa la lámina para repasar la postura a tu ritmo.</p>}
+              {selected.reference && !selected.recognitionClassId && <p>Usa la referencia para repasar la seña a tu ritmo.</p>}
             <div className="library-dialog-actions">
               {situationReturn && <Link className="button button-outline" to={situationReturn}>Volver a la situación</Link>}
               {minigameReturn && <Link className="button button-outline" to={minigameReturn}>Volver al desafío</Link>}
+                {lessonReturn && lessonStep && <Link className="button button-outline" to={getLessonPath(lessonReturn.unit.id, lessonReturn.lesson.id)}
+                  state={{ lessonStep: lessonStep.id }}>Volver a la lección</Link>}
               {selected.recognitionClassId && <Link className="button button-primary" to={getFreePracticePath(selected.recognitionClassId)}>
                 <Camera size={18} aria-hidden="true" /> Practicar con cámara
               </Link>}
-              {selected.lesson && <Link className="button button-outline" to={getLessonPath(selected.lesson.unitId, selected.lesson.lessonId)}>Ir a {selected.lesson.title}</Link>}
+                {selected.lesson && selected.lesson.lessonId !== lessonReturn?.lesson.id &&
+                  <Link className="button button-outline" to={getLessonPath(selected.lesson.unitId, selected.lesson.lessonId)}>Ir a {selected.lesson.title}</Link>}
               <button className={`library-dialog-save${saved.includes(selected.id) ? ' is-saved' : ''}`} type="button"
                 aria-label={`${selected.word} en favoritos`} aria-pressed={saved.includes(selected.id)} onClick={() => toggleSaved(selected)}>
                 <Bookmark size={20} fill={saved.includes(selected.id) ? 'currentColor' : 'none'} aria-hidden="true" />

@@ -6,7 +6,9 @@ import { createProfileBackup } from '../data/profileBackup';
 import { readProfilePhoto } from '../data/profilePhotoStore';
 import { validateStoredPhoto } from '../data/profilePhoto';
 import { PROFILE_BIO_LIMIT, PROFILE_NAME_LIMIT, type PersonalInfoErrors } from '../data/profile';
-import { summarizeProgress } from '../data/progress';
+import { Link } from 'react-router-dom';
+import { StudentLevel } from '../components/StudentLevel';
+import { useStudentOverview } from '../hooks/useStudentOverview';
 import { useStudentProfile } from '../hooks/profileContext';
 import { useStudentProgress } from '../hooks/progressContext';
 import './ProfilePage.css';
@@ -14,7 +16,7 @@ import './ProfilePage.css';
 export function ProfilePage() {
   const { profile, storageAvailable, photoUrl, savePersonalInfo, resetProfile } = useStudentProfile();
   const { progress } = useStudentProgress();
-  const summary = summarizeProgress(progress);
+  const { summary } = useStudentOverview();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ displayName: profile.displayName, bio: profile.bio });
   const [errors, setErrors] = useState<PersonalInfoErrors>({});
@@ -73,9 +75,10 @@ export function ProfilePage() {
 
   const statistics = [
     { label: 'XP acumulados', value: summary.xp, icon: Zap },
-    { label: 'Lecciones completadas', value: summary.completed.length, icon: BookOpen },
-    { label: 'Logros obtenidos', value: summary.achievements.filter(achievement => achievement.obtained).length, icon: Award },
+    { label: 'Lecciones completadas', value: summary.curriculum.done, icon: BookOpen },
+    { label: 'Logros obtenidos', value: summary.latestAchievements.length, icon: Award },
   ];
+  const badges = summary.latestAchievements.slice(0, 3);
 
   return (
     <div className="profile-page">
@@ -96,6 +99,16 @@ export function ProfilePage() {
           <dt><Icon size={18} aria-hidden="true" />{label}</dt>
           <dd>{value.toLocaleString('es-PE')}</dd>
         </div>)}</dl>
+        <div className="profile-learning">
+          <StudentLevel level={summary.level} xp={summary.xp} />
+          <div>
+            <h3>Actividad y logros</h3>
+            <p>Racha actual de {summary.calendar.current} {summary.calendar.current === 1 ? 'día' : 'días'}.</p>
+            {!!summary.historicalLessons && <p>{summary.historicalLessons} {summary.historicalLessons === 1 ? 'finalización anterior' : 'finalizaciones anteriores'} en el historial.</p>}
+            {badges.length ? <ul>{badges.map(badge => <li key={badge.id}>{badge.name}</li>)}</ul> : <p>Aún no has obtenido insignias.</p>}
+            <Link to="/progreso">Ver mi progreso</Link>
+          </div>
+        </div>
       </section>
 
       <div className="profile-details">

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useParams } from 'react-router-dom';
 import { Camera, ChartNoAxesColumnIncreasing, House, LayoutGrid, LibraryBig, List, Menu, Sparkles, Star, X } from 'lucide-react';
-import { summarizeProgress } from '../data/progress';
+import { getProgressTotals } from '../data/progress';
 import { useStudentProgress } from '../hooks/progressContext';
 import { useStudentProfile } from '../hooks/profileContext';
 import { getUnitPath, units } from '../data/curriculum';
@@ -40,7 +40,7 @@ function LearningTip() {
 export function StudentLayout({ children }: { children: ReactNode }) {
   const { progress } = useStudentProgress();
   const { profile, photoUrl } = useStudentProfile();
-  const { xp } = summarizeProgress(progress);
+  const { xp } = getProgressTotals(progress);
   const location = useLocation();
   const { unitId, lessonId, situationId, sceneId } = useParams();
   const menuRef = useRef<HTMLDialogElement>(null);

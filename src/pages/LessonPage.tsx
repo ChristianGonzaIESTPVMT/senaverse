@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Camera, Check, CheckCircle2, CirclePlay, Clock3, Info, LibraryBig, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, CirclePlay, Clock3, Info, LibraryBig, RotateCcw, Sparkles } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { LessonActivity } from '../components/LessonActivity';
 import { LessonSequence } from '../components/LessonSequence';
-import { getLessonLocation, getLessonPath, getResumeLesson, getUnitPath, units, type Lesson, type Unit } from '../data/curriculum';
+import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Lesson, type Unit } from '../data/curriculum';
 import { getEducationalSign, getLibrarySignPath } from '../data/library';
-import type { LearningActivity } from '../hooks/useLearningActivity';
+import { useStudentProgress } from '../hooks/progressContext';
 
-type LessonPageProps = { completed: string[]; activity: LearningActivity; onComplete: (lessonId: string) => void; onVisit: (lessonId: string) => void };
+type LessonPageProps = { completed: string[]; onVisit: (lessonId: string) => void };
 
 export function LessonPage(props: LessonPageProps) {
   const { unitId, lessonId } = useParams();
@@ -22,10 +22,12 @@ export function LessonPage(props: LessonPageProps) {
   return <LessonContent key={lesson.id} unit={unit} lesson={lesson} {...props} />;
 }
 
-function LessonContent({ unit, lesson, completed, activity, onComplete, onVisit }: LessonPageProps & { unit: Unit; lesson: Lesson }) {
+function LessonContent({ unit, lesson, completed, onVisit }: LessonPageProps & { unit: Unit; lesson: Lesson }) {
+  const { progress } = useStudentProgress();
   const lessonIndex = unit.lessons.findIndex(item => item.id === lesson.id);
-  const isDone = completed.includes(lesson.id);
-  const unitDone = unit.lessons.filter(item => completed.includes(item.id)).length;
+  const isDone = lesson.plan ? !!progress.lessonStudy?.[lesson.id]?.completedAt : completed.includes(lesson.id);
+  const unitProgress = getCurriculumProgress(progress).unitProgress.find(item => item.unit.id === unit.id);
+  const next = functionalLessons[functionalLessons.findIndex(item => item.lesson.id === lesson.id) + 1];
   useEffect(() => { onVisit(lesson.id); }, [lesson.id, onVisit]);
 
   return (
@@ -37,24 +39,27 @@ function LessonContent({ unit, lesson, completed, activity, onComplete, onVisit 
       </nav>
       <div className="page-heading lesson-heading">
         <div><span className="section-eyebrow">UNIDAD {String(unit.id).padStart(2, '0')} · LECCIÓN {String(lessonIndex + 1).padStart(2, '0')}</span><h1>{lesson.title}</h1><p>{lesson.description}</p></div>
-        <span className={`status-chip${isDone ? ' finished' : ''}`}>{isDone ? 'Completada' : 'En progreso'}</span>
+        <span className={`status-chip${isDone ? ' finished' : ''}`}>{lesson.plan ? isDone ? 'Completada' : progress.lessonStudy?.[lesson.id] ? 'En progreso' : 'Disponible'
+          : isDone ? 'Finalización anterior' : 'Material preliminar'}</span>
       </div>
       <div className="lesson-layout">
-        {lesson.plan ? <LessonSequence lessonId={lesson.id} plan={lesson.plan} unitPath={getUnitPath(unit.id)} />
-          : <LegacyLesson lesson={lesson} content={lesson.content} unit={unit} isDone={isDone} completed={completed} onComplete={onComplete} />}
+        {lesson.plan ? <LessonSequence lessonId={lesson.id} plan={lesson.plan} unitPath={getUnitPath(unit.id)}
+          nextPath={next && getLessonPath(next.unit.id, next.lesson.id)} />
+          : <LegacyLesson title={lesson.title} content={lesson.content} unit={unit} />}
 
         <aside className="lesson-aside">
           <section className="white-card unit-outline learning-lesson-outline">
             <h3><BookOpen size={19} aria-hidden="true" /> Contenido de la unidad</h3>
-            <div className="bar"><div style={{ width: `${unitDone / unit.lessons.length * 100}%` }} /></div>
-            <span className="unit-completion">{unitDone} de {unit.lessons.length} lecciones</span>
+            {unitProgress?.count ? <><div className="bar"><div style={{ width: `${unitProgress.percent}%` }} /></div>
+              <span className="unit-completion">{unitProgress.done} de {unitProgress.count} lecciones funcionales</span></> : <span className="unit-completion">Material preliminar</span>}
             {unit.lessons.map((item, index) => {
-              const done = completed.includes(item.id);
+                const done = item.plan ? !!progress.lessonStudy?.[item.id]?.completedAt : completed.includes(item.id);
               const current = item.id === lesson.id;
               return (
                 <Link className={`outline-row${current ? ' active' : ''}${done ? ' is-completed' : ''}`} key={item.id} to={getLessonPath(unit.id, item.id)} aria-current={current ? 'page' : undefined}>
                   {done ? <CheckCircle2 size={18} aria-hidden="true" /> : <span className="outline-dot" aria-hidden="true">{index + 1}</span>}
-                  <div><strong>{index + 1}. {item.title}</strong><span>{current ? 'Estás aquí' : done ? 'Completada' : activity.startedLessonIds.includes(item.id) ? 'En progreso' : 'Disponible'}</span></div>
+                  <div><strong>{index + 1}. {item.title}</strong><span>{current ? 'Estás aquí' : item.plan ? done ? 'Completada' : progress.lessonStudy?.[item.id] ? 'En progreso' : 'Disponible'
+                    : done ? 'Finalización anterior' : 'Material preliminar'}</span></div>
                 </Link>
               );
             })}
@@ -66,17 +71,12 @@ function LessonContent({ unit, lesson, completed, activity, onComplete, onVisit 
   );
 }
 
-function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: {
-  lesson: Lesson; content: NonNullable<Lesson['content']>; unit: Unit; isDone: boolean; completed: string[]; onComplete: LessonPageProps['onComplete'];
-}) {
-  const [passed, setPassed] = useState(false);
+function LegacyLesson({ title, content, unit }: { title: string; content: NonNullable<Lesson['content']>; unit: Unit }) {
   const [mediaError, setMediaError] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const sign = content.signId ? getEducationalSign(content.signId) : undefined;
   const videoSrc = content.videoSrc ?? sign?.videoSrc;
   const captionsSrc = content.captionsSrc ?? sign?.captionsSrc;
-  const next = getResumeLesson(completed);
-  const hasPending = units.some(item => item.lessons.some(entry => !completed.includes(entry.id)));
 
   useEffect(() => {
     const video = videoRef.current;
@@ -95,7 +95,7 @@ function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: 
       <section className="white-card lesson-media">
         <div className="lesson-section-top"><span>01 / OBSERVA</span><span><Clock3 size={14} aria-hidden="true" /> Recurso audiovisual</span></div>
         {videoSrc ? <>
-          <video className="learning-lesson-video" key={videoSrc} ref={videoRef} controls playsInline preload="metadata" poster={content.thumbnailSrc ?? sign?.thumbnailSrc} aria-label={`Demostración de ${lesson.title}`} onLoadedData={() => setMediaError('')} onError={() => setMediaError('El video no se pudo cargar. Revisa el recurso e inténtalo nuevamente.')}>
+          <video className="learning-lesson-video" key={videoSrc} ref={videoRef} controls playsInline preload="metadata" poster={content.thumbnailSrc ?? sign?.thumbnailSrc} aria-label={`Demostración de ${title}`} onLoadedData={() => setMediaError('')} onError={() => setMediaError('El video no se pudo cargar. Revisa el recurso e inténtalo nuevamente.')}>
             <source src={videoSrc} />
             {captionsSrc && <track kind="captions" src={captionsSrc} srcLang="es" label="Español" default />}
             Tu navegador no admite la reproducción de este video.
@@ -114,7 +114,7 @@ function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: 
         <p className="lesson-warning"><Info size={16} aria-hidden="true" /> La configuración de las manos, la orientación y el movimiento se detallarán con las demostraciones de LSP validadas.</p>
       </section>
 
-      <LessonActivity activity={content.activity} onResult={setPassed} />
+      <LessonActivity activity={content.activity} />
       <div className="learning-resource-links"><Link to="/biblioteca"><LibraryBig size={18} aria-hidden="true" /> Consultar la Biblioteca de señas <ArrowRight size={17} aria-hidden="true" /></Link></div>
       {content.practiceSignId && <aside className="recommendation">
         <div className="recommendation-icon"><Camera size={22} aria-hidden="true" /></div>
@@ -123,10 +123,8 @@ function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: 
       </aside>}
       <div className="finish-actions">
         <Link to={getUnitPath(unit.id)} className="button button-outline"><ArrowLeft size={17} aria-hidden="true" /> Volver a las lecciones</Link>
-        <button className="button button-primary" type="button" disabled={!passed || isDone} onClick={() => onComplete(lesson.id)}>{isDone ? <><Check size={17} aria-hidden="true" /> Lección completada</> : <>Marcar como completada <Check size={17} aria-hidden="true" /></>}</button>
       </div>
-      {isDone && hasPending && <div className="learning-next-step"><Link to={getLessonPath(next.unit.id, next.lesson.id)} className="button button-outline">Continuar aprendizaje <ArrowRight size={18} aria-hidden="true" /></Link></div>}
-      <p className="demo-note">La evaluación de esta lección es conceptual. La ejecución de las señas se evaluará con los recursos y el reconocimiento correspondientes. El progreso de las lecciones completadas se guarda en este navegador.</p>
+      <p className="demo-note">Actividad conceptual de consulta. Las lecciones con un recorrido completo registran el avance en Mi progreso.</p>
     </div>
   );
 }

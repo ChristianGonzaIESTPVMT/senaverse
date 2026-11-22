@@ -7,16 +7,17 @@ export type Answers = Record<string, Record<string, string>>;
 type Step = { id: string; title: string };
 export type StudyStep = Step & (
   | { kind: 'intro'; text: string }
-  | { kind: 'study'; text: string; signs: { id: string; name: string; explanation: string }[]; reference: LessonReference }
+  | { kind: 'reading'; paragraphs: string[]; references?: LessonReference[] }
+  | { kind: 'study'; text: string; signs: ({ id: string } & ({ name: string; explanation: string } | { name?: never; explanation?: never }))[]; reference?: LessonReference }
   | { kind: 'question' | 'assessment'; questions: Question[] }
-  | { kind: 'practice'; targetId: string; instruction: string; reference: LessonReference; alternative: Question[] }
+  | { kind: 'practice'; targetId: string; instruction: string; reference: LessonReference; alternative: Question[]; notice?: string }
 );
 export type LessonPlan = { objectives: string[]; steps: StudyStep[] };
 
 export function questionFields(activity: LessonActivity) {
-  return activity.type === 'association'
-    ? activity.pairs.map(pair => ({ id: pair.id, correctId: pair.answerId }))
-    : [{ id: 'choice', correctId: activity.correctId }];
+  if (activity.type === 'association') return activity.pairs.map(pair => ({ id: pair.id, correctId: pair.answerId }));
+  if (activity.type === 'order') return activity.order.map((correctId, index) => ({ id: String(index), correctId }));
+  return [{ id: 'choice', correctId: activity.correctId }];
 }
 
 export function gradeAnswers(questions: Question[], value: unknown) {
@@ -30,6 +31,7 @@ export function gradeAnswers(questions: Question[], value: unknown) {
     for (const field of questionFields(activity)) {
       const answer = (group as Record<string, unknown>)[field.id];
       if (typeof answer !== 'string' || !activity.options.some(option => option.id === answer)) return null;
+      if (activity.type === 'order' && Object.values(responses).includes(answer)) return null;
       responses[field.id] = answer;
       total++;
       if (answer === field.correctId) score++;

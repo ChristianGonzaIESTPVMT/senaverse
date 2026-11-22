@@ -1,6 +1,6 @@
-import { memo, useId, useRef, useState } from 'react';
+import { memo, useCallback, useId, useRef, useState } from 'react';
 import { BookOpen, RotateCcw } from 'lucide-react';
-import { PracticeCamera } from './PracticeCamera';
+import { PracticeCamera, type PracticeCameraSessionState } from './PracticeCamera';
 import { recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
 import { getEducationalSignForClass } from '../data/library';
 import { loadEducationModel } from '../features/sign-recognition/educationModel';
@@ -11,18 +11,23 @@ import type { LessonReference } from '../data/lessonPlan';
 
 const PracticePreview = memo(PracticeCamera);
 
-export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
+export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave }: {
   initialSign?: string;
   onConfirmed?: (event: RecognitionConfirmation) => void;
+  onSave?: (signId: string) => void;
   guided?: { targetId: string; instruction: string; reference: LessonReference; onAccept: (signId: string) => void; acceptLabel?: string };
 }) {
   const initial = resolvePracticeSign(guided?.targetId ?? initialSign);
   const [confirmedMatch, setConfirmedMatch] = useState<string | null>(null);
+  const [saveableSignId, setSaveableSignId] = useState<string | null>(null);
+  const [practiceSaved, setPracticeSaved] = useState(false);
+  const savedAttempt = useRef(false);
   const recognition = useRecognition(loadEducationModel, {
     initialMode: initial ? { type: 'directed', targetId: initial.id } : { type: 'free' },
     onConfirmed(event) {
       onConfirmed?.(event);
       if (event.outcome === 'matched' && event.signId === guided?.targetId) setConfirmedMatch(event.signId);
+      if (onSave) setSaveableSignId(event.outcome === 'different' ? null : event.signId);
     },
   });
   const [showLandmarks, setShowLandmarks] = useState(false);
@@ -35,7 +40,19 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
   const entry = getEducationalSignForClass(targetId || confirmed?.id || '');
   const reference = guided?.reference ?? entry?.reference;
 
+  const clearSavedPractice = useCallback(() => {
+    savedAttempt.current = false;
+    setPracticeSaved(false);
+    setSaveableSignId(null);
+  }, []);
+  const { onSessionState } = recognition.cameraBindings;
+  const trackPracticeState = useCallback((state: PracticeCameraSessionState) => {
+    onSessionState(state);
+    if (state.cameraStatus !== 'active') clearSavedPractice();
+  }, [clearSavedPractice, onSessionState]);
+
   function selectTarget(signId: string) {
+    clearSavedPractice();
     setShowUnavailable(false);
     recognition.changeMode(signId ? { type: 'directed', targetId: signId } : { type: 'free' });
   }
@@ -64,7 +81,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
     </div>}
     <div className="practice-workspace">
       <div className="practice-recognition-column">
-        <PracticePreview {...recognition.cameraBindings} disabled={modelState.status !== 'ready' && !cameraActive}
+        <PracticePreview {...recognition.cameraBindings} onSessionState={onSave ? trackPracticeState : onSessionState} disabled={modelState.status !== 'ready' && !cameraActive}
           disabledReason="La cámara estará disponible cuando cargue el reconocimiento." showLandmarks={showLandmarks} />
         <label className="practice-panel practice-overlay-toggle">
           <input type="checkbox" checked={showLandmarks} onChange={event => setShowLandmarks(event.target.checked)} />
@@ -83,10 +100,19 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
           </div>
           <button type="button" className="button button-outline" onClick={() => {
             setConfirmedMatch(null);
+            clearSavedPractice();
             recognition.reset();
           }} disabled={!cameraActive || modelState.status !== 'ready'}>
             <RotateCcw size={17} aria-hidden="true" /> Reintentar práctica
           </button>
+          {onSave && (practiceSaved ? <p role="status">Práctica experimental guardada en Mi progreso.</p>
+            : cameraActive && saveableSignId && <><p>Coincidencia experimental disponible · {recognitionSignsById.get(saveableSignId)?.name}</p>
+              <button className="button button-primary" type="button" onClick={() => {
+              if (savedAttempt.current) return;
+              savedAttempt.current = true;
+              setPracticeSaved(true);
+              onSave(saveableSignId);
+            }}>Guardar práctica con cámara</button></>)}
           {guided && confirmedMatch === guided.targetId && <>
             <p>Coincidencia experimental disponible para registrar en este intento.</p>
             <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>{guided.acceptLabel ?? 'Guardar práctica y continuar'}</button>

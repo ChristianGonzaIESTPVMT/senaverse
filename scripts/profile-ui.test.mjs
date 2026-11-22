@@ -69,7 +69,8 @@ test('profile statistics and header XP use the same real records without mutatin
   const html = renderProfile(progress);
   assert.match(html, />80 XP</);
   assert.match(html, /XP acumulados<\/dt><dd>80<\/dd>/);
-  assert.match(html, /Lecciones completadas<\/dt><dd>1<\/dd>/);
+  assert.match(html, /Lecciones completadas<\/dt><dd>0<\/dd>/);
+  assert.match(html, /1 finalización anterior/);
   assert.match(html, /Logros obtenidos<\/dt><dd>2<\/dd>/);
   assert.equal(JSON.stringify(progress), before);
 }));

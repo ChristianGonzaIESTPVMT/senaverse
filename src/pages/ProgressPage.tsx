@@ -1,19 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Award, Blocks, BookOpen, Camera, Check, ChevronLeft, ChevronRight, CircleCheck, Clock3, Gamepad2, GraduationCap, Hand, History, Layers, LockKeyhole, MessageSquare, Star, Target, UsersRound, X, Zap } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ArrowRight, Award, Blocks, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Gamepad2, GraduationCap, Hand, History, Layers, LockKeyhole, Star, Target, UsersRound, X, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { getUnitPath } from '../data/curriculum';
-import { describeActivity, summarizeProgress, type ProgressActivity } from '../data/progress';
-import { useStudentProgress } from '../hooks/progressContext';
+import { STUDENT_TIME_ZONE } from '../data/learningCalendar';
+import { minigames } from '../data/minigames';
+import { situations } from '../data/situations';
+import type { StudentAchievement } from '../data/studentOverview';
+import { StudentActivityList } from '../components/StudentActivityList';
+import { StudentLevel } from '../components/StudentLevel';
+import { useStudentOverview } from '../hooks/useStudentOverview';
 import './ProgressPage.css';
 
-type Achievement = ReturnType<typeof summarizeProgress>['achievements'][number];
+const dayLabel = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeZone: STUDENT_TIME_ZONE });
 
 function ProgressGlyph() {
   return <span className="progress-glyph" aria-hidden="true"><i /><i /><i /></span>;
 }
 
-function AchievementCard({ achievement, detailed = false }: { achievement: Achievement; detailed?: boolean }) {
+function AchievementCard({ achievement, detailed = false }: { achievement: StudentAchievement; detailed?: boolean }) {
   const Icon = achievement.id === 'first-step' ? GraduationCap : achievement.id === 'explorer' ? Star : achievement.obtained ? Award : LockKeyhole;
   return (
     <article className={`progress-achievement progress-achievement-${achievement.id}${achievement.obtained ? ' is-obtained' : ' is-locked'}`} title={achievement.description}>
@@ -21,61 +26,36 @@ function AchievementCard({ achievement, detailed = false }: { achievement: Achie
       <h3>{achievement.name}</h3>
       {detailed && <p>{achievement.description}</p>}
       <span className="progress-achievement-status">{achievement.obtained ? <Check size={16} aria-hidden="true" /> : <LockKeyhole size={14} aria-hidden="true" />}{achievement.obtained ? 'Obtenido' : 'Bloqueado'}</span>
+      {detailed && (achievement.obtained ? achievement.obtainedAt
+        ? <time dateTime={achievement.obtainedAt}>{dayLabel.format(new Date(achievement.obtainedAt))}</time>
+        : <small>Fecha no disponible</small> : <small>{achievement.value} de {achievement.goal}</small>)}
     </article>
   );
-}
-
-function relativeTime(value: string | null, now: number) {
-  if (!value) return 'Registro anterior · fecha no disponible';
-  const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60000));
-  if (minutes < 1) return 'Hace un momento';
-  const formatter = new Intl.RelativeTimeFormat('es-PE', { numeric: 'auto' });
-  if (minutes < 60) return formatter.format(-minutes, 'minute');
-  if (minutes < 1440) return formatter.format(-Math.floor(minutes / 60), 'hour');
-  if (minutes < 10080) return formatter.format(-Math.floor(minutes / 1440), 'day');
-  return new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeZone: 'America/Lima' }).format(new Date(value));
-}
-
-function ActivityList({ activities, now }: { activities: ProgressActivity[]; now: number }) {
-  const icons = { lesson: BookOpen, camera: Camera, situation: MessageSquare, 'situation-scene': MessageSquare, minigame: Gamepad2 };
-  return <ol className="progress-activity-list">{activities.map(activity => {
-    const Icon = icons[activity.type];
-    return <li key={activity.id}>
-      <span className="progress-activity-icon"><Icon size={27} aria-hidden="true" /></span>
-      <div><p>{describeActivity(activity)}</p><time dateTime={activity.occurredAt ?? undefined} title={activity.occurredAt ? new Intl.DateTimeFormat('es-PE', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Lima' }).format(new Date(activity.occurredAt)) : undefined}>{relativeTime(activity.occurredAt, now)}</time></div>
-      <CircleCheck className="progress-activity-check" size={22} aria-label="Completada" />
-    </li>;
-  })}</ol>;
 }
 
 function EmptyActivity() {
   return <div className="progress-empty">
     <span><BookOpen size={26} aria-hidden="true" /></span>
-    <div><h3>Tu próxima lección es el primer paso</h3><p>Aquí verás las actividades que completes.</p><Link to="/academia">Empezar a aprender <ArrowRight size={15} aria-hidden="true" /></Link></div>
+    <div><h3>Tu próxima lección es el primer paso</h3><p>Aquí verás tus consultas y actividades registradas.</p><Link to="/academia/unidad/2/leccion/numeros">Empezar a aprender <ArrowRight size={15} aria-hidden="true" /></Link></div>
   </div>;
 }
 
 export function ProgressPage() {
-  const { progress } = useStudentProgress();
-  const summary = summarizeProgress(progress);
+  const { now, summary } = useStudentOverview();
   const achievementsRef = useRef<HTMLDialogElement>(null);
   const historyRef = useRef<HTMLDialogElement>(null);
   const [historyPage, setHistoryPage] = useState(1);
-  const [now, setNow] = useState(Date.now);
   const pageSize = 8;
-  const pageCount = Math.max(1, Math.ceil(summary.recent.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(summary.history.length / pageSize));
   const page = Math.min(historyPage, pageCount);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   const statistics = [
-    { label: 'Lecciones completadas', value: summary.completed.length, icon: BookOpen },
-    { label: 'Prácticas realizadas', value: summary.practices, icon: Target },
+    { label: 'Lecciones completadas', value: summary.curriculum.done, icon: BookOpen },
+    { label: 'Prácticas registradas', value: summary.practices, icon: Target },
     { label: 'XP acumulados', value: summary.xp, icon: Zap },
   ];
+  const featured = (summary.latestAchievements.length ? summary.latestAchievements : summary.achievements).slice(0, 3);
+  const weekMaximum = Math.max(...summary.calendar.week.map(day => day.count));
 
   return (
     <div className="progress-page">
@@ -91,44 +71,81 @@ export function ProgressPage() {
           <div className="progress-overall-icon"><ProgressGlyph /></div>
           <div className="progress-overall-copy">
             <h2 id="progress-overall-title">Progreso general</h2>
-            <strong>{summary.percent}%</strong>
-            <progress value={summary.percent} max={100} aria-label={`Progreso general: ${summary.completed.length} lecciones de ${summary.unitProgress.reduce((total, item) => total + item.unit.lessons.length, 0)}`} />
-            <p>¡Sigue avanzando! Cada lección cuenta.</p>
+            <strong>{summary.curriculum.percent}%</strong>
+            {!!summary.curriculum.total && <progress value={summary.curriculum.done} max={summary.curriculum.total}
+              aria-label={`Progreso general: ${summary.curriculum.done} lecciones de ${summary.curriculum.total} funcionales`} />}
+            <p>{summary.curriculum.done} de {summary.curriculum.total} lecciones funcionales.</p>
+            {!!summary.historicalLessons && <p>{summary.historicalLessons} {summary.historicalLessons === 1 ? 'finalización anterior' : 'finalizaciones anteriores'} en el historial.</p>}
           </div>
         </section>
         <dl className="progress-statistics">{statistics.map(({ label, value, icon: Icon }) => <div className="progress-statistic" key={label}>
           <Icon size={35} strokeWidth={1.9} aria-hidden="true" /><dt>{label}</dt>
           <dd>{value.toLocaleString('es-PE')}
-            {label === 'Prácticas realizadas' && (summary.lessonCameraPractices > 0 || summary.lessonAlternatives > 0) &&
-              <small>En Aprender, {summary.lessonCameraPractices} con cámara y {summary.lessonAlternatives} sin cámara.</small>}
+            {label === 'Prácticas registradas' && <small>{summary.matches} coincidencias experimentales · {summary.alternatives} ejercicios sin cámara</small>}
           </dd>
         </div>)}</dl>
       </div>
 
+      <section className="progress-panel progress-motivation" aria-label="Nivel y racha">
+        <StudentLevel level={summary.level} xp={summary.xp} />
+        <dl><div><dt>Racha actual</dt><dd>{summary.calendar.current} {summary.calendar.current === 1 ? 'día' : 'días'}</dd></div>
+          <div><dt>Mejor racha</dt><dd>{summary.calendar.best} {summary.calendar.best === 1 ? 'día' : 'días'}</dd></div></dl>
+        <small>El nivel refleja tu participación y avance en SeñaVerse.</small>
+      </section>
+
       <div className="progress-details">
         <section className="progress-panel progress-units" aria-labelledby="progress-units-title">
           <div className="progress-section-heading"><h2 id="progress-units-title"><Layers aria-hidden="true" /> Avance de mis unidades</h2></div>
-          <ul className="progress-unit-list">{summary.unitProgress.map(({ unit, done, percent }) => {
+          <ul className="progress-unit-list">{summary.curriculum.unitProgress.map(({ unit, count, done, percent }) => {
             const Icon = unit.illustration === 'greetings' ? Hand : unit.illustration === 'alphabet' ? Blocks : UsersRound;
-            return <li key={unit.id}><Link to={getUnitPath(unit.id)} className={`progress-unit${percent === 100 ? ' is-complete' : ''}`} aria-label={`Unidad ${unit.id}: ${unit.title}, ${percent}%, ${done} de ${unit.lessons.length} lecciones completadas`}>
+            return <li key={unit.id}><Link to={getUnitPath(unit.id)} className={`progress-unit${percent === 100 ? ' is-complete' : ''}`}>
               <span className="progress-unit-icon"><Icon size={35} strokeWidth={1.8} aria-hidden="true" /></span>
-              <div className="progress-unit-copy"><div><h3>Unidad {unit.id}: {unit.title}</h3><span className={`progress-percent${percent === 0 ? ' is-zero' : ''}`}>{percent}%</span></div><p>{unit.subtitle}</p><progress value={done} max={unit.lessons.length} aria-label={`Avance en ${unit.title}`} /></div>
+              <div className="progress-unit-copy"><div><h3>Unidad {unit.id}: {unit.title}</h3>{percent !== null && <span className={`progress-percent${percent === 0 ? ' is-zero' : ''}`}>{percent}%</span>}</div>
+                <p>{count ? `${done} de ${count} lecciones funcionales` : 'Material en preparación'}</p>
+                {!!count && <progress value={done} max={count} aria-label={`Avance en ${unit.title}`} />}</div>
             </Link></li>;
           })}</ul>
+          <dl className="progress-module-stats">
+            <div><dt>Aprender</dt><dd>{summary.lessonStarts} lecciones iniciadas · {summary.lessonSteps} actividades completadas</dd></div>
+            <div><dt>Biblioteca y estudio</dt><dd>{summary.consulted} fichas consultadas · {summary.studied} señas estudiadas</dd></div>
+            <div><dt>Situaciones</dt><dd>{summary.completedSituations} de {situations.length} finalizadas · {summary.situationStarts} iniciadas · {summary.situationInteractions} interacciones</dd>
+              <dd>{summary.situationCorrect} respuestas correctas · {summary.situationErrors} incorrectas</dd></div>
+            <div><dt>Minijuegos</dt><dd>{summary.completedGames} de {minigames.length} completados · {summary.gameRuns} partidas</dd>
+              <dd>{summary.gameCorrect} aciertos · {summary.gameErrors} errores registrados</dd></div>
+          </dl>
+          {summary.evaluations.length > 0 && <div className="progress-evaluations"><h3>Evaluaciones</h3><ul>{summary.evaluations.map(evaluation => <li key={evaluation.id}>{evaluation.title} · {evaluation.score} de {evaluation.total}{evaluation.attempts > 1 && ` · ${evaluation.attempts} intentos`}</li>)}</ul></div>}
         </section>
 
         <div className="progress-right-column">
           <section className="progress-panel progress-achievements" aria-labelledby="progress-achievements-title">
             <div className="progress-section-heading"><h2 id="progress-achievements-title"><Award aria-hidden="true" /> Mis logros</h2><button type="button" className="progress-secondary" onClick={() => achievementsRef.current?.showModal()} aria-haspopup="dialog">Ver todos <ArrowRight size={17} aria-hidden="true" /></button></div>
-            <div className="progress-achievement-grid">{summary.achievements.map(achievement => <AchievementCard key={achievement.id} achievement={achievement} />)}</div>
+            <div className="progress-achievement-grid">{featured.map(achievement => <AchievementCard key={achievement.id} achievement={achievement} />)}</div>
           </section>
 
           <section className="progress-panel progress-recent" aria-labelledby="progress-recent-title">
             <div className="progress-section-heading"><h2 id="progress-recent-title"><Clock3 aria-hidden="true" /> Actividad reciente</h2></div>
-            {summary.recent.length ? <ActivityList activities={summary.recent.slice(0, 4)} now={now} /> : <EmptyActivity />}
+            {summary.history.length ? <StudentActivityList activities={summary.history.slice(0, 4)} now={now} /> : <EmptyActivity />}
             <button type="button" className="progress-history-link" aria-haspopup="dialog" onClick={() => { setHistoryPage(1); historyRef.current?.showModal(); }}>Ver historial <ArrowRight size={15} aria-hidden="true" /></button>
           </section>
         </div>
+      </div>
+
+      <div className="progress-details progress-extra">
+        <section className="progress-panel" aria-labelledby="progress-week-title">
+          <div className="progress-section-heading"><h2 id="progress-week-title"><CalendarDays aria-hidden="true" /> Actividad de los últimos siete días</h2></div>
+          {weekMaximum ? <ul className="progress-week">{summary.calendar.week.map(day => <li key={day.id}>
+            <span>{day.label}</span><meter min={0} max={weekMaximum} value={day.count} aria-label={`Actividades del ${day.label}`} /><strong>{day.count}</strong>
+          </li>)}</ul> : <p>Aún no hay actividades educativas fechadas en estos siete días.</p>}
+        </section>
+        <section className="progress-panel" aria-labelledby="progress-records-title">
+          <div className="progress-section-heading"><h2 id="progress-records-title"><Gamepad2 aria-hidden="true" /> Récords personales</h2></div>
+          {summary.records.some(record => record.best || record.legacyBest !== undefined) ? <ul className="progress-record-list">
+            {summary.records.filter(record => record.best || record.legacyBest !== undefined).map(record => <li key={record.game.id}>
+            <Link to={record.path}>{record.game.title}</Link>
+            {record.best && <strong>{record.best.score} puntos de partida</strong>}
+            {record.legacyBest !== undefined && <small>Récord anterior · {record.legacyBest} puntos</small>}
+          </li>)}</ul> : <p>Al completar una partida verás tu mejor puntuación aquí.</p>}
+        </section>
       </div>
 
       <dialog className="progress-dialog" ref={achievementsRef} aria-labelledby="progress-all-achievements-title" onClick={event => { if (event.target === event.currentTarget) achievementsRef.current?.close(); }}>
@@ -139,8 +156,8 @@ export function ProgressPage() {
 
       <dialog className="progress-dialog" ref={historyRef} aria-labelledby="progress-history-title" onClick={event => { if (event.target === event.currentTarget) historyRef.current?.close(); }}>
         <div className="progress-dialog-heading"><h2 id="progress-history-title"><History aria-hidden="true" /> Mi historial</h2><button type="button" autoFocus aria-label="Cerrar historial" onClick={() => historyRef.current?.close()}><X size={22} /></button></div>
-        <p className="progress-dialog-intro">Tus actividades completadas, de la más reciente a la más antigua.</p>
-        {summary.recent.length ? <ActivityList activities={summary.recent.slice((page - 1) * pageSize, page * pageSize)} now={now} /> : <EmptyActivity />}
+        <p className="progress-dialog-intro">Tus registros más recientes aparecen primero. Los registros sin fecha aparecen al final.</p>
+        {summary.history.length ? <StudentActivityList activities={summary.history.slice((page - 1) * pageSize, page * pageSize)} now={now} /> : <EmptyActivity />}
         {pageCount > 1 && <nav className="progress-history-pagination" aria-label="Páginas del historial"><button type="button" disabled={page === 1} onClick={() => setHistoryPage(page - 1)} aria-label="Página anterior"><ChevronLeft size={20} /></button><span aria-live="polite">{page} de {pageCount}</span><button type="button" disabled={page === pageCount} onClick={() => setHistoryPage(page + 1)} aria-label="Página siguiente"><ChevronRight size={20} /></button></nav>}
       </dialog>
     </div>

@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { StudentLayout } from './components/StudentLayout';
 import { getLessonPath } from './data/curriculum';
-import { summarizeProgress } from './data/progress';
+import { getProgressTotals } from './data/progress';
 import { StudentProgressProvider } from './components/StudentProgressProvider';
 import { StudentProfileProvider } from './components/StudentProfileProvider';
 import { useStudentProgress } from './hooks/progressContext';
@@ -36,23 +36,22 @@ const RecognitionLabPage = import.meta.env.DEV && import.meta.env.MODE === 'deve
 
 function StudentApp() {
   const learning = useLearningActivity();
-  const { progress, recordActivity } = useStudentProgress();
-  const { completed } = summarizeProgress(progress);
-  const completeLesson = (lessonId: string) => recordActivity({ type: 'lesson', lessonId });
+  const { progress } = useStudentProgress();
+  const { completed } = getProgressTotals(progress);
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         {DatasetStudioPage && <Route path="/herramientas/dataset" element={<Suspense fallback={<p role="status">Abriendo Dataset Studio…</p>}><DatasetStudioPage /></Suspense>} />}
         {RecognitionLabPage && <Route path="/herramientas/reconocimiento" element={<Suspense fallback={<p role="status">Abriendo el laboratorio…</p>}><RecognitionLabPage /></Suspense>} />}
-        <Route path="/" element={<StudentLayout><DashboardPage completed={completed} lastLessonId={learning.activity.lastLessonId}/></StudentLayout>} />
+        <Route path="/" element={<StudentLayout><DashboardPage /></StudentLayout>} />
         <Route path="/panel" element={<Navigate to="/" replace />} />
         <Route path="/presentacion" element={<HomePage />} />
         <Route path="/academia" element={<StudentLayout><AcademyPage completed={completed} activity={learning.activity}/></StudentLayout>} />
         <Route path="/academia/unidad/:unitId" element={<StudentLayout><AcademyPage completed={completed} activity={learning.activity}/></StudentLayout>} />
-        <Route path="/academia/unidad/:unitId/leccion/:lessonId" element={<StudentLayout><LessonPage completed={completed} activity={learning.activity} onVisit={learning.visitLesson} onComplete={completeLesson}/></StudentLayout>} />
+        <Route path="/academia/unidad/:unitId/leccion/:lessonId" element={<StudentLayout><LessonPage completed={completed} onVisit={learning.visitLesson}/></StudentLayout>} />
         <Route path="/academia/*" element={<Navigate to="/academia" replace />} />
-        <Route path="/leccion/saludos" element={<Navigate to={getLessonPath(1, 'saludos')} replace />} />
+        <Route path="/leccion/saludos" element={<Navigate to={getLessonPath(3, 'saludos')} replace />} />
         <Route path="/biblioteca" element={<StudentLayout><LibraryPage /></StudentLayout>} />
         <Route path="/camara" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo Cámara…</p>}><CameraPage /></Suspense></StudentLayout>} />
         <Route path="/camara/libre" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la práctica…</p>}><FreePracticePage /></Suspense></StudentLayout>} />

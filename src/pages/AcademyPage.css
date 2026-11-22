@@ -209,6 +209,9 @@
 .lesson-answer-fields { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
 .lesson-answer-fields legend { margin-bottom: 8px; padding: 0; }
 .lesson-answer-fields small { display: block; font-weight: 750; }
+.lesson-answer-fields .lesson-answer-explanation { margin: 0 0 8px; }
+.lesson-question-diagram { display: grid; justify-items: start; height: 155px; }
+.lesson-question-diagram canvas { height: 100%; max-width: 100%; width: auto; }
 .lesson-result-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .lesson-result-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 @media (max-width: 680px) {

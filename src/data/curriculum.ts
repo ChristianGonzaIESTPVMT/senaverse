@@ -1,11 +1,14 @@
 import type { LessonPlan } from './lessonPlan.ts';
+import type { StudyRun } from './lessonStudy.ts';
 import { numbersLesson } from './numbersLesson.ts';
+import { basicLessons } from './basicLessons.ts';
 
 type ActivityOption = { id: string; label: string };
-type ActivityBase = { question: string; success: string };
+type ActivityBase = { question: string; success: string; explanation?: string; diagramId?: string };
 export type LessonActivity = ActivityBase & (
   | { type: 'choice' | 'identify'; options: ActivityOption[]; correctId: string }
   | { type: 'association'; options: ActivityOption[]; pairs: { id: string; label: string; answerId: string }[] }
+  | { type: 'order'; options: ActivityOption[]; order: string[] }
 );
 
 type LegacyLessonContent = {
@@ -27,8 +30,7 @@ export type Lesson = {
 } & ({ content: LegacyLessonContent; plan?: never } | { plan: LessonPlan; content?: never });
 export type Unit = { id: number; title: string; subtitle: string; illustration: 'greetings' | 'alphabet' | 'everyday'; lessons: Lesson[] };
 
-/** Contenido DEMOSTRATIVO: validar materiales y señas con especialistas en LSP antes de publicar. */
-export const units: Unit[] = [
+const previousUnits: Unit[] = [
   {
     id: 1,
     title: 'Primeros pasos',
@@ -264,8 +266,46 @@ export const units: Unit[] = [
   },
 ];
 
+export const legacyUnitLessonIds = previousUnits.map(unit => unit.lessons.map(lesson => lesson.id));
+const previousLessons = previousUnits.flatMap(unit => unit.lessons);
+
+function lessons(...ids: string[]): Lesson[] {
+  return ids.map(id => {
+    const available = basicLessons.find(lesson => lesson.id === id) ?? previousLessons.find(lesson => lesson.id === id);
+    if (!available) throw new Error(`Lección desconocida: ${id}`);
+    return available;
+  });
+}
+
+export const units: Unit[] = [
+  { id: 1, title: 'Primeros pasos', subtitle: 'Conoce la LSP y practica la atención visual.', illustration: 'greetings',
+    lessons: lessons('introduccion', 'comunicacion-visual', 'repaso-basico', 'evaluacion-inicial') },
+  { id: 2, title: 'Números básicos', subtitle: 'Identifica cantidades y estudia los números del cero al diez.', illustration: 'alphabet',
+    lessons: lessons('numeros', 'cero', 'seis-a-diez', 'abecedario', 'dactilologia', 'repaso-alfabeto') },
+  { id: 3, title: 'Saludos y cortesía', subtitle: 'Elige un saludo según el momento y practica cómo pedir disculpas.', illustration: 'greetings',
+    lessons: lessons('saludos', 'cortesia') },
+  { id: 4, title: 'Expresiones cotidianas', subtitle: 'Practica respuestas, cantidades y compañía.', illustration: 'everyday',
+    lessons: lessons('expresiones', 'elecciones-y-compania') },
+  { id: 5, title: 'Personas, familia y entorno', subtitle: 'Identifica vínculos familiares y lugares frecuentes.', illustration: 'everyday',
+    lessons: lessons('familia', 'comunidad', 'presentaciones', 'alimentos') },
+  { id: 6, title: 'Aplicación y evaluación', subtitle: 'Usa el vocabulario estudiado en situaciones cotidianas.', illustration: 'alphabet',
+    lessons: lessons('repaso-cotidiano') },
+];
+
 export const initialCompletedLessonIds = ['introduccion', 'abecedario'];
-export const totalLessons = units.reduce((sum, unit) => sum + unit.lessons.length, 0);
+export const functionalLessons = units.flatMap(unit => unit.lessons.filter(lesson => lesson.plan).map(lesson => ({ unit, lesson })));
+export const totalLessons = functionalLessons.length;
+
+export function getCurriculumProgress({ lessonStudy }: { lessonStudy?: Record<string, StudyRun> }) {
+  const completed = functionalLessons.filter(({ lesson }) => !!lessonStudy?.[lesson.id]?.completedAt).map(({ lesson }) => lesson.id);
+  const unitProgress = units.map(unit => {
+    const count = unit.lessons.filter(lesson => lesson.plan).length;
+    const done = unit.lessons.filter(lesson => lesson.plan && completed.includes(lesson.id)).length;
+    return { unit, count, done, percent: count ? Math.round(done / count * 100) : null };
+  });
+  return { total: totalLessons, done: completed.length, completed, unitProgress,
+    percent: totalLessons ? Math.round(completed.length / totalLessons * 100) : 0 };
+}
 
 export function getUnitPath(unitId: number) {
   return `/academia/unidad/${unitId}`;

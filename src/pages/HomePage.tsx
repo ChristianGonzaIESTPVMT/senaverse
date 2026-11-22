@@ -32,7 +32,7 @@ export function HomePage() {
             <div className="lesson-teaser">
               <div className="teaser-top"><span className="teaser-dots"><i/><i/><i/></span><span className="teaser-label">ACADEMIA SEÑAVERSE</span></div>
               <div className="teaser-video"><div className="play-circle"><Play size={28} fill="currentColor" /></div><strong>Observa, aprende y practica</strong><span>Espacio para video validado de LSP</span></div>
-              <div className="teaser-bottom"><strong>Saludos y despedidas</strong><span>Lección de ejemplo</span><div className="bar"><div style={{width:'66%'}}/></div></div>
+              <div className="teaser-bottom"><strong>Números básicos</strong><Link to="/academia/unidad/2/leccion/numeros">Ver lección</Link></div>
             </div>
             <div className="float-pill float-one"><span className="float-symbol"><GraduationCap size={19}/></span> Aprende a tu ritmo</div>
             <div className="float-pill float-two"><span className="float-symbol mint"><Target size={18}/></span> Practica lo aprendido</div>

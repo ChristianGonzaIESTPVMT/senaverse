@@ -12,13 +12,14 @@ import { checkLesson } from './fixtures/lesson-browser.mjs';
 import { checkLibrary } from './fixtures/library-browser.mjs';
 import { checkSituations } from './fixtures/situation-browser.mjs';
 import { checkMinigames } from './fixtures/minigames-browser.mjs';
+import { checkStudentOverview } from './fixtures/student-overview-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
 const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
   'library-development', 'library-production', 'situation-development', 'situation-production',
-  'minigames-development', 'minigames-production'].includes(mode));
+  'minigames-development', 'minigames-production', 'progress-development', 'progress-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -245,7 +246,7 @@ try {
     window.labWorkers = [];
     window.labWorkerErrors = [];
     window.labBlockModel = true;
-    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-'].some(prefix => mode.startsWith(prefix))};
+    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-', 'progress-'].some(prefix => mode.startsWith(prefix))};
     window.studentAttempts = 0;
     const fetchResource = window.fetch.bind(window);
     window.fetch = (resource, options) => (window.labBlockModel && String(resource).endsWith('/__senaverse/recognition-v1.json'))
@@ -291,7 +292,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('minigames-')) {
+  if (mode.startsWith('progress-')) {
+    await checkStudentOverview({ send, evaluate, requests }, origin, until, datasetPath);
+  } else if (mode.startsWith('minigames-')) {
     await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('situation-')) {
     await checkSituations({ send, evaluate, requests }, origin, until, datasetPath);

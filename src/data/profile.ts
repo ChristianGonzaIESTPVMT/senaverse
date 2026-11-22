@@ -1,4 +1,5 @@
-import { restoreProgress, summarizeProgress, type StudentProgress } from './progress.ts';
+import { getProgressTotals, restoreProgress, type StudentProgress } from './progress.ts';
+import { selectStudentOverview } from './studentOverview.ts';
 import { getEducationalSign, normalizeLibrarySignIds } from './library.ts';
 
 export const PROFILE_KEY = 'senaverse-student-profile-v1';
@@ -82,7 +83,8 @@ export function toggleFavoriteSign(profile: StudentProfile, id: string): Student
 
 export function createProfileExport(profile: StudentProfile, progress: StudentProgress, exportedAt = new Date().toISOString()) {
   const validatedProgress = restoreProgress(JSON.stringify(progress));
-  const summary = summarizeProgress(validatedProgress);
+  const instant = Date.parse(exportedAt);
+  const summary = selectStudentOverview(validatedProgress, Number.isFinite(instant) ? instant : Date.now());
   return {
     schemaVersion: 1,
     exportedAt,
@@ -90,7 +92,7 @@ export function createProfileExport(profile: StudentProfile, progress: StudentPr
     progress: validatedProgress,
     progressSummary: {
       xp: summary.xp,
-      completedLessons: summary.completed.length,
+      completedLessons: getProgressTotals(validatedProgress).completed.length,
       achievements: summary.achievements.filter(achievement => achievement.obtained).map(({ id, name }) => ({ id, name })),
     },
   };

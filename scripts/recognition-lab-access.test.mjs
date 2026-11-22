@@ -26,7 +26,7 @@ async function fixture(work) {
 
 async function withServer(directory, settings, work) {
   const server = await createServer({
-    configFile, envDir: directory, logLevel: 'silent',
+    configFile, envDir: directory, cacheDir: join(directory, 'vite-cache'), logLevel: 'silent',
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { host: '127.0.0.1', port: 0, ws: false, watch: null },
     ...settings,

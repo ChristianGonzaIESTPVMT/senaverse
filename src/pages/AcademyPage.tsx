@@ -1,7 +1,8 @@
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, House, Layers3, Play, UsersRound } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
-import { getLessonLocation, getLessonPath, getNextLesson, getResumeLesson, getUnitPath, totalLessons, units, type Unit } from '../data/curriculum';
+import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Unit } from '../data/curriculum';
+import { useStudentProgress } from '../hooks/progressContext';
 import type { LearningActivity } from '../hooks/useLearningActivity';
 import './AcademyPage.css';
 
@@ -17,8 +18,9 @@ function UnitIllustration({ unit }: { unit: Unit }) {
   );
 }
 
-function UnitLessons({ unit, completed, activity }: AcademyProps & { unit: Unit }) {
-  const done = unit.lessons.filter(lesson => completed.includes(lesson.id)).length;
+function UnitLessons({ unit, completed }: AcademyProps & { unit: Unit }) {
+  const { progress } = useStudentProgress();
+  const unitProgress = getCurriculumProgress(progress).unitProgress.find(item => item.unit.id === unit.id);
 
   return (
     <div className="learning-unit-page">
@@ -31,21 +33,22 @@ function UnitLessons({ unit, completed, activity }: AcademyProps & { unit: Unit 
         <UnitIllustration unit={unit} />
       </header>
       <section className="learning-unit-progress" aria-label="Progreso de la unidad">
-        <div><h2>Progreso de la unidad</h2><span>{done} de {unit.lessons.length} lecciones completadas</span></div>
-        <progress value={done} max={unit.lessons.length} aria-label={`Progreso de la unidad ${unit.id}`} />
+        <div><h2>Progreso de la unidad</h2><span>{unitProgress?.count ? `${unitProgress.done} de ${unitProgress.count} lecciones funcionales` : 'Material en preparación'}</span></div>
+        {!!unitProgress?.count && <progress value={unitProgress.done} max={unitProgress.count} aria-label={`Progreso de la unidad ${unit.id}`} />}
       </section>
-      <div className="learning-section-heading"><h2>Lecciones de la unidad</h2><span>Contenido de muestra</span></div>
+      <div className="learning-section-heading"><h2>Lecciones de la unidad</h2></div>
       <ol className="learning-lesson-list">
         {unit.lessons.map((lesson, index) => {
-          const isDone = completed.includes(lesson.id);
-          const isStarted = activity.startedLessonIds.includes(lesson.id);
-          const status = isDone ? 'Completada' : isStarted ? 'En progreso' : 'Disponible';
+          const isDone = lesson.plan ? !!progress.lessonStudy?.[lesson.id]?.completedAt : completed.includes(lesson.id);
+          const isStarted = !!progress.lessonStudy?.[lesson.id];
+          const status = lesson.plan ? isDone ? 'Completada' : isStarted ? 'En progreso' : 'Disponible'
+            : isDone ? 'Finalización anterior' : 'Material preliminar';
           return (
             <li className={`learning-lesson-row${isDone ? ' is-completed' : ''}`} key={lesson.id}>
               <span className="learning-lesson-number" aria-hidden="true">{isDone ? <Check size={21} /> : index + 1}</span>
               <div className="learning-lesson-copy"><h3>{lesson.title}</h3><p>{lesson.description}</p><span><Clock3 size={14} aria-hidden="true" /> {lesson.duration}</span></div>
               <span className={`learning-lesson-status${isDone ? ' is-completed' : ''}`}>{status}</span>
-              <Link className={`button ${isDone ? 'button-outline' : 'button-primary'} learning-lesson-open`} to={getLessonPath(unit.id, lesson.id)}>{isDone ? 'Repasar' : isStarted ? 'Continuar' : 'Comenzar'}<ArrowRight size={17} aria-hidden="true" /></Link>
+              <Link className={`button ${lesson.plan && !isDone ? 'button-primary' : 'button-outline'} learning-lesson-open`} to={getLessonPath(unit.id, lesson.id)}>{lesson.plan ? isDone ? 'Repasar' : isStarted ? 'Continuar' : 'Comenzar' : 'Consultar'}<ArrowRight size={17} aria-hidden="true" /></Link>
             </li>
           );
         })}
@@ -57,14 +60,15 @@ function UnitLessons({ unit, completed, activity }: AcademyProps & { unit: Unit 
 }
 
 export function AcademyPage({ completed, activity }: AcademyProps) {
+  const { progress } = useStudentProgress();
   const { unitId } = useParams();
   const selectedUnit = units.find(unit => String(unit.id) === unitId);
   if (unitId && !selectedUnit) return <Navigate to="/academia" replace />;
   if (selectedUnit) return <UnitLessons unit={selectedUnit} completed={completed} activity={activity} />;
 
-  const finishedCount = units.flatMap(unit => unit.lessons).filter(lesson => completed.includes(lesson.id)).length;
-  const percent = Math.round(finishedCount / totalLessons * 100);
-  const current = getResumeLesson(completed, activity.lastLessonId);
+  const { done: finishedCount, percent, unitProgress, completed: functionalCompletions } = getCurriculumProgress(progress);
+  const current = functionalLessons.find(location => !!progress.lessonStudy?.[location.lesson.id] && !functionalCompletions.includes(location.lesson.id))
+    ?? functionalLessons.find(location => !functionalCompletions.includes(location.lesson.id)) ?? functionalLessons[0];
   const last = activity.lastLessonId ? getLessonLocation(activity.lastLessonId) : undefined;
 
   return (
@@ -78,20 +82,20 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
         <div className="learning-banner-stats">
           <div className="learning-banner-stat"><HomeVisual name="progress" /><dl><dt>Progreso general</dt><dd>{percent}%</dd></dl></div>
           <div className="learning-banner-stat"><Check size={32} aria-hidden="true" /><dl><dt>Lecciones completadas</dt><dd>{finishedCount}</dd></dl></div>
-          <div className="learning-banner-stat"><Layers3 size={31} aria-hidden="true" /><dl><dt>Unidad actual</dt><dd>Unidad {current.unit.id}</dd></dl></div>
+          {current && <div className="learning-banner-stat"><Layers3 size={31} aria-hidden="true" /><dl><dt>Unidad de práctica</dt><dd>Unidad {current.unit.id}</dd></dl></div>}
         </div>
       </section>
       <div className="learning-banner-foot"><span>Progreso local · lecciones completadas</span>{last && <Link to={getLessonPath(last.unit.id, last.lesson.id)}>Última lección visitada · {last.lesson.title}<ArrowRight size={16} aria-hidden="true" /></Link>}</div>
 
-      <div className="learning-section-heading"><h2>Unidades de aprendizaje</h2></div>
+      <div className="learning-section-heading"><h2>Nivel básico</h2></div>
+      <p>{unitProgress.length} unidades · {functionalLessons.length} lecciones disponibles</p>
       <section className="learning-units-grid" aria-label="Unidades de aprendizaje">
-        {units.map(unit => {
-          const done = unit.lessons.filter(lesson => completed.includes(lesson.id)).length;
-          const next = getNextLesson(unit, completed);
-          const started = done > 0 || unit.lessons.some(lesson => activity.startedLessonIds.includes(lesson.id));
-          const isComplete = done === unit.lessons.length;
+        {unitProgress.map(({ unit, count, done }) => {
+          const next = unit.lessons.find(lesson => lesson.plan && !functionalCompletions.includes(lesson.id));
+          const started = done > 0 || unit.lessons.some(lesson => !!progress.lessonStudy?.[lesson.id]);
+          const isComplete = !!count && done === count;
           const canContinue = started && !!next;
-          const status = isComplete ? 'Completada' : started ? 'En progreso' : 'Disponible';
+          const status = isComplete ? 'Completada' : started ? 'En progreso' : count ? 'Disponible' : 'Material preliminar';
           const actionPath = canContinue ? getLessonPath(unit.id, next.id) : getUnitPath(unit.id);
 
           return (
@@ -100,12 +104,13 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
               <h3 id={`learning-unit-${unit.id}`}><Link to={getUnitPath(unit.id)}>Unidad {unit.id} · {unit.title}</Link></h3>
               <p>{unit.subtitle}</p>
               <span className={`learning-unit-status${isComplete ? ' is-completed' : ''}`}>{isComplete && <CheckCircle2 size={15} aria-hidden="true" />}{status}</span>
-              <div className="learning-card-progress"><span>{done} de {unit.lessons.length} lecciones completadas</span><progress value={done} max={unit.lessons.length} aria-label={`Progreso de ${unit.title}`} /></div>
+              {!!count && <div className="learning-card-progress"><span>{done} de {count} lecciones funcionales</span><progress value={done} max={count} aria-label={`Progreso de ${unit.title}`} /></div>}
               <Link className={`button ${canContinue ? 'button-primary' : 'button-outline'} learning-unit-action`} to={actionPath}>{canContinue ? 'Continuar unidad' : 'Ver unidad'}{canContinue && <ArrowRight size={20} aria-hidden="true" />}{isComplete && <Check size={19} aria-hidden="true" />}{!started && <Play size={17} aria-hidden="true" />}</Link>
             </article>
           );
         })}
       </section>
+      <p className="learning-progress-note">Completar la ruta registra tu avance en el nivel básico de SeñaVerse.</p>
     </div>
   );
 }

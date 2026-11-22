@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Camera, Check } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { LessonAnswerFields } from './LessonActivity';
 import { gradeAnswers, type Answers, type LessonPlan, type LessonReference, type Question, type StudyStep } from '../data/lessonPlan';
 import { nextStudyStep, type Attempt, type StepProgress, type StudyInput, type StudyRun } from '../data/lessonStudy';
@@ -63,6 +63,7 @@ function PracticeStep({ step, previous, submit }: {
   return <div className="lesson-sequence-stack">
     {path !== 'camera' && <><p>{step.instruction}</p><Reference reference={step.reference} /></>}
     {supportsCamera && <p className="lesson-warning">Reconocimiento experimental. La revisión lingüística está pendiente. Si te cuesta obtener una coincidencia, puedes elegir el ejercicio sin cámara.</p>}
+    {step.notice && <p>{step.notice}</p>}
     <div className="lesson-sequence-nav">
       {supportsCamera && path !== 'camera' && <button type="button" className="button button-outline" onClick={() => setPath('camera')}>
         <Camera size={17} aria-hidden="true" /> Practicar con cámara
@@ -79,25 +80,59 @@ function PracticeStep({ step, previous, submit }: {
   </div>;
 }
 
-function Summary({ plan, run, finish }: { plan: LessonPlan; run?: StudyRun; finish: () => void }) {
+function Assessment({ step, result, submit, review }: {
+  step: Extract<StudyStep, { questions: Question[] }>; result?: StepProgress;
+  submit: (input: StudyInput) => void; review: (input: StudyInput) => void;
+}) {
+  const [repeating, setRepeating] = useState(false);
+  const previous = result?.reviewAttempts?.at(-1) ?? result?.attempts.at(-1);
   return <div className="lesson-sequence-stack">
-    <ul className="lesson-result-list">{plan.steps.filter(step => step.kind === 'practice' || step.kind === 'assessment').map(step => {
-      const result = run?.steps[step.id]?.attempts.at(-1);
-      return <li key={step.id}><strong>{step.title}</strong><span>{result?.grade && step.kind === 'assessment'
-        ? `${result.grade.score} de ${result.grade.total} correctas`
-        : result?.input.method === 'camera' ? 'Coincidencia experimental con cámara' : 'Ejercicio sin cámara'}</span></li>;
+    <Questions key={repeating ? 'retry' : 'result'} questions={step.questions} method="answers"
+      previous={repeating ? undefined : previous} complete={result?.complete && !repeating} submit={input => {
+        if (!repeating) { submit(input); return; }
+        review(input);
+        setRepeating(false);
+      }} />
+    {result?.complete && <div className="lesson-sequence-nav">
+      <button type="button" className="button button-outline" onClick={() => setRepeating(!repeating)}>
+        {repeating ? 'Cancelar repetición' : 'Repetir evaluación'}
+      </button>
+    </div>}
+  </div>;
+}
+
+function Summary({ plan, run, finish, onReview, nextPath }: {
+  plan: LessonPlan; run?: StudyRun; finish: () => void; onReview: (index: number) => void; nextPath?: string;
+}) {
+  return <div className="lesson-sequence-stack">
+    <ul className="lesson-result-list">{plan.steps.map((step, index) => {
+      if (step.kind !== 'practice' && step.kind !== 'assessment') return null;
+      const progress = run?.steps[step.id];
+      const result = progress?.reviewAttempts?.at(-1) ?? progress?.attempts.at(-1);
+      const assessment = step.kind === 'assessment' && result?.grade;
+      return <li key={step.id}><strong>{step.title}</strong><span>{assessment
+        ? `${assessment.score} de ${assessment.total} correctas`
+        : result?.input.method === 'camera' ? 'Coincidencia experimental con cámara' : 'Ejercicio sin cámara'}</span>
+        {assessment && <><button type="button" className="button button-outline" onClick={() => onReview(index)}>Revisar evaluación</button>
+          {assessment.score < assessment.total && <p>Repasa las referencias y vuelve a intentar las preguntas que marcaste incorrectamente.</p>}</>}
+      </li>;
     })}</ul>
-    <p>El resultado de cámara es orientativo. La evaluación final mide comprensión de las configuraciones y las cantidades.</p>
-    {run?.completedAt ? <p role="status" className="success-message">Lección completada y guardada.</p>
+    {plan.steps.some(step => step.kind === 'practice') && <p>Las coincidencias de cámara son orientativas. La evaluación se califica con las respuestas del ejercicio.</p>}
+    {run?.completedAt ? <><p role="status" className="success-message">Lección completada y guardada.</p>
+      {nextPath && <Link className="button button-primary" to={nextPath}>Siguiente lección <ArrowRight size={17} aria-hidden="true" /></Link>}</>
       : <button className="button button-primary" type="button" onClick={finish}><Check size={17} aria-hidden="true" /> Finalizar lección</button>}
   </div>;
 }
 
-export function LessonSequence({ lessonId, plan, unitPath }: { lessonId: string; plan: LessonPlan; unitPath: string }) {
+export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
+  lessonId: string; plan: LessonPlan; unitPath: string; nextPath?: string;
+}) {
   const { progress, recordActivity } = useStudentProgress();
-  const [selected, setSelected] = useState<number | null>(null);
+  const location = useLocation();
   const run = progress.lessonStudy?.[lessonId];
   const available = nextStudyStep(plan, run);
+  const returnIndex = plan.steps.findIndex(step => step.id === location.state?.lessonStep);
+  const [selected, setSelected] = useState<number | null>(() => returnIndex >= 0 && returnIndex <= available ? returnIndex : null);
   const index = selected ?? available;
   const step = plan.steps[index];
   const result = step && run?.steps[step.id];
@@ -131,22 +166,37 @@ export function LessonSequence({ lessonId, plan, unitPath }: { lessonId: string;
       {step?.kind === 'intro' && <><p>{step.text}</p><ul>{plan.objectives.map(objective => <li key={objective}>{objective}</li>)}</ul>
         {!run && progress.activities.some(activity => activity.id === `lesson:${lessonId}`) &&
           <p>Tu finalización anterior sigue registrada. Puedes recorrer esta versión de la lección.</p>}</>}
+      {step?.kind === 'reading' && <div className="lesson-sequence-stack">
+        {step.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
+        {step.references?.map(reference => <Reference key={reference.url} reference={reference} />)}
+      </div>}
       {step?.kind === 'study' && <>
-        <p>{step.text}</p><Reference reference={step.reference} />
+        <p>{step.text}</p>
+        <div className="lesson-sequence-stack">{[...new Map(
+          (step.reference ? [step.reference] : step.signs.flatMap(sign => {
+            const reference = getEducationalSign(sign.id)?.reference;
+            return reference ? [reference] : [];
+          })).map(reference => [reference.url, reference]),
+        ).values()].map(reference => <Reference key={reference.url} reference={reference} />)}</div>
           <dl className="lesson-number-list">{step.signs.map(sign => {
             const entry = getEducationalSign(sign.id);
+            const name = sign.name ?? entry?.word;
             return <div key={sign.id}>
-              <dt>{sign.name}</dt><dd>{sign.explanation}</dd>
+              <dt>{name}</dt><dd>{sign.explanation ?? entry?.instructions}</dd>
               <dd className="lesson-sign-availability">{entry?.recognitionClassId ? 'Reconocimiento experimental disponible' : 'Contenido de estudio'}</dd>
-              {entry && <dd><Link to={getLibrarySignPath(entry.id)} aria-label={`Ver ficha de ${sign.name} en Biblioteca`}>Ver ficha en Biblioteca</Link></dd>}
+              {entry && <dd><Link to={getLibrarySignPath(entry.id)} state={{ lessonReturn: { lessonId, stepId: step.id } }}
+                aria-label={`Ver ficha de ${name} en Biblioteca`}>Ver ficha en Biblioteca</Link></dd>}
             </div>;
           })}</dl>
-        <p className="lesson-warning">La lección se basa en la lámina del MINEDU. La revisión lingüística del contenido en SeñaVerse está pendiente.</p>
+        <p className="lesson-warning">Las referencias proceden del MINEDU. La revisión lingüística de las fichas de SeñaVerse está pendiente.</p>
       </>}
-      {(step?.kind === 'question' || step?.kind === 'assessment') && <Questions questions={step.questions} method="answers"
+      {step?.kind === 'question' && <Questions questions={step.questions} method="answers"
         previous={result?.attempts.at(-1)} complete={result?.complete} submit={submit} />}
+      {step?.kind === 'assessment' && <Assessment step={step} result={result} submit={submit}
+        review={input => recordActivity({ type: 'lesson-review', lessonId, stepId: step.id, input })} />}
       {step?.kind === 'practice' && <PracticeStep step={step} previous={result} submit={submit} />}
-      {!step && <Summary plan={plan} run={run} finish={() => recordActivity({ type: 'lesson-finish', lessonId })} />}
+      {!step && <Summary plan={plan} run={run} onReview={setSelected} nextPath={nextPath}
+        finish={() => recordActivity({ type: 'lesson-finish', lessonId })} />}
       <div className="lesson-sequence-nav">
         {index > 0 && <button className="button button-outline" type="button" onClick={() => setSelected(index - 1)}>
           <ArrowLeft size={17} aria-hidden="true" /> Anterior
@@ -154,7 +204,7 @@ export function LessonSequence({ lessonId, plan, unitPath }: { lessonId: string;
         {result?.complete && <button className="button button-primary" type="button" onClick={() => setSelected(index + 1)}>
           {index + 1 === plan.steps.length ? 'Ver resumen' : 'Continuar'} <ArrowRight size={17} aria-hidden="true" />
         </button>}
-        {!result?.complete && (step?.kind === 'intro' || step?.kind === 'study') &&
+        {!result?.complete && (step?.kind === 'intro' || step?.kind === 'reading' || step?.kind === 'study') &&
           <button className="button button-primary" type="button" onClick={() => submit({ method: 'read' }, true)}>
             {step.kind === 'intro' ? 'Comenzar lección' : 'Continuar'} <ArrowRight size={17} aria-hidden="true" />
           </button>}

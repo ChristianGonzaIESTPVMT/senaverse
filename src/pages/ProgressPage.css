@@ -79,6 +79,31 @@
 .progress-activity-list > li > div { flex: 1; min-width: 0; }
 .progress-activity-list p { margin: 0 0 3px; font-size: 14px; line-height: 1.35; font-weight: 800; }
 .progress-activity-list time { color: light-dark(#756e99, var(--color-text-muted)); font-size: 12px; line-height: 1.3; }
+.progress-activity-list small { display: block; color: var(--color-text-secondary); font-size: 12px; }
+.student-level { display: grid; gap: 6px; min-width: 0; }
+.student-level strong { font-size: 1.15rem; color: var(--color-text); }
+.student-level span, .student-level small, .progress-motivation > small { color: var(--color-text-secondary); }
+.student-level progress { width: 100%; height: 10px; accent-color: var(--violet); }
+.progress-motivation { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 26px; margin-block: 18px; }
+.progress-motivation > small { grid-column: 1 / -1; }
+.progress-motivation dl { display: flex; flex-wrap: wrap; margin: 0; gap: 12px 22px; }
+.progress-motivation dt, .progress-module-stats dt { font-size: .9rem; font-weight: 800; }
+.progress-motivation dd { margin: 4px 0 0; font-weight: 850; color: var(--color-primary); }
+.progress-module-stats { display: grid; gap: 10px; margin: 18px 0 0; }
+.progress-module-stats > div { padding: 9px 12px; border: 1px solid var(--color-line); border-radius: 12px; }
+.progress-module-stats dd { margin: 3px 0 0; color: var(--color-text-secondary); font-size: .9rem; }
+.progress-evaluations h3 { margin-bottom: 6px; }
+.progress-evaluations ul { margin: 0; padding-inline-start: 20px; }
+.progress-extra { margin-top: 18px; }
+.progress-week, .progress-record-list { display: grid; list-style: none; margin: 0; padding: 0; gap: 8px; }
+.progress-week li { display: grid; grid-template-columns: minmax(0, 100px) minmax(0, 1fr) 28px; align-items: center; gap: 8px; font-size: .85rem; }
+.progress-week meter { width: 100%; }
+.progress-week meter::-webkit-meter-optimum-value { background: var(--color-primary); }
+.progress-record-list li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 5px 12px; padding-block: 6px; border-bottom: 1px solid var(--color-line); }
+.progress-record-list a { color: var(--color-primary); font-weight: 750; text-decoration: underline; }
+.progress-record-list strong { font-size: .85rem; }
+.progress-achievement time, .progress-achievement small { display: block; margin-top: 5px; color: var(--color-text-secondary); font-size: .78rem; }
+@media (max-width: 600px) { .progress-motivation { grid-template-columns: minmax(0, 1fr); } }
 .progress-activity-check { flex-shrink: 0; fill: #00b482; stroke: #fff; }
 .progress-history-link { display: flex; align-items: center; gap: 7px; margin: 11px 3px 0 auto; padding: 3px; border: 0; background: transparent; color: light-dark(#6532cb, var(--color-primary)); font-size: 12px; font-weight: 850; }
 .progress-history-link:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -193,6 +218,7 @@ body:has(.progress-dialog[open]) { overflow: hidden; }
   .progress-dialog .progress-achievement h3 { margin: 0; }
   .progress-dialog .progress-achievement p { margin: 0; }
   .progress-dialog .progress-achievement-status { justify-self: start; }
+  .progress-dialog .progress-achievement :is(time, small) { grid-column: 2; }
 }
 @media (max-width: 600px) {
   .app-shell:has(.progress-page) .app-topbar { gap: 10px; padding-inline: 16px; }

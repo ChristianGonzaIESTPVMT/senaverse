@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, writeFile, unlink, rmdir } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { createElement } from 'react';
 import { renderToPipeableStream } from 'react-dom/server';
@@ -18,15 +18,15 @@ const studentPages = [
 ];
 
 async function withEnvironment(work) {
-  const directory = await mkdtemp(join(tmpdir(), 'senaverse-dataset-access-'));
+  const base = await realpath(tmpdir());
+  const directory = await realpath(await mkdtemp(join(base, 'senaverse-dataset-access-')));
+  assert.match(relative(base, directory), /^senaverse-dataset-access-[^/\\]+$/);
   const original = process.env[flagName];
   delete process.env[flagName];
   try { return await work(directory); }
   finally {
     if (original === undefined) delete process.env[flagName]; else process.env[flagName] = original;
-    // Only remove the known files created in this unique fixture directory.
-    for (const file of ['.env.example', '.env.development.local']) await unlink(join(directory, file)).catch(error => { if (error.code !== 'ENOENT') throw error; });
-    await rmdir(directory);
+    await rm(directory, { recursive: true, force: true, maxRetries: 3 });
   }
 }
 
@@ -62,7 +62,7 @@ async function renderAppAt(App, pathname) {
 
 async function withApp(directory, work) {
   const server = await createServer({
-    envDir: directory,
+    envDir: directory, cacheDir: join(directory, 'vite-cache'),
     // Avoid sharing the SSR-test optimizer cache with the other test processes.
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },

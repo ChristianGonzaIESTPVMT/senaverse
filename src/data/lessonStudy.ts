@@ -4,7 +4,7 @@ import { recognitionSignsById } from '../features/sign-recognition/recognitionCa
 export type StudyInput = { method: 'read' } | { method: 'camera'; signId: string }
   | { method: 'answers' | 'alternative'; answers: Answers };
 export type Attempt = { at: string; input: StudyInput; grade?: { score: number; total: number } };
-export type StepProgress = { attempts: Attempt[]; complete: boolean };
+export type StepProgress = { attempts: Attempt[]; complete: boolean; reviewAttempts?: Attempt[] };
 export type StudyRun = { startedAt: string; steps: Record<string, StepProgress>; completedAt?: string };
 
 export function nextStudyStep(plan: LessonPlan, run?: StudyRun) {
@@ -14,7 +14,7 @@ export function nextStudyStep(plan: LessonPlan, run?: StudyRun) {
 
 function validateInput(step: StudyStep, value: unknown, at: string) {
   if (!value || typeof value !== 'object' || !('method' in value)) return null;
-  if ((step.kind === 'intro' || step.kind === 'study') && value.method === 'read') {
+  if ((step.kind === 'intro' || step.kind === 'reading' || step.kind === 'study') && value.method === 'read') {
     const attempt: Attempt = { at, input: { method: 'read' } };
     return { attempt, complete: true };
   }
@@ -44,6 +44,17 @@ export function submitStudyStep(plan: LessonPlan, run: StudyRun, stepId: string,
   return { ...run, steps: { ...run.steps, [stepId]: { attempts: [...attempts, valid.attempt], complete: valid.complete } } };
 }
 
+export function reviewAssessment(plan: LessonPlan, run: StudyRun, stepId: string, input: unknown, at: string): StudyRun {
+  const step = plan.steps.find(item => item.id === stepId);
+  const result = run.steps[stepId];
+  if (step?.kind !== 'assessment' || !result?.complete) return run;
+  const valid = validateInput(step, input, at);
+  if (!valid) return run;
+  return { ...run, steps: { ...run.steps, [stepId]: {
+    ...result, reviewAttempts: [...(result.reviewAttempts ?? []), valid.attempt],
+  } } };
+}
+
 function hasTime(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
@@ -60,6 +71,11 @@ export function restoreStudyRun(plan: LessonPlan, value: unknown) {
       if (hasTime(attempt?.at)) run = submitStudyStep(plan, run, id, attempt.input, attempt.at);
     }
     if (!run.steps[id]?.complete) break;
+    if ('reviewAttempts' in step && Array.isArray(step.reviewAttempts)) {
+      for (const attempt of step.reviewAttempts) {
+        if (hasTime(attempt?.at)) run = reviewAssessment(plan, run, id, attempt.input, attempt.at);
+      }
+    }
   }
   if ('completedAt' in value && hasTime(value.completedAt) && nextStudyStep(plan, run) === plan.steps.length) {
     run.completedAt = value.completedAt;

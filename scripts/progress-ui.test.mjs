@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import { units, totalLessons } from '../src/data/curriculum.ts';
+import { units } from '../src/data/curriculum.ts';
 import { emptyProgress, recordProgressEvent, recordSignConsultation } from '../src/data/progress.ts';
 
 const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: 'custom' });
@@ -36,11 +36,13 @@ test('the real progress page renders an empty student, shared navigation, dialog
   for (const unit of units) assert.ok(html.includes(`Unidad ${unit.id}: ${unit.title}`));
 });
 
-test('rendered statistics, units, header XP and badges reflect the same completed lesson', () => {
+test('historical lesson credit appears in XP, badge and history while the available curriculum stays at zero', () => {
   const state = recordProgressEvent(emptyProgress(), { type: 'lesson', lessonId: 'introduccion' }, '2026-11-16T15:00:00Z');
   const html = renderProgress(state);
   assert.match(html, />80 XP</);
-  assert.ok(html.includes(`<strong>${Math.round(100 / totalLessons)}%</strong>`));
+  assert.match(html, /<strong>0%<\/strong>/);
+  assert.match(html, /0 de 1 lecciones funcionales/);
+  assert.match(html, /1 finalización anterior/);
   assert.match(html, /first-step is-obtained/);
   assert.match(html, /explorer is-locked/);
   assert.match(html, /consistency is-locked/);

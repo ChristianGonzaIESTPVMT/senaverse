@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import { createServer } from 'vite';
 
 // Exercise the application's initialization lifecycle without requesting a real webcam.
 const runtimeKey = '__senaverseHandLandmarkerTestRuntime';
-const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+const tempRoot = await realpath(tmpdir());
+const directory = await realpath(await mkdtemp(join(tempRoot, 'senaverse-hand-test-')));
+assert.match(relative(tempRoot, directory), /^senaverse-hand-test-[^/\\]+$/);
+const server = await createServer({ configFile: false, cacheDir: join(directory, 'ssr'), server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
   ssr: { noExternal: ['@mediapipe/tasks-vision'] },
   plugins: [{ name: 'hand-landmarker-test-runtime', enforce: 'pre',
     resolveId(id) {
@@ -18,7 +24,13 @@ const server = await createServer({ configFile: false, server: { middlewareMode:
     },
   }],
 });
-after(async () => { await server.close(); delete globalThis[runtimeKey]; delete globalThis.__senaverseTestWasmFactory; delete globalThis.ModuleFactory; });
+after(async () => {
+  try { await server.close(); }
+  finally {
+    delete globalThis[runtimeKey]; delete globalThis.__senaverseTestWasmFactory; delete globalThis.ModuleFactory;
+    await rm(directory, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
 const { createHandLandmarker, closeHandLandmarker } = await server.ssrLoadModule('/src/features/sign-recognition/handLandmarker.ts');
 
 function configureRuntime(create) {
@@ -180,7 +192,7 @@ test('worker handler enforces increasing timestamps, closes bitmaps and disposes
 });
 
 test('the application and local model/WASM load over HTTP under a production subpath', async () => {
-  const app = await createServer({ base: '/senaverse/', optimizeDeps: { noDiscovery: true, include: [] },
+  const app = await createServer({ base: '/senaverse/', cacheDir: join(directory, 'http'), optimizeDeps: { noDiscovery: true, include: [] },
     server: { host: '127.0.0.1', port: 0, hmr: false, ws: false } });
   try {
     await app.listen();

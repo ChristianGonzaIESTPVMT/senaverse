@@ -65,6 +65,19 @@ export const numbersReference = {
 };
 const numbersSource = { title: 'Orientaciones para la atención de estudiantes con discapacidad auditiva',
   publisher: 'Ministerio de Educación del Perú', url: numbersReference.url, page: 72 };
+export const guideReference = (page: number) => ({
+  title: `Ver la guía ilustrada del MINEDU · página ${page}`,
+  url: `${mineduGuidePdf}#page=${page}`,
+});
+const guideSource = (page: number) => ({
+  title: 'Lengua de señas peruana. Guía para el aprendizaje de la lengua de señas peruana, vocabulario básico',
+  publisher: 'Ministerio de Educación del Perú',
+  url: 'https://repositorio.minedu.gob.pe/handle/20.500.12799/5545',
+  page,
+});
+const guideSign = (page: number, instructions: string, lesson: LibraryEntry['lesson']) => ({
+  instructions, lesson, reference: guideReference(page), source: guideSource(page),
+});
 const numbersGuide = new Map<string, { number: string; tone: LibraryEntry['tone']; instructions: string; extended: Finger[] }>([
   ['LSP-001', { number: '1', tone: 'lavender', instructions: 'Queda extendido el índice. Los demás dedos se mantienen flexionados.', extended: ['index'] }],
   ['LSP-002', { number: '2', tone: 'blue', instructions: 'Quedan extendidos el índice y el medio, uno al lado del otro.', extended: ['index', 'middle'] }],
@@ -73,9 +86,14 @@ const numbersGuide = new Map<string, { number: string; tone: LibraryEntry['tone'
   ['LSP-005', { number: '5', tone: 'lavender', instructions: 'Se abre la mano y quedan extendidos los cinco dedos.', extended: ['thumb', 'index', 'middle', 'ring', 'little'] }],
 ]);
 const numbersLink = { unitId: 2, lessonId: 'numeros', title: 'Números básicos' };
-const greetingsLink = { unitId: 1, lessonId: 'saludos', title: 'Saludos básicos' };
-const linkedLessons = new Map([
-  ['hola', greetingsLink], ['adios', greetingsLink], ['gracias', { unitId: 1, lessonId: 'cortesia', title: 'Expresiones de cortesía' }],
+const greetingsLink = { unitId: 3, lessonId: 'saludos', title: 'Saludos básicos' };
+const courtesyLink = { unitId: 3, lessonId: 'cortesia', title: 'Expresiones de cortesía' };
+const familyLink = { unitId: 5, lessonId: 'familia', title: 'Familia y personas' };
+const placesLink = { unitId: 5, lessonId: 'comunidad', title: 'Comunidad y lugares' };
+const familyReferences = new Map([
+  ['familia', guideSign(79, 'Usa la configuración F de la figura con ambas manos y traza un semicírculo hacia delante.', familyLink)],
+  ['mama', guideSign(79, 'Coloca la mano con la configuración M de la figura a la altura del hombro y muévela de lado a lado.', familyLink)],
+  ['papa', guideSign(79, 'Coloca la mano con la configuración P de la figura a la altura del hombro y muévela de lado a lado.', familyLink)],
 ]);
 const recognitionDescriptions = new Map([
   ['LSP-006', { description: 'Respuesta afirmativa', meaning: 'Una expresión de afirmación o acuerdo.' }],
@@ -106,7 +124,9 @@ const recognizedEntries = recognitionSigns
     return { ...shared, category: sign.id === 'LSP-006' ? 'respuestas' : 'cotidiano',
       tone: 'lavender', description: description?.description ?? sign.name,
       meaning: description?.meaning ?? sign.name, instructions,
-      ...(original && { reference: { title: `Ver la guía ilustrada del MINEDU · página ${original.page}`, url: `${mineduGuidePdf}#page=${original.page}` },
+      lesson: original?.page === 134 ? { unitId: 4, lessonId: 'expresiones', title: 'Expresiones cotidianas' }
+        : { unitId: 4, lessonId: 'elecciones-y-compania', title: 'Solo y Con' },
+      ...(original && { reference: guideReference(original.page),
         source: { title: original.title, publisher: original.publisher, url: original.repositoryUrl, page: original.page } }),
     };
   });
@@ -115,15 +135,43 @@ const zero: LibraryEntry = {
   id: 'cero', word: 'Cero', category: 'numeros', description: 'Número 0', meaning: 'Representa una cantidad nula.',
   instructions: 'En la lámina, la mano queda cerrada en un puño. Observa la posición del pulgar en el dibujo de Cero.',
   type: 'static', hands: 1, validation: 'pending', reference: numbersReference, source: numbersSource,
-  tone: 'blue', keywords: ['0'],
+  tone: 'blue', keywords: ['0'], lesson: { unitId: 2, lessonId: 'cero', title: 'Cero y cantidades vacías' },
 };
+
+const additionalNumbers = ['Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'].map<LibraryEntry>((word, index) => {
+  const number = index + 6;
+  return {
+    id: word.toLowerCase(), word, category: 'numeros', tone: 'mint', hands: 1, validation: 'pending',
+    description: `Número ${number}`, meaning: `Representa la cantidad ${number}.`, keywords: [String(number)],
+    instructions: number === 10 ? 'Observa la postura de la mano y sigue la dirección de la flecha en el dibujo de Diez.'
+      : `Observa la postura del número ${number} y compara qué dedos están extendidos y cuáles quedan flexionados.`,
+    reference: numbersReference, source: numbersSource,
+    lesson: { unitId: 2, lessonId: 'seis-a-diez', title: 'Del seis al diez' },
+  };
+});
+
+const additionalSigns: Omit<LibraryEntry, 'validation'>[] = [
+  { id: 'buenos-dias', word: 'Buenos días', description: 'Saludo de la mañana', meaning: 'Un saludo al encontrarse por la mañana.',
+    category: 'saludo', tone: 'lavender', ...guideSign(46, 'Sigue los dos dibujos de izquierda a derecha y fíjate en la dirección de cada flecha.', greetingsLink) },
+  { id: 'buenas-noches', word: 'Buenas noches', description: 'Saludo nocturno', meaning: 'Un saludo al encontrarse por la noche.',
+    category: 'saludo', tone: 'blue', ...guideSign(46, 'Sigue los dos dibujos en orden y observa cómo termina el movimiento de la segunda figura.', greetingsLink) },
+  { id: 'disculpa', word: 'Disculpa', description: 'Expresión de cortesía', meaning: 'Una expresión para pedir disculpas.',
+    category: 'saludo', tone: 'peach', keywords: ['disculpar', 'perdón'],
+    ...guideSign(47, 'Observa cómo se colocan las dos manos en la viñeta Disculpar y sigue la flecha de desplazamiento.', courtesyLink) },
+  { id: 'casa', word: 'Casa', description: 'Lugar donde se vive', meaning: 'Un lugar que sirve de vivienda.',
+    category: 'cotidiano', tone: 'mint', hands: 2, ...guideSign(254, 'Junta las yemas de los dedos de ambas manos para formar la silueta de un techo.', placesLink) },
+  { id: 'colegio', word: 'Colegio', description: 'Lugar donde se estudia', meaning: 'Un lugar donde se imparten clases.',
+    category: 'cotidiano', tone: 'blue', hands: 2, ...guideSign(285, 'Junta ambas manos con los dedos parcialmente flexionados y sigue el recorrido circular mostrado en la figura.', placesLink) },
+];
 
 /** The educational catalogue includes entries with no corresponding model class. */
 export const libraryEntries: LibraryEntry[] = [
   ...originalEntries.map<LibraryEntry>(entry => recognizedEntries.find(sign => sign.id === legacyIds.get(entry.id))
-    ?? { ...entry, validation: 'pending', lesson: linkedLessons.get(entry.id) }),
+    ?? { ...entry, ...familyReferences.get(entry.id), validation: 'pending' }),
   ...recognizedEntries.filter(entry => !formerClassIds.has(entry.id)),
   zero,
+  ...additionalNumbers,
+  ...additionalSigns.map<LibraryEntry>(entry => ({ ...entry, validation: 'pending' })),
 ];
 
 const byId = new Map(libraryEntries.map(entry => [entry.id, entry]));

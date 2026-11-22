@@ -21,7 +21,7 @@ type GameAction = { type: 'tick' | 'hide' | 'next'; at: number }
   | { type: 'practice'; at: number; signId: string; input: SignPractice };
 
 export type GameOutcome = { settings: GameSettings; limit: number; elapsedMs: number; correct: number; errors: number; bestStreak: number;
-  camera: number; alternative: number };
+  camera: number; alternative: number; practicedSignIds?: string[] };
 
 export function shuffle<T>(items: readonly T[], random = Math.random): T[] {
   const ordered = [...items];
@@ -119,7 +119,8 @@ export function gameOutcome(run: GameRun): GameOutcome | undefined {
   const methods = run.board.kind === 'challenge' ? run.board.methods : [];
   const camera = methods.filter(method => method === 'camera').length;
   return { settings: run.settings, limit: run.limit, elapsedMs: run.ended - run.started, correct: run.score.correct, errors: run.score.errors,
-    bestStreak: run.score.bestStreak, camera, alternative: methods.length - camera };
+    bestStreak: run.score.bestStreak, camera, alternative: methods.length - camera,
+    ...(run.board.kind === 'challenge' && { practicedSignIds: [...run.board.targets] }) };
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -165,5 +166,11 @@ export function validateGameOutcome(game: Minigame, value: unknown): GameOutcome
       if (camera || alternative || tally > limit || (settings.duration ? elapsedMs > settings.duration * 1000
         || (tally !== limit && elapsedMs !== settings.duration * 1000) : tally !== limit)) return;
   }
-  return { settings, limit, elapsedMs, correct, errors, bestStreak, camera, alternative };
+  let practicedSignIds: string[] | undefined;
+  if (game.kind === 'challenge' && Array.isArray(value.practicedSignIds)) {
+    const eligible = new Set(gameVocabulary(game, settings.category).map(sign => sign.id));
+    const ids = value.practicedSignIds.filter((id): id is string => typeof id === 'string' && eligible.has(id));
+    if (ids.length === correct && ids.length === value.practicedSignIds.length && new Set(ids).size === correct) practicedSignIds = ids;
+  }
+  return { settings, limit, elapsedMs, correct, errors, bestStreak, camera, alternative, ...(practicedSignIds && { practicedSignIds }) };
 }

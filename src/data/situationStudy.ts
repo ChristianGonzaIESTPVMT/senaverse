@@ -5,7 +5,7 @@ import { allSituations, type Situation, type SituationScene } from './situations
 export const LEGACY_SITUATION_KEY = 'senaverse-situation-answers-v1';
 
 export type SituationPractice = SignPractice;
-export type SceneStudy = { choiceId: string; attempts: string[]; checked: boolean; practice?: SituationPractice };
+export type SceneStudy = { choiceId: string; attempts: string[]; checked: boolean; practice?: SituationPractice; practiceAt?: string };
 export type SituationRun = { startedAt: string | null; scenes: Record<string, SceneStudy>; completedAt?: string };
 export type SituationStudyEvent = { type: 'situation-start' | 'situation-finish' | 'situation-repeat'; situationId: string }
   | { type: 'situation-select'; situationId: string; sceneId: string; choiceId: string }
@@ -93,7 +93,7 @@ export function updateSituationRun(situation: Situation, run: SituationRun | und
     if (!current.checked) return run;
     const practice = restorePractice(scene, current.choiceId, event.input);
     if (!practice) return run;
-    answer = { ...current, practice };
+    answer = { ...current, practice, practiceAt: at };
   }
   return { ...run, scenes: { ...run.scenes, [scene.id]: answer } };
 }
@@ -109,7 +109,9 @@ export function restoreSituationRun(situation: Situation, value: unknown): Situa
     const attempts = Array.isArray(saved.attempts) ? saved.attempts.flatMap(id => optionId(scene, id) ?? []) : [];
     const checked = saved.checked === true && attempts.at(-1) === choiceId;
     const practice: SituationPractice | undefined = ordered && checked ? restorePractice(scene, choiceId, saved.practice) : undefined;
-    run.scenes[scene.id] = { choiceId, attempts, checked, ...(practice && { practice }) };
+    const practiceAt = practice && date(saved.practiceAt) && (!run.startedAt || Date.parse(saved.practiceAt) >= Date.parse(run.startedAt))
+      && (!date(value.completedAt) || Date.parse(saved.practiceAt) <= Date.parse(value.completedAt)) ? saved.practiceAt : undefined;
+    run.scenes[scene.id] = { choiceId, attempts, checked, ...(practice && { practice }), ...(practiceAt && { practiceAt }) };
     ordered = !!practice;
   }
   if (ordered && date(value.completedAt)) run.completedAt = value.completedAt;

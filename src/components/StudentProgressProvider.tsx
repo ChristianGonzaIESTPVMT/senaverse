@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { LEGACY_PROGRESS_KEY, PROGRESS_KEY, emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, type ProgressEvent } from '../data/progress';
+import { LEGACY_PROGRESS_KEY, PROGRESS_KEY, canWriteProgress, emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, type ProgressEvent } from '../data/progress';
 import { ProgressContext } from '../hooks/progressContext';
 import { LEGACY_SITUATION_KEY } from '../data/situationStudy';
 
@@ -10,7 +10,7 @@ export function StudentProgressProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); }
+    try { if (canWriteProgress(localStorage.getItem(PROGRESS_KEY))) localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); }
     catch { /* Keep working in memory when browser storage is unavailable. */ }
   }, [progress]);
 
@@ -18,7 +18,10 @@ export function StudentProgressProvider({ children }: { children: ReactNode }) {
     const occurredAt = new Date().toISOString();
     setProgress(previous => recordProgressEvent(previous, event, occurredAt));
   }, []);
-  const consultSign = useCallback((signId: string) => setProgress(previous => recordSignConsultation(previous, signId)), []);
+  const consultSign = useCallback((signId: string) => {
+    const at = new Date().toISOString();
+    setProgress(previous => recordSignConsultation(previous, signId, at));
+  }, []);
 
   return <ProgressContext value={{ progress, recordActivity, consultSign }}>{children}</ProgressContext>;
 }

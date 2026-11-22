@@ -1,24 +1,28 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
-import { getLessonPath, getResumeLesson, totalLessons, units } from '../data/curriculum';
+import { StudentActivityList } from '../components/StudentActivityList';
+import { StudentLevel } from '../components/StudentLevel';
 import type { HomeVisualName } from '../data/homeVisuals';
-import { summarizeProgress } from '../data/progress';
-import { useStudentProgress } from '../hooks/progressContext';
+import { useStudentOverview } from '../hooks/useStudentOverview';
 
 const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
   { title: 'Ruta de aprendizaje', description: 'Lecciones organizadas por niveles.', action: 'Explorar', to: '/academia', visual: 'learning' },
   { title: 'Biblioteca', description: 'Encuentra vocabulario de LSP.', action: 'Ver señas', to: '/biblioteca', visual: 'library' },
+  { title: 'Situaciones', description: 'Practica en contextos cotidianos.', action: 'Ver situaciones', to: '/simulador', visual: 'learning' },
+  { title: 'Cámara', description: 'Práctica local con reconocimiento experimental.', action: 'Abrir Cámara', to: '/camara', visual: 'welcome' },
   { title: 'Minijuegos', description: 'Actividades para reforzar.', action: 'Practicar', to: '/minijuegos', visual: 'games' },
 ];
 
-export function DashboardPage({ completed, lastLessonId = null }: { completed: string[]; lastLessonId?: string | null }) {
-  const { progress } = useStudentProgress();
-  const finishedCount = units.flatMap(unit => unit.lessons).filter(lesson => completed.includes(lesson.id)).length;
-  const percent = Math.round(finishedCount / totalLessons * 100);
-  const experience = summarizeProgress(progress).xp;
-  const resume = getResumeLesson(completed, lastLessonId);
-  const lessonCompleted = completed.includes(resume.lesson.id);
+export function DashboardPage() {
+  const { now, summary } = useStudentOverview();
+  const { resumeLesson, initialLesson, resumeSituation } = summary;
+  const lesson = resumeLesson ?? initialLesson;
+  const recommendation = resumeSituation ? { path: resumeSituation.path, title: 'Continuar situación', detail: `${resumeSituation.title} · ${resumeSituation.detail}` }
+    : summary.curriculum.completed.includes('numeros') && !summary.completedSituations ? { path: '/simulador', title: 'Practicar en una situación', detail: 'Aplica los números en una compra o al elegir una cantidad.' }
+      : summary.curriculum.completed.includes('numeros') && !summary.completedGames ? { path: '/minijuegos', title: 'Reforzar con minijuegos', detail: 'Relaciona los números con sus posturas en LSP.' }
+        : { path: '/biblioteca', title: 'Consultar Biblioteca', detail: 'Revisa los significados y las referencias de las señas.' };
+  const badges = summary.latestAchievements.slice(0, 3);
 
   return (
     <div className="home-dashboard">
@@ -29,11 +33,11 @@ export function DashboardPage({ completed, lastLessonId = null }: { completed: s
 
       <section className="home-banner" aria-labelledby="home-banner-title">
         <div className="home-banner-copy">
-          <span className="home-banner-eyebrow">Continúa aprendiendo</span>
-          <h2 id="home-banner-title">Cada seña nos acerca un poco más.</h2>
-          <p>Explora las lecciones, practica lo aprendido y avanza a tu propio ritmo.</p>
-          <Link to={getLessonPath(resume.unit.id, resume.lesson.id)} className="home-continue">
-            {lessonCompleted ? 'Repasar lección' : 'Continuar lección'} <ArrowRight size={23} aria-hidden="true" />
+          <span className="home-banner-eyebrow">{resumeLesson ? 'Continúa aprendiendo' : 'Tu ruta de aprendizaje'}</span>
+          <h2 id="home-banner-title">{lesson?.title ?? 'Explora las lecciones'}</h2>
+          <p>{lesson?.detail}</p>
+          <Link to={lesson?.path ?? '/academia'} className="home-continue">
+            {resumeLesson ? 'Continuar aprendiendo' : initialLesson?.completed ? 'Repasar lección' : 'Empezar a aprender'} <ArrowRight size={23} aria-hidden="true" />
           </Link>
         </div>
         <div className="home-banner-art" aria-hidden="true">
@@ -49,22 +53,32 @@ export function DashboardPage({ completed, lastLessonId = null }: { completed: s
       <section className="home-learning" aria-labelledby="home-learning-title">
         <div className="home-section-heading">
           <h2 id="home-learning-title">Mi aprendizaje</h2>
-          <span className="home-demo-label">Tu progreso local</span>
+          <Link className="home-overview-link" to="/progreso">Ver mi progreso <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
         <div className="home-stats">
           <div className="home-stat">
             <HomeVisual name="lessons" />
-            <dl className="home-stat-copy"><dt>Lecciones completadas</dt><dd>{finishedCount}<span>/{totalLessons}</span></dd></dl>
+            <dl className="home-stat-copy"><dt>Lecciones completadas</dt><dd>{summary.curriculum.done}<span>/{summary.curriculum.total}</span></dd></dl>
           </div>
           <div className="home-stat">
             <HomeVisual name="experience" />
-            <dl className="home-stat-copy"><dt>Puntos de experiencia</dt><dd>{experience}</dd></dl>
+            <dl className="home-stat-copy"><dt>XP acumulados</dt><dd>{summary.xp}</dd></dl>
           </div>
           <div className="home-stat">
             <HomeVisual name="progress" />
-            <dl className="home-stat-copy"><dt>Progreso del recorrido</dt><dd>{percent}%</dd></dl>
+            <dl className="home-stat-copy"><dt>Racha actual</dt><dd>{summary.calendar.current}<span> {summary.calendar.current === 1 ? 'día' : 'días'}</span></dd></dl>
           </div>
         </div>
+        <div className="home-learning-detail">
+          <StudentLevel level={summary.level} xp={summary.xp} />
+          <div><h3><Link className="home-overview-link" to={recommendation.path}>{recommendation.title} <ArrowRight size={17} aria-hidden="true" /></Link></h3><p>{recommendation.detail}</p></div>
+        </div>
+      </section>
+      <section className="home-learning-detail home-recent" aria-label="Actividad y logros">
+        <div><h2>Actividad reciente</h2>{summary.history.length ? <StudentActivityList activities={summary.history.slice(0, 3)} now={now} />
+          : <p>Tus actividades aparecerán aquí cuando empieces a practicar.</p>}</div>
+        <div><h2>Últimos logros</h2>{badges.length ? <ul>{badges.map(badge => <li key={badge.id}>{badge.name}</li>)}</ul>
+          : <p>Tus logros aparecerán después de completar las primeras actividades.</p>}</div>
       </section>
 
       <section className="home-explore" aria-labelledby="home-explore-title">
