@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { createServer } from 'vite';
-import { LAB_FLAG, LAB_MODEL_PATH, LAB_MODEL_VERSION } from '../src/features/sign-recognition/labProtocol.ts';
+import { LAB_FLAG, LAB_MODEL_PATH, LAB_MODEL_VERSION, LAB_V2_MODEL_PATH } from '../src/features/sign-recognition/labProtocol.ts';
 
 const configFile = resolve('vite.config.ts');
 const fixturePaths = ['ml/datasets/fixture.json', 'ml/artifacts/fixture.json',
@@ -43,10 +43,12 @@ test('the model route requires the explicit development flag and rejects product
     await writeFile(join(directory, '.env.example'), LAB_FLAG + '=true\n');
     await withServer(directory, { root: directory }, async origin => {
       assert.equal((await fetch(origin + '/' + LAB_MODEL_PATH)).status, 404);
+      assert.equal((await fetch(origin + '/' + LAB_V2_MODEL_PATH)).status, 404);
     });
     process.env[LAB_FLAG] = 'true';
     await withServer(directory, { root: directory, mode: 'production' }, async origin => {
       assert.equal((await fetch(origin + '/' + LAB_MODEL_PATH)).status, 404);
+      assert.equal((await fetch(origin + '/' + LAB_V2_MODEL_PATH)).status, 404);
     });
   });
 });
@@ -60,6 +62,7 @@ test('missing or unverified V1 returns 503 while original private paths are bloc
     }
     await withServer(directory, { root: directory }, async origin => {
       assert.equal((await fetch(origin + '/' + LAB_MODEL_PATH)).status, 503);
+      assert.equal((await fetch(origin + '/' + LAB_V2_MODEL_PATH)).status, 503);
       await mkdir(join(directory, 'ml/artifacts/hito-3'), { recursive: true });
       await writeFile(join(directory, 'ml/artifacts/hito-3/model.json'), '{"private":"unapproved"}');
       assert.equal((await fetch(origin + '/' + LAB_MODEL_PATH)).status, 503);

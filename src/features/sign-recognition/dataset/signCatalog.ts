@@ -6,6 +6,7 @@ export const LSP_SOURCE = {
   repositoryUrl: 'https://repositorio.minedu.gob.pe/handle/20.500.12799/5545',
 };
 export const NEGATIVE_CATEGORY_ID = 'NEG-001';
+export const NADA_EXECUTION = 'Junta las yemas del pulgar y el índice de la mano derecha. Mantén los demás dedos extendidos, con la mano vertical y la palma hacia afuera. Desplaza la mano de tu derecha a tu izquierda y conserva la secuencia completa.';
 export const isLegacySignId = (id: string) => /^sign-(0[1-9]|10)$/.test(id);
 
 /** Catalog configuration supplied for Hito 2; expert linguistic review is still pending. */
@@ -17,7 +18,7 @@ export function createInitialSignCatalog(): DatasetSign[] {
     { name: 'Cuatro', type: 'static', hands: 1, duration: 1500, page: 73, execution: 'Reproduce con una mano la postura de «Cuatro» ilustrada en la página 73 de la guía MINEDU. Mantén esa postura durante todo el intervalo.' },
     { name: 'Cinco', type: 'static', hands: 1, duration: 1500, page: 73, execution: 'Reproduce con una mano la postura de «Cinco» ilustrada en la página 73 de la guía MINEDU. Mantén esa postura durante todo el intervalo.' },
     { name: 'Sí', type: 'dynamic', hands: 1, duration: 2500, page: 134, execution: 'Según la referencia: puño derecho vertical, con movimiento de muñeca de arriba hacia abajo. Registra el movimiento completo durante el intervalo.' },
-    { name: 'Nada', type: 'dynamic', hands: 1, duration: 2500, page: 134, execution: 'Según la referencia: pulgar e índice derechos juntos, los demás dedos extendidos y desplazamiento lateral de derecha a izquierda. Registra la secuencia completa.' },
+    { name: 'Nada', type: 'dynamic', hands: 1, duration: 2500, page: 134, execution: NADA_EXECUTION },
     { name: 'Mucho', type: 'dynamic', hands: 2, duration: 3000, page: 134, execution: 'Abre y cierra las yemas de los dedos de ambas manos. Mantén las dos manos visibles y registra su movimiento simultáneo completo.' },
     { name: 'Solo', type: 'dynamic', hands: 1, duration: 2500, page: 135, execution: 'Según la referencia: índice derecho extendido verticalmente, realizando un movimiento giratorio. Registra el movimiento completo.' },
     { name: 'Con', type: 'dynamic', hands: 2, duration: 3000, page: 135, execution: 'Coloca ambas manos en puño, con los pulgares extendidos, aproximándolas entre sí. Registra el acercamiento completo con las dos manos visibles.' },

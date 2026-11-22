@@ -230,3 +230,22 @@
   .practice-camera-placeholder strong, .practice-demo-placeholder strong { font-size: 15px; }
   .practice-camera-placeholder p, .practice-demo-placeholder p { font-size: 13px; }
 }
+.camera-challenge-link { margin-top: 20px; }
+.practice-recognition-column { display: grid; align-content: start; gap: 14px; min-width: 0; }
+.practice-recognition-result, .practice-catalog { padding: clamp(16px, 3vw, 24px); }
+.practice-recognition-result { display: grid; gap: 12px; }
+.practice-recognition-result > *, .practice-student-result > * { margin: 0; }
+.practice-recognition-result h2 { color: var(--color-text); font-size: 1.12rem; }
+.practice-recognition-result .button { justify-self: start; }
+.practice-student-result { display: grid; gap: 5px; min-height: 44px; }
+.practice-student-result strong { color: var(--color-primary); font-size: 1.5rem; }
+.practice-reference-link { display: inline-flex; align-items: center; gap: 8px; color: var(--color-primary); font-weight: 750; }
+.practice-reference-link svg { flex: none; }
+.practice-overlay-toggle { display: flex; align-items: center; gap: 9px; padding: 12px 16px; cursor: pointer; }
+.practice-overlay-toggle input { accent-color: var(--color-primary); }
+.practice-catalog { margin-top: 16px; }
+.practice-catalog summary { cursor: pointer; font-weight: 800; }
+.practice-catalog ul { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 14px 0 0; list-style: none; }
+.practice-catalog button[aria-pressed="true"] { border-color: var(--color-primary); color: var(--color-primary); }
+.practice-recognition-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.practice-recognition-error p { margin: 0; }

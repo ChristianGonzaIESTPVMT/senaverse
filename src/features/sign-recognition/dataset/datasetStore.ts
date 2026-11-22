@@ -141,6 +141,17 @@ export class DatasetStore {
     if (result.insufficient) throw new Error('Una muestra de calidad insuficiente debe repetirse o mantenerse pendiente.');
   }
 
+  async setV2Exclusion(id: string, excluded: boolean) {
+    return transaction(await this.open(), ['samples'], 'readwrite', async tx => {
+      const store = tx.objectStore('samples');
+      const sample = await request<SampleSummary | undefined>(store.get(id));
+      if (!sample) throw new Error('La muestra ya no existe.');
+      if (excluded) sample.excludedFromV2 = true;
+      else delete sample.excludedFromV2;
+      store.put(sample);
+    });
+  }
+
   async updateSampleReviews(ids: readonly string[], action: SampleReviewAction) {
     return transaction(await this.open(), ['samples'], 'readwrite', async tx => {
       const store = tx.objectStore('samples');

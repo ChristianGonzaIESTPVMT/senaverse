@@ -1,5 +1,5 @@
 import type { FreshHandInference } from '../types';
-import { expectedHandsMatch, signConfigurationErrors } from './signCatalog.ts';
+import { expectedHandsMatch, NADA_EXECUTION, signConfigurationErrors } from './signCatalog.ts';
 import { calculateQuality, workerResultFrame } from './datasetValidation.ts';
 import type { CountdownSeconds } from './countdownPreferences';
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MODEL_METADATA, type CaptureIncident, type DatasetFrame, type DatasetParticipant, type DatasetSample, type DatasetSign } from './datasetTypes.ts';
@@ -101,9 +101,11 @@ export class DatasetCapture {
       recordedAt: this.recordedAt, durationMs: sign.durationMs, frames: this.frames, incidents: this.incidents,
       qualityMetrics: calculateQuality(this.frames, sign.durationMs, sign.expectedHands,
         { incidents: this.incidents, completed: true, requestedDurationMs: sign.durationMs }), reviewStatus: 'pending',
-      captureMetadata: { configuration: this.configuration, model: structuredClone(MODEL_METADATA), labelSnapshot: sign,
+      captureMetadata: { configuration: this.configuration, model: structuredClone(MODEL_METADATA),
+        labelSnapshot: sign.id === 'LSP-007' ? { ...sign, instructions: NADA_EXECUTION } : sign,
         consentedAt: participant.consentedAt!, consentVersion: CONSENT_VERSION, requestedDurationMs: sign.durationMs, completed: true,
-        qualityPolicyVersion: 2, recordingStartedAtMs: this.startAt, coordinates: 'mediapipe-original', visualMirrored: true } };
+        qualityPolicyVersion: 2, recordingStartedAtMs: this.startAt, coordinates: 'mediapipe-original', visualMirrored: true,
+        ...(sign.category && { collectionProtocol: 'hito-4.3' }) } };
     this.phase = 'review';
   }
 

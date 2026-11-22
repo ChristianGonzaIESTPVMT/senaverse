@@ -3,7 +3,7 @@ import { FileJson } from 'lucide-react';
 import { isOperatorReviewed, type DatasetSnapshot, type SampleReviewAction, type SampleSummary } from '../../features/sign-recognition/dataset/datasetTypes';
 
 const PAGE_SIZE = 8;
-const initialFilters = { sign: '', participant: '', reviewed: '', acceptance: '', quality: '' };
+const initialFilters = { sign: '', participant: '', reviewed: '', acceptance: '', quality: '', id: '' };
 const acceptance = { pending: 'Pendiente de decisión', accepted: 'Aceptada', rejected: 'Rechazada' };
 const dateFormat = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'medium' });
 
@@ -20,7 +20,8 @@ export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onB
     && (!filters.participant || sample.participantId === filters.participant)
     && (!filters.reviewed || isOperatorReviewed(sample) === (filters.reviewed === 'reviewed'))
     && (!filters.acceptance || sample.reviewStatus === filters.acceptance)
-    && (!filters.quality || sample.qualityMetrics.sufficient === (filters.quality === 'sufficient'))), [snapshot.samples, filters]);
+    && (!filters.quality || sample.qualityMetrics.sufficient === (filters.quality === 'sufficient'))
+    && sample.sampleId.toLowerCase().includes(filters.id.trim().toLowerCase())), [snapshot.samples, filters]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const page = Math.min(samplePage, pageCount);
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -53,6 +54,7 @@ export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onB
   return <section className="dataset-panel dataset-samples" aria-labelledby="dataset-samples-title">
     <div className="dataset-section-title"><div><span className="dataset-eyebrow">04 / REVISIÓN</span><h2 id="dataset-samples-title">Muestras guardadas</h2></div></div>
     <div className="dataset-sample-filters">
+      <label className="dataset-field">ID de muestra<input type="search" disabled={locked} value={filters.id} onChange={event => changeFilter('id', event.target.value)} /></label>
       <label className="dataset-field">Seña<select disabled={locked} value={filters.sign} onChange={event => changeFilter('sign', event.target.value)}>
         <option value="">Todas</option>{snapshot.signs.map(sign => <option key={sign.id} value={sign.id}>{sign.id} · {sign.name || 'Etiqueta anterior'}</option>)}
       </select></label>
@@ -109,6 +111,7 @@ export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onB
               <span className="dataset-badge">{isOperatorReviewed(sample) ? 'Revisada por operador' : 'Sin revisar'}</span>
               <span className={`dataset-badge${sample.reviewStatus === 'accepted' ? ' is-accepted' : ''}`}>{acceptance[sample.reviewStatus]}</span>
               {!sample.qualityMetrics.sufficient && <span className="dataset-quality-flag">Calidad insuficiente</span>}
+              {sample.excludedFromV2 && <span className="dataset-badge">Excluida de V2</span>}
             </td>
             <td><div className="dataset-row-actions">
               <button type="button" disabled={locked} onClick={() => onReview(sample.sampleId)}>Revisar</button>

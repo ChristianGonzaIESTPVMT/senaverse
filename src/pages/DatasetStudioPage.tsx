@@ -152,6 +152,7 @@ export default function DatasetStudioPage() {
           <SignSelector signs={snapshot.signs} selectedId={signId} disabled={locked} onSelect={setSignId} onEdit={() => { if (sign) setEditingSign(sign); }} />
           <div className="dataset-local-note"><FileJson size={21} aria-hidden="true" /><p>Diez señas LSP pendientes de revisión lingüística, con duración individual. Los ejemplos negativos pertenecen a una categoría técnica independiente. Cada repetición conserva su secuencia temporal.</p></div>
         </aside>{sign && <RecordingPanel key={`${participantId}/${signId}/${consentId}`} participant={participant} sign={sign} sessionConsent={!!participantId && consentId === participantId} repetition={repetition} disabled={operation} onLocked={setRecordingLocked}
+          campaignCount={snapshot.samples.filter(sample => sample.labelId === signId && sample.captureMetadata.collectionProtocol === 'hito-4.3').length}
           countdownSeconds={countdowns[sign.expectedHands]} onCountdownChange={seconds => {
             saveCountdownPreference(sign.expectedHands, seconds);
             setCountdowns(previous => ({ ...previous, [sign.expectedHands]: seconds }));
@@ -169,7 +170,7 @@ export default function DatasetStudioPage() {
       {editingSign && <SignEditor key={editingSign.id} sign={editingSign} saving={operation} onCancel={closeDetail} onSave={updated => { void perform(() => store.saveSign(updated), 'Metadatos guardados.').then(saved => { if (saved) closeDetail(); }); }} />}
       {reviewing && <>
         <div className="dataset-section-title">
-          <div><span className="dataset-eyebrow">{reviewing.participantId} · REPETICIÓN {reviewing.repetition}</span><h2>{reviewing.captureMetadata.labelSnapshot.name}</h2></div>
+          <div><span className="dataset-eyebrow">{reviewing.participantId} · REPETICIÓN {reviewing.repetition}</span><h2>{reviewing.captureMetadata.labelSnapshot.name}</h2><p className="dataset-muted">{reviewing.sampleId}</p></div>
           <button className="dataset-icon-button" type="button" aria-label="Cerrar revisión" autoFocus onClick={closeDetail}><X size={21} /></button>
         </div>
         <SampleQuality sample={reviewing} /><SampleFrames key={reviewing.sampleId} sample={reviewing} />
@@ -181,6 +182,13 @@ export default function DatasetStudioPage() {
             onClick={() => reviewOne(reviewing, 'accept')}>Aceptar muestra</button>
           <button className="button button-outline" type="button" disabled={operation || reviewing.reviewStatus === 'rejected'}
             onClick={() => reviewOne(reviewing, 'reject')}>Descartar de uso</button>
+          <button className="button button-outline" type="button" disabled={operation} onClick={() => {
+            const excluded = !reviewing.excludedFromV2;
+            void perform(async () => {
+              await store.setV2Exclusion(reviewing.sampleId, excluded);
+              setReviewing(await store.getSample(reviewing.sampleId));
+            }, excluded ? 'Muestra excluida de la V2.' : 'Exclusión de la V2 retirada.');
+          }}>{reviewing.excludedFromV2 ? 'Retirar exclusión de V2' : 'Excluir de V2'}</button>
         </div>
       </>}
     </dialog>

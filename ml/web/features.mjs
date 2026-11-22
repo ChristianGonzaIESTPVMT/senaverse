@@ -1,4 +1,6 @@
 /** Shared by offline training and the browser. Uses unmirrored MediaPipe image landmarks. */
+import { movementEvidence } from './movement.mjs';
+
 export const FEATURE_CONFIG = Object.freeze({
   version: 'lsp-geometry-1',
   steps: 24,
@@ -116,7 +118,7 @@ function trackFrames(frames, aspect, config) {
         && Math.hypot(wrist[0] - previous.wrist[0], wrist[1] - previous.wrist[1]) <= .32;
       const id = linked ? previous.id : ++epoch;
       tracks[slot] = { id, wrist, time: timestamp, side: hand.side, previous: linked ? { wrist: previous.wrist, time: previous.time } : null };
-      slots[slot] = { id, points: hand.points };
+      slots[slot] = { id, points: hand.points, side: hand.side };
     });
     return { slots, timestamp };
   });
@@ -139,7 +141,8 @@ function resample(tracked, end, config) {
     return a.slots.map((previous, slot) => {
       const next = b.slots[slot];
       return previous && next && previous.id === next.id
-        ? { id: previous.id, points: interpolate(previous.points, next.points, fraction) }
+        ? { id: previous.id, points: interpolate(previous.points, next.points, fraction),
+          side: previous.side === next.side ? previous.side : null }
         : null;
     });
   });
@@ -214,7 +217,16 @@ function describePair(sequence, config) {
 const notReady = () => ({ features: null, reason: 'insufficient-window', motion: 0 });
 const noHands = () => ({ features: null, reason: 'no-hands', motion: 0 });
 
-function windowEndingAt(frames, last, aspect, config) {
+function describeSequence(sequence, config) {
+  const firstHand = describeHand(sequence.map(slots => slots[0]), config);
+  const secondHand = describeHand(sequence.map(slots => slots[1]), config);
+  return {
+    features: [...firstHand.vector, ...secondHand.vector, ...describePair(sequence, config)],
+    motion: firstHand.motion + secondHand.motion,
+  };
+}
+
+function windowEndingAt(frames, last, aspect, config, experimental = false) {
   if (last < 0) return notReady();
   const end = frames[last].timestampMs;
   if (!frames[last].hands.length) return noHands();
@@ -226,14 +238,64 @@ function windowEndingAt(frames, last, aspect, config) {
   const handCounts = [0, 0, 0];
   for (const slots of sequence) handCounts[Number(!!slots[0]) + Number(!!slots[1])]++;
   if (1 - handCounts[0] / sequence.length < config.minPresenceRatio) return { ...noHands(), handCounts };
-  const firstHand = describeHand(sequence.map(slots => slots[0]), config);
-  const secondHand = describeHand(sequence.map(slots => slots[1]), config);
+  const singleton = experimental && trackSide(sequence, handCounts[1]);
   return {
-    features: [...firstHand.vector, ...secondHand.vector, ...describePair(sequence, config)],
+    ...describeSequence(sequence, config),
     reason: null,
-    motion: firstHand.motion + secondHand.motion,
     handCounts,
+    ...(experimental && {
+      side: singleton || null,
+      canonicalFeatures: singleton === 'Left' ? describeSequence(reflectSinglePose(sequence), config).features : null,
+      movement: movementEvidence(sequence, config),
+    }),
   };
+}
+
+function trackSide(sequence, singleSteps) {
+  if (singleSteps < .8 * sequence.length || sequence.some(row => row.every(Boolean))) return null;
+  const visible = sequence.flat().filter(Boolean);
+  if (new Set(visible.map(slot => slot.id)).size !== 1) return null;
+  return ['Left', 'Right'].find(side => visible.filter(slot => slot.side === side).length >= .8 * visible.length) ?? null;
+}
+
+// Reflect only the articulation around each wrist. Original motion and paired geometry stay untouched.
+function reflectSinglePose(sequence) {
+  return sequence.map(row => row.map(slot => slot && {
+    ...slot, points: slot.points.map(([x, y, z]) => [2 * slot.points[0][0] - x, y, z]),
+  }));
+}
+
+function causalSlice(frames, last, config) {
+  const time = frames[last].timestampMs;
+  const count = frames[last].hands.length;
+  let first = last;
+  while (first > 0 && frames[first].timestampMs > time - config.windowMs
+    && frames[first - 1].hands.length === count
+    && frames[first].timestampMs - frames[first - 1].timestampMs <= config.maxGapMs) first--;
+  return frames.slice(first, last + 1);
+}
+
+/** Causal windows from a single take. Call only after assigning the whole take to a split. */
+export function* causalWindowsV2(frames, aspect, config = FEATURE_CONFIG) {
+  checkFeatureConfig(config);
+  checkWindowInput(frames, aspect);
+  let next = -Infinity;
+  for (const [i, frame] of frames.entries()) {
+    if (!frame.hands.length || (frame.timestampMs < next && i !== frames.length - 1)) continue;
+    const slice = causalSlice(frames, i, config);
+    if (frame.timestampMs - slice[0].timestampMs < config.windowMs) continue;
+    yield { ...windowEndingAt(slice, slice.length - 1, aspect, config, true), endMs: frame.timestampMs };
+    next = frame.timestampMs + config.windowStrideMs;
+  }
+}
+
+export function recordedMovement(frames, aspect, config = FEATURE_CONFIG) {
+  checkWindowInput(frames, aspect);
+  if (frames.length < 8) return null;
+  const tracked = trackFrames(frames, aspect, config);
+  const sequence = tracked.flatMap((row, i) => i && row.timestamp - tracked[i - 1].timestamp > config.maxGapMs
+    ? [[null, null], row.slots] : [row.slots]);
+  return movementEvidence(sequence, { steps: 12 });
 }
 
 function frameIsValid(frame) {
@@ -320,11 +382,11 @@ export function createLiveWindow(config = FEATURE_CONFIG) {
       while (frames.length >= 2 && frames[1].timestampMs <= capturedAtMs - config.windowMs) frames.shift();
       return true;
     },
-    read(nowMs = performance.now()) {
+    read(nowMs = performance.now(), experimental = false) {
       if (!frames.length || !Number.isFinite(nowMs) || nowMs < lastCaptured - 1 || nowMs - lastCaptured > config.maxFreshAgeMs) {
         return { features: null, reason: 'stale-or-missing-result', motion: 0 };
       }
-      return windowEndingAt(frames, frames.length - 1, aspect, config);
+      return windowEndingAt(frames, frames.length - 1, aspect, config, experimental);
     },
   };
 }

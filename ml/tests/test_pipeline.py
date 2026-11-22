@@ -3,6 +3,9 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -11,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from audit import EXPECTED, LABELS, LSP, NEGATIVE, audit
 from split import SPLITS, split_recordings
 from training import check_parity, fit_candidates, make_bundle, predict_rows, select_thresholds
+import v2
+from pipeline import digest, write_json
 
 
 START = datetime(2025, 3, 1, tzinfo=timezone.utc)
@@ -156,6 +161,75 @@ class SplitTest(unittest.TestCase):
         negatives = [recording(NEGATIVE, n + 1, 150 * n) for n in range(3)]
         _, summary = split_recordings(regular + negatives, 1729)
         self.assertTrue(all(summary["counts"][part][NEGATIVE] == 1 for part in SPLITS))
+
+
+class V2PipelineTest(unittest.TestCase):
+    def test_prepares_disjoint_captures_and_compares_a_synthetic_svm_through_the_browser_policy(self):
+        def take(label, person, label_index):
+            sample = audited_recording(label=label)
+            sample["sampleId"] = f"sample-{person}-{label}"
+            sample["participantId"] = person
+            sample["captureMetadata"]["collectionProtocol"] = "hito-4.3"
+            for frame in sample["frames"]:
+                base = frame["hands"][0]
+                for index, point in enumerate(base["landmarks"]):
+                    point["x"] += .05 * int(person[-1]) + .01 * label_index
+                    point["y"] += index * (.001 + .0001 * label_index)
+                if EXPECTED.get(label) == 2:
+                    other = copy.deepcopy(base)
+                    other["handedness"][0]["categoryName"] = "Left"
+                    for point in other["landmarks"]:
+                        point["x"] += .15
+                    frame["hands"].append(other)
+                    frame["handCount"] = 2
+            return sample
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            work, private, original = (root / name for name in ("v2", "reports", "v1"))
+            original.mkdir()
+            baseline, dataset = root / "baseline.json", root / "dataset.json"
+            old = take(v2.NADA, "P001", 12)
+            held = take("LSP-001", "P001", 13)
+            held["sampleId"] += "-v1-test"
+            held["repetition"] = 2
+            old["sampleId"] += "-old"
+            old["repetition"] = 2
+            del old["captureMetadata"]["collectionProtocol"]
+            base = {**document(old, held), "datasetId": "test-dataset"}
+            base["mediaPipeModel"]["sha256"] = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
+            write_json(baseline, base)
+            archive = original / "test.npz"
+            np.savez_compressed(archive, test_ids=[held["sampleId"]], test_labels=[held["labelId"]])
+            write_json(original / "prepared.json", {"sourceSha256": digest(baseline), "files": {"test.npz": digest(archive)}, "configurations": {}})
+            samples = [take(label, person, index) for person in ("P001", "P002", "P003")
+                       for index, label in enumerate(LABELS)]
+            excluded = take(NEGATIVE, "P002", 14)
+            excluded.update(sampleId="sample-excluded", repetition=2, excludedFromV2=True)
+            people = [dict(base["participants"][0], id=identifier) for identifier in ("P001", "P002", "P003")]
+            write_json(dataset, {**base, "participants": people, "samples": [*samples, old, held, excluded]})
+            args = SimpleNamespace(dataset=dataset, baseline=baseline, seed=1729, test_participant=["P003"],
+                                   validation_participant=["P002"], partition="test")
+            with patch.multiple(v2, WORK=work, PRIVATE=private, V1=original):
+                self.assertEqual(v2.prepare(args), {name: dict.fromkeys(LABELS, 1) for name in v2.GROUPS})
+                review = v2.read_json(private / "dataset-audit.json")
+                self.assertEqual({row["sampleId"] for row in review["excluded"]},
+                                 {old["sampleId"], held["sampleId"], excluded["sampleId"]})
+                v2.train()
+                bundle = v2.read_json(work / "model.json")
+                self.assertEqual(bundle["outputDimensions"], 11)
+                self.assertIn(NEGATIVE, [row["id"] for row in bundle["labels"]])
+                reference = copy.deepcopy(bundle)
+                reference.update(modelVersion="3.0.0-experimental.1+349faaea0427", outputDimensions=10)
+                reference["labels"].pop()
+                reference["parameters"]["weights"].pop()
+                reference["parameters"]["bias"].pop()
+                write_json(original / "model.json", reference)
+                report = v2.compare(args)
+                for name in ("v1", "v2"):
+                    self.assertEqual(report[name]["positiveTakes"], 10)
+                    self.assertEqual(report[name]["negativeTakes"], 1)
+                self.assertFalse((root / "model.json").exists())
 
 
 class ModelTest(unittest.TestCase):

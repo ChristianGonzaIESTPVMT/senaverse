@@ -1,3 +1,5 @@
+import type { MovementEvidence } from './movement.mjs';
+
 export type FeatureConfig = {
   version: string;
   steps: number;
@@ -17,6 +19,9 @@ export type PreparedWindow = {
   reason: WindowReason | null;
   motion: number;
   handCounts?: [number, number, number];
+  side?: 'Left' | 'Right' | null;
+  canonicalFeatures?: number[] | null;
+  movement?: MovementEvidence;
 };
 export type LiveInference = {
   source: 'worker';
@@ -28,7 +33,7 @@ export type LiveInference = {
 };
 export type WindowBuffer = {
   push(event: LiveInference, nowMs?: number): boolean;
-  read(nowMs?: number): PreparedWindow;
+  read(nowMs?: number, experimental?: boolean): PreparedWindow;
   reset(): void;
   summary(): { frames: number; spanMs: number };
 };
@@ -38,3 +43,5 @@ export function checkFeatureConfig(config: unknown): asserts config is FeatureCo
 export function recordedWindow(frames: Frame[], aspect: number, config?: FeatureConfig): PreparedWindow;
 export function trailingWindow(frames: Frame[], aspect: number, config?: FeatureConfig): PreparedWindow;
 export function createLiveWindow(config?: FeatureConfig): WindowBuffer;
+export function causalWindowsV2(frames: Frame[], aspect: number, config?: FeatureConfig): Iterable<PreparedWindow & { endMs: number }>;
+export function recordedMovement(frames: Frame[], aspect: number, config?: FeatureConfig): MovementEvidence | null;

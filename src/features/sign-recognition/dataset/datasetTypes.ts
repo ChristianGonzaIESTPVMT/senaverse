@@ -36,12 +36,14 @@ export type DatasetCaptureMetadata = {
   recordingStartedAtMs?: number;
   coordinates?: 'mediapipe-original';
   visualMirrored?: true;
+  collectionProtocol?: 'hito-4.3';
 };
 export type DatasetSample = {
   sampleId: string; labelId: string; participantId: string; repetition: number; recordedAt: string;
   durationMs: number; frames: DatasetFrame[]; incidents: CaptureIncident[]; qualityMetrics: QualityMetrics;
   captureMetadata: DatasetCaptureMetadata; reviewStatus: 'pending' | 'accepted' | 'rejected';
   operatorReviewed?: boolean;
+  excludedFromV2?: true;
 };
 export type SampleSummary = Omit<DatasetSample, 'frames'>;
 export type SampleReviewAction = 'mark' | 'unmark' | 'accept' | 'reject';

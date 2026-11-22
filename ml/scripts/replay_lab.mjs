@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { recordedWindow, trailingWindow } from '../web/features.mjs';
 import { parseLabModel } from '../../src/features/sign-recognition/labModel.ts';
-import { createRecognitionSession, recognitionDefaults } from '../../src/features/sign-recognition/liveRecognition.ts';
+import { recognitionDefaults } from '../../src/features/sign-recognition/liveRecognition.ts';
+import { simulate } from './replay_session.mjs';
 
 function percentile(values, fraction) {
   if (!values.length) return null;
@@ -11,34 +12,6 @@ function percentile(values, fraction) {
 
 function distribution(values) {
   return { n: values.length, p50: percentile(values, .50), p95: percentile(values, .95) };
-}
-
-function simulate(model, row) {
-  let now = 0;
-  let started = 0;
-  const session = createRecognitionSession(model, () => now + performance.now() - started);
-  session.start();
-  const snapshots = [];
-  let tick = 0;
-  for (const frame of row.frames) {
-    const source = frame.sourceTimestamps;
-    const capturedAtMs = source.capturedAtMs - row.recordingStart;
-    const inferenceTimestampMs = source.inferenceTimestampMs - row.recordingStart;
-    const receivedAtMs = source.receivedAtMs - row.recordingStart;
-    while (tick < receivedAtMs) {
-      session.expire(tick);
-      tick += 50;
-    }
-    const event = { source: 'worker', capturedAtMs, inferenceTimestampMs, receivedAtMs,
-      configuration: row.configuration,
-      result: { landmarks: frame.hands.map(hand => hand.landmarks), handedness: frame.hands.map(hand => hand.handedness) } };
-    now = receivedAtMs;
-    started = performance.now();
-    const view = session.observe(event, receivedAtMs);
-    if (view?.top.length) snapshots.push({ ...view, capturedAtMs });
-  }
-  session.stop();
-  return snapshots;
 }
 
 function compare(model, rows) {

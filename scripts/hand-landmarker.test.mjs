@@ -180,7 +180,8 @@ test('worker handler enforces increasing timestamps, closes bitmaps and disposes
 });
 
 test('the application and local model/WASM load over HTTP under a production subpath', async () => {
-  const app = await createServer({ base: '/senaverse/', server: { host: '127.0.0.1', port: 0, hmr: false, ws: false } });
+  const app = await createServer({ base: '/senaverse/', optimizeDeps: { noDiscovery: true, include: [] },
+    server: { host: '127.0.0.1', port: 0, hmr: false, ws: false } });
   try {
     await app.listen();
     const origin = `http://127.0.0.1:${app.httpServer.address().port}`;
@@ -193,6 +194,9 @@ test('the application and local model/WASM load over HTTP under a production sub
     const model = await fetch(`${origin}/senaverse/models/hand_landmarker.task`, { method: 'HEAD' });
     assert.equal(model.status, 200);
     assert.equal(Number(model.headers.get('content-length')), 7819105);
+    const classifier = await fetch(`${origin}/senaverse/models/lsp-v1.json`);
+    assert.equal(classifier.status, 200);
+    assert.equal((await classifier.json()).outputDimensions, 10);
     const wasm = await fetch(`${origin}/senaverse/mediapipe/wasm/vision_wasm_internal.wasm`, { method: 'HEAD' });
     assert.equal(wasm.status, 200);
     assert.match(wasm.headers.get('content-type'), /application\/wasm/);

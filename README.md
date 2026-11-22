@@ -22,6 +22,10 @@ El Hito 2 incorpora [SeñaVerse Dataset Studio](docs/dataset-studio.md), herrami
 
 El Hito 4 incorpora el [Laboratorio de reconocimiento LSP](docs/recognition-lab-hito-4.md) en `/herramientas/reconocimiento`. En desarrollo, `VITE_ENABLE_RECOGNITION_LAB=true` habilita la ruta y la carga del modelo experimental V1. Incluye modos libre y dirigido, confirmación temporal y diagnóstico local.
 
+El [Hito 4.3](docs/recognition-lab-hito-4-3.md) documenta la auditoría de Nada, las pruebas de lateralidad y movimiento, y los pasos de recopilación y comparación para V2.
+
+Los [Hitos 5.0 y 5.1](docs/hito-5-1-camara.md) incorporan reconocimiento educativo experimental en Cámara y documentan el motor compartido y la distribución local de V1.
+
 `.env.example` es solo una plantilla y Vite no lo carga. El archivo `.env.development.local` debe estar junto a `package.json`; queda fuera de Git y solo afecta al modo de desarrollo. Ejecuta `npm.cmd run dev` y abre `http://localhost:5173/herramientas/dataset` (o el puerto que anuncie Vite). Con la variable ausente o distinta de `true`, esa ruta está deshabilitada y redirige a Inicio. Consulta la [guía de acceso y diagnóstico](docs/dataset-studio.md).
 
 El [catálogo inicial y protocolo piloto de LSP](docs/lsp-catalog-pilot.md) configura diez entradas estables `LSP-001` a `LSP-010`, con referencia MINEDU (2015), duración individual y revisión lingüística pendiente. Conserva las etiquetas y muestras anteriores sin asignar correspondencias, y separa los ejemplos negativos en una categoría técnica. El piloto físico previsto reúne 24 muestras reales de Uno, Tres, Sí y Mucho; permanece pendiente hasta recopilarlo con dos participantes.

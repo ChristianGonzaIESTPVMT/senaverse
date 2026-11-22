@@ -29,7 +29,8 @@ import './pages/LibraryPage.css';
 import './pages/CameraPage.css';
 import './pages/SituationsPage.css';
 
-const DatasetStudioPage = import.meta.env.VITE_ENABLE_DATA_COLLECTION === 'true' ? lazy(() => import('./pages/DatasetStudioPage')) : null;
+const DatasetStudioPage = import.meta.env.DEV && import.meta.env.MODE === 'development' && import.meta.env.VITE_ENABLE_DATA_COLLECTION === 'true'
+  ? lazy(() => import('./pages/DatasetStudioPage')) : null;
 const RecognitionLabPage = import.meta.env.DEV && import.meta.env.MODE === 'development' && import.meta.env.VITE_ENABLE_RECOGNITION_LAB === 'true'
   ? lazy(() => import('./pages/RecognitionLabPage')) : null;
 
@@ -41,7 +42,7 @@ function StudentApp() {
   const completeLesson = (lessonId: string) => recordActivity({ type: 'lesson', lessonId });
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         {DatasetStudioPage && <Route path="/herramientas/dataset" element={<Suspense fallback={<p role="status">Abriendo Dataset Studio…</p>}><DatasetStudioPage /></Suspense>} />}
         {RecognitionLabPage && <Route path="/herramientas/reconocimiento" element={<Suspense fallback={<p role="status">Abriendo el laboratorio…</p>}><RecognitionLabPage /></Suspense>} />}

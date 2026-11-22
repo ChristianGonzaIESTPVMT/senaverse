@@ -56,6 +56,19 @@ test('quality review is explicit and insufficient captures cannot be marked acce
   assert.equal((await store.getSample(weak.sampleId)).reviewStatus, 'rejected');
 });
 
+test('V2 exclusion survives export and can be reversed without changing the reviewed recording', async () => {
+  const store = database(); await prepared(store);
+  const { sampleId } = await store.saveSample(sampleFixture('sample-v2-exclusion'));
+  await store.reviewSample(sampleId, 'accepted');
+  await store.updateSampleReviews([sampleId], 'mark');
+  const reviewed = await store.getSample(sampleId);
+  await store.setV2Exclusion(sampleId, true);
+  const backup = parseDatasetJSON(serializeDataset(await store.document('backup', exportedAt)));
+  assert.deepEqual(backup.samples[0], { ...reviewed, excludedFromV2: true });
+  await store.setV2Exclusion(sampleId, false);
+  assert.deepEqual(await store.getSample(sampleId), reviewed);
+});
+
 test('saving after a countdown preserves the existing sample, its review, and the dataset metadata', async () => {
   const store = database();
   await prepared(store);

@@ -49,11 +49,12 @@ function validatePoint(value: unknown) {
 }
 
 export function validateDatasetSample(value: unknown): asserts value is DatasetSample {
-  const sample = object(value, ['sampleId', 'labelId', 'participantId', 'repetition', 'recordedAt', 'durationMs', 'frames', 'incidents', 'qualityMetrics', 'captureMetadata', 'reviewStatus', 'operatorReviewed'], 'muestra');
+  const sample = object(value, ['sampleId', 'labelId', 'participantId', 'repetition', 'recordedAt', 'durationMs', 'frames', 'incidents', 'qualityMetrics', 'captureMetadata', 'reviewStatus', 'operatorReviewed', 'excludedFromV2'], 'muestra');
   check(id(sample.sampleId) && id(sample.labelId) && string(sample.participantId, 7) && /^P\d{3,6}$/.test(sample.participantId), 'identificadores de la muestra.');
   check(integer(sample.repetition, 1, 1000000) && date(sample.recordedAt) && number(sample.durationMs, MIN_RECORDING_MS, MAX_RECORDING_MS), 'repetición, fecha o duración.');
   check(choice(sample.reviewStatus, ['pending', 'accepted', 'rejected']), 'estado de revisión.');
   check(sample.operatorReviewed === undefined || typeof sample.operatorReviewed === 'boolean', 'revisión por operador.');
+  check(sample.excludedFromV2 === undefined || sample.excludedFromV2 === true, 'exclusión de V2.');
   array(sample.frames, 1000, 'fotogramas');
   let previous = -Infinity;
   for (const value of sample.frames) {
@@ -83,7 +84,8 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
     const incident = object(value, ['timestampMs', 'type'], 'incidencia');
     check(number(incident.timestampMs, 0, sample.durationMs) && choice(incident.type, ['hand-count-mismatch', 'result-gap', 'invalid-result', 'duplicate-timestamp', 'out-of-order-timestamp']), 'incidencia de captura.');
   }
-  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed', 'qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored'], 'metadatos');
+  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed', 'qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored', 'collectionProtocol'], 'metadatos');
+  check(metadata.collectionProtocol === undefined || (metadata.collectionProtocol === 'hito-4.3' && metadata.qualityPolicyVersion === 2), 'protocolo de recopilación.');
   validateModel(metadata.model); validateSign(metadata.labelSnapshot);
   check(metadata.labelSnapshot.id === sample.labelId && metadata.labelSnapshot.validationStatus !== 'unconfigured', 'etiqueta original.');
   check(metadata.completed === true && date(metadata.consentedAt) && metadata.consentVersion === CONSENT_VERSION

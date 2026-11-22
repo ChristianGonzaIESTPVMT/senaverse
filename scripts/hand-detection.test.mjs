@@ -196,12 +196,16 @@ test('official pinned model and matching local WASM files are present', async ()
   assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
 });
 
-test('shared video and overlay use identical CSS mirrors; all three views reuse PracticeCamera', async () => {
+test('shared video and overlay use identical CSS mirrors and the educational views reuse the camera', async () => {
   const css = await readFile(new URL('../src/pages/CameraPage.css', import.meta.url), 'utf8');
   assert.match(css, /\.practice-camera-preview video \{[^}]*object-fit: cover;[^}]*transform: scaleX\(-1\)/);
   assert.match(css, /\.practice-hand-overlay \{[^}]*transform: scaleX\(-1\)/);
-  for (const path of ['pages/FreePracticePage.tsx', 'pages/SignChallengePage.tsx', 'components/SituationPracticeStep.tsx']) {
+  for (const path of ['pages/SignChallengePage.tsx', 'components/SituationPracticeStep.tsx']) {
     assert.match(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'), /<PracticeCamera/);
+  }
+  assert.match(await readFile(new URL('../src/components/RecognitionPractice.tsx', import.meta.url), 'utf8'), /memo\(PracticeCamera\)/);
+  for (const path of ['pages/CameraPage.tsx', 'pages/FreePracticePage.tsx']) {
+    assert.match(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'), /<RecognitionPractice/);
   }
 });
 

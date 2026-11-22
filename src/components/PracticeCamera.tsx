@@ -3,6 +3,7 @@ import { Camera, CameraOff, ScanLine } from 'lucide-react';
 import { useHandDetection } from '../features/sign-recognition/useHandDetection';
 import { handDetectionMessage, type FreshHandInference, type HandDetectionState, type HandDiagnosticSnapshot } from '../features/sign-recognition/types';
 import { CAMERA_VIDEO_CONSTRAINTS, DEFAULT_HAND_PROFILE, type HandDetectionProfile } from '../features/sign-recognition/config';
+import { claimCamera } from '../features/sign-recognition/cameraAccess';
 
 const HandDiagnostics = import.meta.env.DEV ? lazy(() => import('../features/sign-recognition/HandDiagnostics')) : null;
 
@@ -16,8 +17,9 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'No se pudo abrir la cámara seleccionada. Puede estar ocupada, desconectada o deshabilitada en el sistema. Revisa qué cámara está elegida en el navegador y cierra otras aplicaciones que la estén utilizando.',
 };
 
-export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', onFreshInference, onSessionState, onDiagnostics }: { disabled?: boolean;
+export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', showLandmarks = true, onFreshInference, onSessionState, onDiagnostics }: { disabled?: boolean;
   disabledReason?: string;
+  showLandmarks?: boolean;
   onFreshInference?: (event: FreshHandInference) => void;
   onSessionState?: (state: PracticeCameraSessionState) => void;
   onDiagnostics?: (snapshot: HandDiagnosticSnapshot | null) => void;
@@ -25,6 +27,7 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const leaseRef = useRef<ReturnType<typeof claimCamera>>(null);
   const requestRef = useRef(0);
   const [status, setStatus] = useState<CameraStatus>('idle');
   const [error, setError] = useState('');
@@ -44,6 +47,8 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
       requestRef.current += 1;
       streamRef.current?.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      leaseRef.current?.release();
+      leaseRef.current = null;
       if (video) video.srcObject = null;
     };
   }, []);
@@ -53,6 +58,8 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
     requestRef.current += 1;
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
+    leaseRef.current?.release();
+    leaseRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setStatus('idle');
     setError('');
@@ -65,13 +72,20 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
   }
 
   async function startCamera() {
-    if (disabled) return;
+    if (disabled || leaseRef.current) return;
     detection.stop();
     if (!navigator.mediaDevices?.getUserMedia) {
       failCamera('La vista previa requiere acceso a cámara en un navegador compatible mediante HTTPS o localhost.');
       return;
     }
 
+    const lease = claimCamera();
+    if (!lease) {
+      setError('Otra vista está utilizando la cámara o esperando permiso. Ciérrala o responde al permiso y vuelve a intentarlo.');
+      setStatus('error');
+      return;
+    }
+    leaseRef.current = lease;
     const requestId = ++requestRef.current;
     setStatus('requesting');
     setError('');
@@ -84,6 +98,7 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
 
       if (requestRef.current !== requestId || !videoRef.current) {
         stream.getTracks().forEach(track => track.stop());
+        lease.release();
         return;
       }
 
@@ -95,10 +110,13 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
         if (requestRef.current !== requestId) return;
         failCamera('La cámara se ha desconectado. Puedes volver a activarla.');
       }, { once: true }));
+      await videoRef.current.play();
     } catch (cameraError) {
       if (requestRef.current !== requestId) return;
       const name = cameraError instanceof Error ? cameraError.name : '';
       failCamera(cameraErrors[name] ?? 'No se pudo activar la cámara. Revisa la conexión y vuelve a intentarlo.');
+    } finally {
+      lease.settled();
     }
   }
 
@@ -121,7 +139,7 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
       </div>
       <div className="practice-camera-preview">
         <video ref={videoRef} autoPlay playsInline muted hidden={!isActive} aria-label="Vista previa de tu cámara" onError={() => failCamera('La vista previa no pudo reproducirse. Puedes volver a activar la cámara.')} />
-        <canvas ref={canvasRef} className="practice-hand-overlay" hidden={!isActive} aria-hidden="true" />
+        <canvas ref={canvasRef} className="practice-hand-overlay" hidden={!isActive} style={{ opacity: showLandmarks ? undefined : 0 }} aria-hidden="true" />
         {!isActive && <div className="practice-camera-placeholder">
           <CameraOff size={43} strokeWidth={1.5} aria-hidden="true" />
           <strong>{isRequesting ? 'Esperando tu autorización' : 'La cámara está desactivada'}</strong>

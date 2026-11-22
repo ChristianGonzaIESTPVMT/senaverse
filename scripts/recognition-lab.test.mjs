@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FEATURE_CONFIG, featureCount, trailingWindow } from '../ml/web/features.mjs';
+import { causalWindowsV2, FEATURE_CONFIG, featureCount, trailingWindow } from '../ml/web/features.mjs';
+import { passesMovement } from '../ml/web/movement.mjs';
 import { frames, hand, inference } from '../ml/tests/fixtures.mjs';
 import { MODEL_METADATA } from '../src/features/sign-recognition/dataset/datasetTypes.ts';
 import { LAB_SIGNS, loadLabModel, parseLabModel } from '../src/features/sign-recognition/labModel.ts';
@@ -23,10 +24,21 @@ function scores(index, winning = .92, runnerUp = .04) {
   return values;
 }
 
-function harness(predict = () => scores(0)) {
+const v2Labels = [...labels, { id: 'NEG-001', name: 'Ejemplos negativos' }];
+const v2Document = {
+  ...modelDocument, modelVersion: '4.3.0-experimental.1+0123456789ab', labels: v2Labels, outputDimensions: v2Labels.length,
+  parameters: { ...modelDocument.parameters, weights: v2Labels.map(zeros), bias: v2Labels.map(() => 0) },
+  policy: { version: 'lsp-lab-2', byLabel: Object.fromEntries(labels.map(({ id }) => [id, { confidence: .75, margin: .4 }])) },
+};
+
+function scoresV2(index) {
+  return v2Labels.map((_, i) => i === index ? .90 : .01);
+}
+
+function harness(predict = () => scores(0), version = 'v1') {
   let now = 0;
   const vectors = [];
-  const model = parseLabModel(modelDocument);
+  const model = parseLabModel(version === 'v2' ? structuredClone(v2Document) : modelDocument, version);
   model.predictor.scores = features => { vectors.push(features); return predict(features); };
   const session = createRecognitionSession(model, () => now);
   session.start();
@@ -63,6 +75,76 @@ test('loadLabModel accepts the V1 projection, preserves IDs, and handles missing
   assert.throws(() => parseLabModel({ ...modelDocument, modelVersion: 'V2' }), /V1/);
   assert.throws(() => parseLabModel({ ...modelDocument, preprocessing: { ...FEATURE_CONFIG, steps: 32 } }), /V1/);
   assert.throws(() => parseLabModel({ ...modelDocument, parameters: { ...modelDocument.parameters, weights: [] } }), /SVM/);
+});
+
+test('V2 accepts its explicit negative label and keeps per-class thresholds', () => {
+  const lab = harness(() => scoresV2(10), 'v2');
+  assert.equal(lab.block(0, 1800).reason, 'negative-class');
+  assert.equal(lab.latest().status, 'unknown');
+  assert.equal(lab.latest().stableId, null);
+  assert.equal(lab.feed({ timestampMs: 1850, hands: [] }).status, 'searching');
+  assert.throws(() => parseLabModel(v2Document), /V1/);
+  assert.throws(() => parseLabModel({ ...v2Document, policy: { version: 'lsp-lab-2' } }, 'v2'), /política/);
+
+  const demanding = harness(() => scoresV2(0), 'v2');
+  demanding.model.policy.byLabel['LSP-001'].confidence = .95;
+  assert.equal(demanding.block(0, 1850).reason, 'low-score');
+});
+
+test('V2 rejects a fixed or linearly moving index and confirms a rotating index', () => {
+  const held = harness(() => scoresV2(8), 'v2');
+  assert.equal(held.block(0, 1850).reason, 'movement');
+  const line = (t) => {
+    const pose = hand(.35, .48);
+    pose.landmarks[8].x += .08 * Math.sin(t / 230);
+    return [pose];
+  };
+  assert.equal(harness(() => scoresV2(8), 'v2').block(0, 1850, line).reason, 'movement');
+  const rotation = (t) => {
+    const pose = hand(.35, .48);
+    pose.landmarks[8].x += .055 * Math.cos(t / 175);
+    pose.landmarks[8].y += .055 * Math.sin(t / 175);
+    return [pose];
+  };
+  const moving = harness(() => scoresV2(8), 'v2');
+  assert.equal(moving.block(0, 1850, rotation).stableId, 'LSP-009');
+  assert.equal(moving.feed({ timestampMs: 1900, hands: [] }).status, 'searching');
+  assert.equal(moving.block(1950, 2150).status, 'collecting');
+});
+
+test('static canonicalization reverses the left pose while preserving raw motion and paired geometry', () => {
+  const right = hand(.4, .48);
+  const left = { handedness: [{ categoryName: 'Left', score: .97 }],
+    landmarks: right.landmarks.map(point => ({ ...point, x: .8 - point.x })) };
+  const flipped = frames(() => [left]);
+  const first = [...causalWindowsV2(flipped, 4 / 3)][0];
+  const original = trailingWindow(frames(() => [right]), 4 / 3);
+  assert.equal(first.side, 'Left');
+  assert.notDeepEqual(first.features, original.features);
+  assert.ok(first.canonicalFeatures.every((value, i) => Math.abs(value - original.features[i]) < 1e-12));
+  assert.deepEqual([...causalWindowsV2(frames(() => [right]), 4 / 3)][0].features, original.features);
+  assert.equal([...causalWindowsV2(frames(() => [left, hand(.65, .48)]), 4 / 3)][0].canonicalFeatures, null);
+  const lab = harness(() => scoresV2(0), 'v2');
+  assert.equal(lab.block(0, 1850, () => [left]).stableId, 'LSP-001');
+  assert.equal(lab.latest().canonical, true);
+  const transition = lab.feed({ timestampMs: 1900, hands: [left, hand(.65, .48)] });
+  assert.equal(transition.status, 'collecting');
+  assert.equal(transition.stableId, null);
+});
+
+test('Nada uses signed original image displacement while Con requires convergence', () => {
+  const nada = (direction) => frames(t => {
+    const pose = hand(.4 + direction * t / 8500, .48);
+    pose.landmarks[4] = { ...pose.landmarks[8] };
+    return [pose];
+  });
+  const toward = frameSet => [...causalWindowsV2(frameSet, 4 / 3)][0].movement;
+  assert.equal(passesMovement('LSP-007', toward(nada(1))), true);
+  assert.equal(passesMovement('LSP-007', toward(nada(-1))), false);
+  assert.equal(passesMovement('LSP-010', toward(frames(t => [
+    hand(.25 + t / 8500, .48), hand(.75 - t / 8500, .48),
+  ]))), true);
+  assert.equal(passesMovement('LSP-010', toward(frames(() => [hand(.25, .48), hand(.75, .48)]))), false);
 });
 
 test('the first live vector equals the training transform for its actual timestamps and geometry', () => {

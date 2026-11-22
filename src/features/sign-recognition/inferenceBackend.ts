@@ -3,6 +3,11 @@ import type { BackendOptions, CapturedHandFrame, HandInferenceBackend, Inference
 import type { HandWorkerRequest, HandWorkerResponse } from './workerProtocol.ts';
 import { detectionError } from './detectionErrors.ts';
 
+type WorkerDisposal = { defer: (finish: () => void) => void; finished: () => void };
+let closingWorker: { worker: Worker; terminate: () => void } | null = null;
+const FIRST_INFERENCE_TIMEOUT_MS = 10000;
+const INFERENCE_TIMEOUT_MS = 2000;
+
 export function closeCapturedFrame(frame: CapturedHandFrame) {
   frame.close();
 }
@@ -24,7 +29,7 @@ function absoluteAssets() {
 
 /** One request at a time, never a worker-side queue. Exported to exercise transport cancellation. */
 export function connectHandWorker(worker: Worker, signal: AbortSignal, options: BackendOptions,
-  assets: ReturnType<typeof getHandLandmarkerAssets>): Promise<HandInferenceBackend> {
+  assets: ReturnType<typeof getHandLandmarkerAssets>, disposal?: WorkerDisposal): Promise<HandInferenceBackend> {
   return new Promise((resolve, reject) => {
     let closed = false;
     let ready = false;
@@ -42,6 +47,7 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
       if (disposalTimer !== null) clearTimeout(disposalTimer);
       worker.onmessage = null; worker.onerror = null; worker.onmessageerror = null;
       worker.terminate();
+      disposal?.finished();
     };
     function close() {
       if (closed) return;
@@ -53,7 +59,11 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
       pending?.reject(new DOMException('Detección cancelada.', 'AbortError'));
       pending = null;
       if (!ready || wasBusy) { terminate(); return; }
-      try { post({ type: 'dispose' }); disposalTimer = setTimeout(terminate, 50); }
+      try {
+        post({ type: 'dispose' });
+        disposalTimer = setTimeout(terminate, 50);
+        disposal?.defer(terminate);
+      }
       catch { terminate(); }
     }
     function fail(error: Error) {
@@ -81,7 +91,9 @@ export function connectHandWorker(worker: Worker, signal: AbortSignal, options: 
             const id = ++requestId;
             pending = { id, timestamp, resolve: resolveFrame, reject: rejectFrame };
             try {
-              inferenceTimer = setTimeout(() => fail(detectionError('inference', 'El Worker no respondió a la inferencia.')), 2000);
+              // Cold GPU execution can outlast regular inference. The frame freshness check still applies.
+              const timeout = id === 1 ? FIRST_INFERENCE_TIMEOUT_MS : INFERENCE_TIMEOUT_MS;
+              inferenceTimer = setTimeout(() => fail(detectionError('inference', 'El Worker no respondió a la inferencia.')), timeout);
               post({ type: 'frame', id, timestamp, frame: frame as ImageBitmap }, [frame as ImageBitmap]);
             } catch (error) {
               if (inferenceTimer !== null) clearTimeout(inferenceTimer);
@@ -111,6 +123,10 @@ export async function createHandInferenceBackend(signal: AbortSignal, options: B
     throw new Error('La detección requiere Web Worker, OffscreenCanvas e ImageBitmap.');
   }
   const assets = absoluteAssets();
+  closingWorker?.terminate();
   const worker = new Worker(new URL('./handDetection.worker.ts', import.meta.url), { type: 'module', name: 'senaverse-hands' });
-  return connectHandWorker(worker, signal, options, assets);
+  return connectHandWorker(worker, signal, options, assets, {
+    defer(terminate) { closingWorker = { worker, terminate }; },
+    finished() { if (closingWorker?.worker === worker) closingWorker = null; },
+  });
 }
