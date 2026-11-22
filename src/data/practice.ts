@@ -1,7 +1,7 @@
-import { libraryEntries } from './library';
+import { getEducationalSign } from './library';
 
 // Catálogo de demostración para preparar las vistas de práctica.
-export const practiceSigns = libraryEntries.filter(entry => ['hola', 'gracias', 'adios', 'si', 'no'].includes(entry.id));
+export const practiceSigns = ['hola', 'gracias', 'adios', 'si', 'no'].flatMap(id => getEducationalSign(id) ?? []);
 
 export function getFreePracticePath(signId: string) {
   return `/camara/libre?sena=${encodeURIComponent(signId)}`;

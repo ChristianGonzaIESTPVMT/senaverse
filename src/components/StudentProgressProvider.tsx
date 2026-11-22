@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { LEGACY_PROGRESS_KEY, PROGRESS_KEY, emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, type ProgressEvent } from '../data/progress';
 import { ProgressContext } from '../hooks/progressContext';
+import { LEGACY_SITUATION_KEY } from '../data/situationStudy';
 
 export function StudentProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState(() => {
-    try { return restoreProgress(localStorage.getItem(PROGRESS_KEY), localStorage.getItem(LEGACY_PROGRESS_KEY)); }
+    try { return restoreProgress(localStorage.getItem(PROGRESS_KEY), localStorage.getItem(LEGACY_PROGRESS_KEY), localStorage.getItem(LEGACY_SITUATION_KEY)); }
     catch { return emptyProgress(); }
   });
 

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { PROFILE_KEY, defaultProfile, isAvatarId, restoreProfile, validatePersonalInfo, type AvatarId, type PersonalInfo, type StudentProfile } from '../data/profile';
+import { LEGACY_FAVORITES_KEY, PROFILE_KEY, defaultProfile, isAvatarId, restoreProfile, toggleFavoriteSign, validatePersonalInfo,
+  type AvatarId, type PersonalInfo, type StudentProfile } from '../data/profile';
 import { ProfileContext } from '../hooks/profileContext';
 import { cleanProfilePhotos, commitProfilePhoto, deleteProfilePhoto, readProfilePhoto } from '../data/profilePhotoStore';
 
 export function StudentProfileProvider({ children }: { children: ReactNode }) {
   const [{ profile, storageAvailable }, setState] = useState(() => {
-    try { return { profile: restoreProfile(localStorage.getItem(PROFILE_KEY)), storageAvailable: true }; }
+    try { return { profile: restoreProfile(localStorage.getItem(PROFILE_KEY), localStorage.getItem(LEGACY_FAVORITES_KEY)), storageAvailable: true }; }
     catch { return { profile: defaultProfile(), storageAvailable: false }; }
   });
   const currentProfile = useRef(profile);
@@ -41,7 +42,7 @@ export function StudentProfileProvider({ children }: { children: ReactNode }) {
       if (event.key !== PROFILE_KEY && event.key !== null) return;
       try {
         if (event.storageArea !== localStorage) return;
-        const next = restoreProfile(event.newValue);
+        const next = restoreProfile(event.newValue, localStorage.getItem(LEGACY_FAVORITES_KEY));
         currentProfile.current = next;
         setState({ profile: next, storageAvailable: true });
       } catch { setState(previous => ({ ...previous, storageAvailable: false })); }
@@ -54,6 +55,14 @@ export function StudentProfileProvider({ children }: { children: ReactNode }) {
     const { value, errors } = validatePersonalInfo(input);
     if (Object.keys(errors).length === 0) persist({ ...currentProfile.current, ...value });
     return errors;
+  }, [persist]);
+
+  const toggleFavorite = useCallback((signId: string) => {
+    if (photoOperation.current) return null;
+    const next = toggleFavoriteSign(currentProfile.current, signId);
+    if (next === currentProfile.current) return null;
+    persist(next);
+    return next.favoriteSignIds ?? [];
   }, [persist]);
 
   const saveAvatar = useCallback(async (avatarId: AvatarId) => {
@@ -78,12 +87,12 @@ export function StudentProfileProvider({ children }: { children: ReactNode }) {
 
   const resetProfile = useCallback(async () => {
     if (photoOperation.current) throw new Error('Espera a que termine el cambio de foto.');
-    const previousId = currentProfile.current.photoId;
-    persist(defaultProfile(), !!previousId);
-    if (previousId) await deleteProfilePhoto(previousId);
+    const { photoId, favoriteSignIds } = currentProfile.current;
+    persist({ ...defaultProfile(), ...(favoriteSignIds && { favoriteSignIds }) }, !!photoId);
+    if (photoId) await deleteProfilePhoto(photoId);
   }, [persist]);
 
   const photoUrl = photo?.id === profile.photoId ? photo?.url : undefined;
   const photoLoading = !!profile.photoId && photo?.id !== profile.photoId;
-  return <ProfileContext value={{ profile, storageAvailable, photoUrl, photoLoading, savePersonalInfo, saveAvatar, savePhoto, resetProfile }}>{children}</ProfileContext>;
+  return <ProfileContext value={{ profile, storageAvailable, photoUrl, photoLoading, savePersonalInfo, saveAvatar, savePhoto, resetProfile, toggleFavorite }}>{children}</ProfileContext>;
 }

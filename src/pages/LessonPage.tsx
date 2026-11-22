@@ -4,8 +4,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { LessonActivity } from '../components/LessonActivity';
 import { LessonSequence } from '../components/LessonSequence';
 import { getLessonLocation, getLessonPath, getResumeLesson, getUnitPath, units, type Lesson, type Unit } from '../data/curriculum';
-import { libraryEntries } from '../data/library';
-import { getFreePracticePath } from '../data/practice';
+import { getEducationalSign, getLibrarySignPath } from '../data/library';
 import type { LearningActivity } from '../hooks/useLearningActivity';
 
 type LessonPageProps = { completed: string[]; activity: LearningActivity; onComplete: (lessonId: string) => void; onVisit: (lessonId: string) => void };
@@ -73,7 +72,7 @@ function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: 
   const [passed, setPassed] = useState(false);
   const [mediaError, setMediaError] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const sign = libraryEntries.find(item => item.id === content.signId);
+  const sign = content.signId ? getEducationalSign(content.signId) : undefined;
   const videoSrc = content.videoSrc ?? sign?.videoSrc;
   const captionsSrc = content.captionsSrc ?? sign?.captionsSrc;
   const next = getResumeLesson(completed);
@@ -119,8 +118,8 @@ function LegacyLesson({ lesson, content, unit, isDone, completed, onComplete }: 
       <div className="learning-resource-links"><Link to="/biblioteca"><LibraryBig size={18} aria-hidden="true" /> Consultar la Biblioteca de señas <ArrowRight size={17} aria-hidden="true" /></Link></div>
       {content.practiceSignId && <aside className="recommendation">
         <div className="recommendation-icon"><Camera size={22} aria-hidden="true" /></div>
-        <div><strong>Prepara tu práctica de este saludo</strong><p>Abre «Hola» en el Centro de práctica. El reconocimiento está pendiente de integración.</p></div>
-        <Link to={getFreePracticePath(content.practiceSignId)}>Practicar con cámara <ArrowRight size={16} aria-hidden="true" /></Link>
+          <div><strong>Consulta la ficha de esta seña</strong><p>Revisa el significado y los recursos disponibles en la Biblioteca.</p></div>
+          <Link to={getLibrarySignPath(content.practiceSignId)}>Ver ficha <ArrowRight size={16} aria-hidden="true" /></Link>
       </aside>}
       <div className="finish-actions">
         <Link to={getUnitPath(unit.id)} className="button button-outline"><ArrowLeft size={17} aria-hidden="true" /> Volver a las lecciones</Link>

@@ -9,11 +9,13 @@ import { createServer, preview } from 'vite';
 import { simulate } from '../ml/scripts/replay_session.mjs';
 import { parseLabModel } from '../src/features/sign-recognition/labModel.ts';
 import { checkLesson } from './fixtures/lesson-browser.mjs';
+import { checkLibrary } from './fixtures/library-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
 const mode = process.argv[3] ?? 'lab';
-assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production'].includes(mode));
+assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
+  'library-development', 'library-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -141,14 +143,17 @@ async function checkStudent({ send, evaluate, requests }, origin) {
         landmarks: frame.hands.map(hand => hand.landmarks), handedness: frame.hands.map(hand => hand.handedness),
       } }));
       await choose(target);
-      await evaluate(`document.querySelector('.practice-recognition-result button').click();
-        window.studentTrace = { frames: ${JSON.stringify(frames)}, cursor: 0, started: null, states: new Set() };
-        window.studentTrace.observer = new MutationObserver(() => window.studentTrace?.states.add(
-          document.querySelector('.practice-student-result')?.textContent));
-        window.studentTrace.observer.observe(document.querySelector('.practice-student-result'),
-          { subtree: true, childList: true, characterData: true });`);
-      await until(expected, () => evaluate(`document.querySelector('.practice-student-result')?.textContent.includes(${JSON.stringify(expected)}) &&
-        (document.querySelector('.practice-student-result strong')?.textContent ?? null) === ${JSON.stringify(confirmedName)}`)).catch(async error => {
+      await evaluate(`(() => {
+        document.querySelector('.practice-recognition-result button').click();
+        window.studentTrace = { frames: ${JSON.stringify(frames)}, cursor: 0, started: null, states: new Map() };
+        const result = document.querySelector('.practice-student-result');
+        window.studentTrace.observer = new MutationObserver(() => window.studentTrace?.states.set(
+          result.textContent, result.querySelector('strong')?.textContent ?? null));
+        window.studentTrace.observer.observe(result,
+          { subtree: true, childList: true, characterData: true });
+      })()`);
+      await until(expected, () => evaluate(`[...window.studentTrace.states].some(([message, sign]) =>
+        message.includes(${JSON.stringify(expected)}) && sign === ${JSON.stringify(confirmedName)})`)).catch(async error => {
         const states = await evaluate('({ cursor: window.studentTrace.cursor, states: [...window.studentTrace.states] })');
         throw new Error(`${error.message}. ${JSON.stringify(states)}`, { cause: error });
       });
@@ -235,7 +240,7 @@ try {
     window.labWorkers = [];
     window.labWorkerErrors = [];
     window.labBlockModel = true;
-    window.studentBlockModel = true;
+    window.studentBlockModel = ${!mode.startsWith('library-')};
     window.studentAttempts = 0;
     const fetchResource = window.fetch.bind(window);
     window.fetch = (resource, options) => (window.labBlockModel && String(resource).endsWith('/__senaverse/recognition-v1.json'))
@@ -281,7 +286,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('lesson-')) {
+  if (mode.startsWith('library-')) {
+    await checkLibrary({ send, evaluate, requests }, origin, until);
+  } else if (mode.startsWith('lesson-')) {
     await checkLesson({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode !== 'lab') {
     await checkStudent({ send, evaluate, requests }, origin);

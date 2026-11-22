@@ -5,7 +5,7 @@ import { summarizeProgress } from '../data/progress';
 import { useStudentProgress } from '../hooks/progressContext';
 import { useStudentProfile } from '../hooks/profileContext';
 import { getUnitPath, units } from '../data/curriculum';
-import { getSituationFilter, getSituationPath, getSituationsPath, situations } from '../data/situations';
+import { getSituation, getSituationFilter, getSituationPath, getSituationsPath } from '../data/situations';
 import { Brand } from './Brand';
 import { StudentAvatar } from './StudentAvatar';
 import { ThemeToggle } from './ThemeToggle';
@@ -59,7 +59,7 @@ export function StudentLayout({ children }: { children: ReactNode }) {
     { label: 'Desafío de señas', to: '/camara/desafio' },
   ].find(page => page.to === location.pathname);
   if (practicePage) breadcrumbs.push(practicePage);
-  const situation = situations.find(item => item.id === situationId);
+  const situation = getSituation(situationId);
   if (situation) {
     breadcrumbs.push({ label: situation.title, to: getSituationPath(situation.id, situationFilter) });
     const sceneIndex = situation.scenes.findIndex(scene => scene.id === sceneId);

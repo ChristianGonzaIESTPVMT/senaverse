@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bookmark, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Frown, Hand, Heart, HeartHandshake, LayoutGrid, Play, Search, SearchX, Smile, Soup, Sparkles, UsersRound, UserRound, Video, X, Droplets, Circle } from 'lucide-react';
-import { libraryCategories, libraryEntries, type LibraryCategory, type LibraryEntry } from '../data/library';
+import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Hand, Heart, LayoutGrid, Search, SearchX, Soup, Sparkles, UsersRound, X } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { getEducationalSign, libraryCategories, searchLibrary, type LibraryCategory, type LibraryEntry } from '../data/library';
+import { getLessonPath } from '../data/curriculum';
+import { getFreePracticePath } from '../data/practice';
 import { useStudentProgress } from '../hooks/progressContext';
+import { useStudentProfile } from '../hooks/profileContext';
 
-type CategoryFilter = 'all' | 'saved' | LibraryCategory;
-
-const SAVED_KEY = 'senaverse-library-saved-v1';
+type CategoryFilter = 'all' | LibraryCategory;
 const PAGE_SIZE = 6;
 const mainCategories = [
   { id: 'all', label: 'Todas', icon: LayoutGrid },
@@ -18,31 +20,16 @@ const extraCategories = [
   { id: 'respuestas', label: 'Respuestas', icon: Check },
   { id: 'alimentos', label: 'Alimentos', icon: Soup },
   { id: 'cotidiano', label: 'Vida cotidiana', icon: Sparkles },
-  { id: 'saved', label: 'Guardadas', icon: Bookmark },
 ] as const;
 
-function searchWords(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().match(/[a-z0-9]+/g) ?? [];
-}
-
-function readSaved(): string[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]');
-    if (Array.isArray(stored)) return libraryEntries.filter(entry => stored.includes(entry.id)).map(entry => entry.id);
-  } catch { /* Los marcadores también funcionan durante la sesión sin almacenamiento. */ }
-  return [];
-}
-
-function LibraryThumbnail({ entry }: { entry: LibraryEntry }) {
-  const icons = { wave: Hand, heart: Heart, family: UsersRound, yes: Check, no: X, person: UserRound, happy: Smile, sad: Frown, surprise: Circle, number: Circle, water: Droplets, food: Soup, help: HeartHandshake };
-  const Icon = icons[entry.visual];
-
+function LibraryReference({ entry }: { entry: LibraryEntry }) {
   return (
-    <div className={`library-thumbnail library-thumbnail-${entry.visual}`} data-tone={entry.tone} aria-hidden="true">
-      {entry.thumbnailSrc ? <img src={entry.thumbnailSrc} alt="" loading="lazy" /> : <>
-        <span className="library-thumbnail-orbit" />
-        {entry.number ? <span className="library-thumbnail-number">{entry.number}</span> : <Icon className="library-thumbnail-icon" strokeWidth={1.65} />}
-        <span className="library-thumbnail-label">LSP</span>
+    <div className="library-thumbnail library-card-reference" data-tone={entry.tone}>
+      {entry.thumbnailSrc ? <img src={entry.thumbnailSrc} alt={`Referencia de ${entry.word}`} loading="lazy" /> : <>
+        <BookOpen size={31} aria-hidden="true" />
+        {entry.reference ? <a href={entry.reference.url} target="_blank" rel="noopener noreferrer"
+          aria-label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</a>
+          : <span>{entry.videoSrc ? 'Video en la ficha' : 'Referencia pendiente'}</span>}
       </>}
     </div>
   );
@@ -50,13 +37,20 @@ function LibraryThumbnail({ entry }: { entry: LibraryEntry }) {
 
 export function LibraryPage() {
   const { consultSign } = useStudentProgress();
+  const { profile, storageAvailable, toggleFavorite } = useStudentProfile();
+  const saved = profile.favoriteSignIds ?? [];
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const requested = params.get('sena');
+  const selected = requested === null ? undefined : getEducationalSign(requested);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
+  const [compatible, setCompatible] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const [saved, setSaved] = useState(readSaved);
   const [savedMessage, setSavedMessage] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
-  const [selected, setSelected] = useState<LibraryEntry | null>(null);
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -65,8 +59,19 @@ export function LibraryPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try { localStorage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch { /* Usar marcadores en memoria. */ }
-  }, [saved]);
+    const dialog = dialogRef.current;
+    if (selected) {
+      consultSign(selected.id);
+      if (dialog && !dialog.open) dialog.showModal();
+    } else if (dialog?.open) {
+      dialog.close();
+      if (!dialog.contains(document.activeElement) && document.activeElement === document.body) searchRef.current?.focus();
+    }
+  }, [consultSign, selected]);
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => video?.pause();
+  }, [selected]);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -87,12 +92,8 @@ export function LibraryPage() {
     };
   }, [moreOpen]);
 
-  const terms = searchWords(query);
-  const filtered = libraryEntries.filter(entry => {
-    const inCategory = category === 'all' || (category === 'saved' ? saved.includes(entry.id) : entry.category === category);
-    const words = searchWords([entry.word, entry.description, ...(entry.keywords ?? [])].join(' '));
-    return inCategory && terms.every(term => words.some(word => word.startsWith(term)));
-  });
+  const filtered = searchLibrary({ query, category, compatible, favorites: savedOnly ? saved : undefined });
+  const hasFilters = !!query || category !== 'all' || compatible || savedOnly;
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(1, pageCount));
   const visibleEntries = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -106,20 +107,26 @@ export function LibraryPage() {
   }
 
   function toggleSaved(entry: LibraryEntry) {
-    const isSaved = saved.includes(entry.id);
-    setSaved(previous => isSaved ? previous.filter(id => id !== entry.id) : [...previous, entry.id]);
-    setSavedMessage(isSaved ? `${entry.word} se quitó de guardadas.` : `${entry.word} se guardó para repasar.`);
+    const next = toggleFavorite(entry.id);
+    setSavedMessage(next ? next.includes(entry.id) ? `${entry.word} se guardó para repasar.` : `${entry.word} se quitó de favoritos.`
+      : 'Espera a que se termine de guardar el perfil y vuelve a intentarlo.');
   }
 
   function resetFilters() {
     setQuery('');
+    setCompatible(false);
+    setSavedOnly(false);
     selectCategory('all');
+    searchRef.current?.focus();
   }
 
-  function openEntry(entry: LibraryEntry) {
-    consultSign(entry.id);
-    setSelected(entry);
-    dialogRef.current?.showModal();
+  function closeEntry() {
+    if (location.state?.libraryCard) navigate(-1);
+    else setParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.delete('sena');
+      return next;
+    }, { replace: true });
   }
 
   function changePage(next: number) {
@@ -162,31 +169,49 @@ export function LibraryPage() {
             {activeExtra?.label ?? 'Más'}<ChevronDown size={20} aria-hidden="true" />
           </button>
           {moreOpen && <div id="library-extra-categories" className="library-more-options" role="group" aria-label="Más categorías">
-            <span className="library-more-caption">SIGUE EXPLORANDO</span>
-            {extraCategories.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { selectCategory(id); moreButtonRef.current?.focus(); }}><Icon size={20} aria-hidden="true" /><span>{label}</span>{id === 'saved' && <span className="library-saved-count">{saved.length}</span>}{id !== 'saved' && category === id && <Check size={17} aria-hidden="true" />}</button>)}
+            {extraCategories.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { selectCategory(id); moreButtonRef.current?.focus(); }}><Icon size={20} aria-hidden="true" /><span>{label}</span>{category === id && <Check size={17} aria-hidden="true" />}</button>)}
           </div>}
         </div>
       </div>
 
-      <p className="sr-only" role="status">{filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}. {filtered.length > 0 ? `Página ${currentPage} de ${pageCount}.` : ''}</p>
-      <p className="sr-only" role="status">{savedMessage}</p>
+      <div className="library-result-toolbar">
+        <div className="library-refinements" role="group" aria-label="Filtros adicionales">
+          <label><input type="checkbox" checked={compatible} onChange={event => { setCompatible(event.target.checked); setPage(1); }} /> Con reconocimiento</label>
+          <label><input type="checkbox" checked={savedOnly} onChange={event => { setSavedOnly(event.target.checked); setPage(1); }} /> Favoritos ({saved.length})</label>
+        </div>
+        <p role="status">{filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}{pageCount > 1 ? ` · Página ${currentPage} de ${pageCount}` : ''}</p>
+        {hasFilters && <button type="button" className="button button-outline" onClick={resetFilters}>Limpiar filtros</button>}
+      </div>
+      {requested !== null && !selected && <div className="library-invalid">
+        <p role="status">La ficha solicitada no está disponible.</p>
+        <button className="button button-outline" type="button" onClick={() => { closeEntry(); searchRef.current?.focus(); }}>Volver al catálogo</button>
+      </div>}
+      {!storageAvailable && <p role="status">Los cambios en favoritos se conservarán solo durante esta sesión.</p>}
+      {!selected && <p className="sr-only" role="status">{savedMessage}</p>}
       <section className="library-results" aria-label="Palabras de la biblioteca" ref={resultsRef} tabIndex={-1}>
         {visibleEntries.length > 0 ? <div className="library-grid">
           {visibleEntries.map(entry => {
             const isSaved = saved.includes(entry.id);
+            const detail = new URLSearchParams(params);
+            detail.set('sena', entry.id);
             return (
               <article className="library-card" key={entry.id}>
-                <LibraryThumbnail entry={entry} />
-                <div className="library-card-copy"><h2>{entry.word}</h2><p>{entry.description}</p><button className="library-view" type="button" aria-haspopup="dialog" aria-label={`Ver seña: ${entry.word}`} onClick={() => openEntry(entry)}><Play size={17} fill="currentColor" aria-hidden="true" />Ver seña</button></div>
-                <button className={`library-save${isSaved ? ' is-saved' : ''}`} type="button" aria-label={isSaved ? `Quitar ${entry.word} de guardadas` : `Guardar ${entry.word}`} aria-pressed={isSaved} onClick={() => toggleSaved(entry)}><Bookmark size={23} fill={isSaved ? 'currentColor' : 'none'} aria-hidden="true" /></button>
+                <LibraryReference entry={entry} />
+                <div className="library-card-copy">
+                  <h2>{entry.word}</h2>
+                  <span className="library-entry-category">{libraryCategories.find(item => item.id === entry.category)?.label}</span>
+                  <span className={`library-compatibility${entry.recognitionClassId ? ' is-compatible' : ''}`}>{entry.recognitionClassId ? 'Con reconocimiento experimental' : 'Sin reconocimiento'}</span>
+                  <Link className="library-view" to={{ search: detail.toString() }} state={{ libraryCard: requested === null }}
+                    aria-haspopup="dialog" aria-label={`Ver seña: ${entry.word}`}>Ver ficha</Link>
+                </div>
+                <button className={`library-save${isSaved ? ' is-saved' : ''}`} type="button" aria-label={`${entry.word} en favoritos`} aria-pressed={isSaved} onClick={() => toggleSaved(entry)}><Bookmark size={23} fill={isSaved ? 'currentColor' : 'none'} aria-hidden="true" /></button>
               </article>
             );
           })}
         </div> : <div className="library-empty">
-          {category === 'saved' && !query ? <Bookmark size={40} aria-hidden="true" /> : <SearchX size={40} aria-hidden="true" />}
-          <h2>{category === 'saved' && !query ? 'Tus favoritas, siempre a mano' : 'No encontramos esa palabra'}</h2>
-          <p>{category === 'saved' && !query ? 'Toca el marcador de una tarjeta para guardarla y volver a repasarla cuando quieras.' : 'Prueba con otra palabra o cambia la categoría para seguir explorando.'}</p>
-          <button type="button" className="button button-primary" onClick={resetFilters}>{category === 'saved' && !query ? 'Explorar la biblioteca' : 'Limpiar filtros'}</button>
+          {savedOnly && !saved.length ? <Bookmark size={40} aria-hidden="true" /> : <SearchX size={40} aria-hidden="true" />}
+          <h2>{savedOnly && !saved.length ? 'Aún no tienes favoritos' : 'No hay señas con esos filtros'}</h2>
+          <p>{savedOnly && !saved.length ? 'Usa el marcador de una tarjeta para guardarla.' : 'Prueba otra búsqueda o ajusta los filtros.'}</p>
         </div>}
       </section>
 
@@ -196,9 +221,10 @@ export function LibraryPage() {
         <button type="button" className="library-page-arrow" aria-label="Página siguiente" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}><ChevronRight size={25} aria-hidden="true" /></button>
       </nav>}
 
-      <dialog ref={dialogRef} className="library-dialog" aria-labelledby="library-dialog-title" onClose={() => { videoRef.current?.pause(); setSelected(null); }} onClick={event => { if (event.target === event.currentTarget) dialogRef.current?.close(); }}>
+      <dialog ref={dialogRef} className="library-dialog" aria-labelledby="library-dialog-title" onClose={() => videoRef.current?.pause()}
+        onCancel={event => { event.preventDefault(); closeEntry(); }} onClick={event => { if (event.target === event.currentTarget) closeEntry(); }}>
         <div className="library-dialog-content">
-          <button className="library-dialog-close" type="button" aria-label="Cerrar ficha" autoFocus onClick={() => dialogRef.current?.close()}><X size={24} /></button>
+          <button className="library-dialog-close" type="button" aria-label="Cerrar ficha" autoFocus onClick={closeEntry}><X size={24} /></button>
           <span className="library-dialog-category">{selectedCategory?.label}</span>
           <h2 id="library-dialog-title">{selected?.word}</h2>
           <p className="library-dialog-description">{selected?.description}</p>
@@ -207,9 +233,39 @@ export function LibraryPage() {
               <source src={selected.videoSrc} />
               {selected.captionsSrc && <track kind="captions" src={selected.captionsSrc} srcLang="es" label="Español" default />}
               Tu navegador no admite la reproducción de este video.
-            </video> : <div className="library-video-placeholder"><LibraryThumbnail entry={selected} /><span><Video size={20} aria-hidden="true" />Video próximamente</span><p>Aquí encontrarás la demostración en Lengua de Señas Peruana.</p></div>}
-            <div className="library-meaning"><CircleHelp size={20} aria-hidden="true" /><div><h3>¿Qué significa?</h3><p>{selected.meaning}</p></div></div>
-            <button className={`library-dialog-save${saved.includes(selected.id) ? ' is-saved' : ''}`} type="button" aria-pressed={saved.includes(selected.id)} onClick={() => toggleSaved(selected)}><Bookmark size={20} fill={saved.includes(selected.id) ? 'currentColor' : 'none'} aria-hidden="true" />{saved.includes(selected.id) ? 'Guardada para repasar' : 'Guardar para repasar'}</button>
+            </video> : selected.thumbnailSrc && <img className="library-video" src={selected.thumbnailSrc} alt={`Referencia de ${selected.word}`} />}
+            <div className="library-meaning">
+              <BookOpen size={20} aria-hidden="true" />
+              <div>
+                <h3>Referencia y ejecución</h3>
+                {selected.reference && <a href={selected.reference.url} target="_blank" rel="noopener noreferrer">{selected.reference.title} (nueva pestaña)</a>}
+                {selected.instructions ? <p>{selected.instructions}</p> : <p>La referencia visual y las instrucciones están pendientes de incorporación.</p>}
+              </div>
+            </div>
+            <dl className="library-sign-facts">
+              <div><dt>Postura y movimiento</dt><dd>{selected.type === 'static' ? 'Estática · postura sostenida'
+                : selected.type === 'dynamic' ? 'Dinámica · incluye movimiento' : 'Pendiente de revisión'}</dd></div>
+              <div><dt>Manos</dt><dd>{selected.hands === 1 ? 'Una' : selected.hands === 2 ? 'Dos' : 'Pendiente de revisión'}</dd></div>
+              <div><dt>Validación lingüística</dt><dd>{selected.validation === 'pending' ? 'Pendiente de revisión' : 'Revisada'}</dd></div>
+              <div><dt>Reconocimiento</dt><dd>{selected.recognitionClassId ? 'Disponible · experimental V1' : 'Sin reconocimiento automático'}</dd></div>
+            </dl>
+            <p>{selected.meaning}</p>
+            {selected.source && <p className="library-source">Fuente · {selected.source.publisher}. <a href={selected.source.url}
+              target="_blank" rel="noopener noreferrer">{selected.source.title}{selected.source.page && `, p. ${selected.source.page}`}</a></p>}
+            {selected.reference && !selected.recognitionClassId && <p>Usa la lámina para repasar la postura a tu ritmo.</p>}
+            <div className="library-dialog-actions">
+              {selected.recognitionClassId && <Link className="button button-primary" to={getFreePracticePath(selected.recognitionClassId)}>
+                <Camera size={18} aria-hidden="true" /> Practicar con cámara
+              </Link>}
+              {selected.lesson && <Link className="button button-outline" to={getLessonPath(selected.lesson.unitId, selected.lesson.lessonId)}>Ir a {selected.lesson.title}</Link>}
+              <button className={`library-dialog-save${saved.includes(selected.id) ? ' is-saved' : ''}`} type="button"
+                aria-label={`${selected.word} en favoritos`} aria-pressed={saved.includes(selected.id)} onClick={() => toggleSaved(selected)}>
+                <Bookmark size={20} fill={saved.includes(selected.id) ? 'currentColor' : 'none'} aria-hidden="true" />
+                {saved.includes(selected.id) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+              </button>
+            </div>
+            {!storageAvailable && <p role="status">Los cambios en favoritos se conservarán solo durante esta sesión.</p>}
+            <p className="sr-only" role="status">{savedMessage}</p>
           </>}
         </div>
       </dialog>

@@ -205,6 +205,7 @@
 .lesson-number-list dt, .lesson-answer-fields legend { font-weight: 850; }
 .lesson-number-list dd { margin: 3px 0 0; }
 .lesson-sign-availability { color: var(--color-text-secondary); font-size: .84em; }
+.lesson-number-list a { color: var(--color-primary); font-weight: 750; text-decoration: underline; text-underline-offset: .16em; }
 .lesson-answer-fields { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
 .lesson-answer-fields legend { margin-bottom: 8px; padding: 0; }
 .lesson-answer-fields small { display: block; font-weight: 750; }

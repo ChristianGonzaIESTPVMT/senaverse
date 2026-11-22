@@ -1,7 +1,8 @@
 import { memo, useId, useRef, useState } from 'react';
 import { BookOpen, RotateCcw } from 'lucide-react';
 import { PracticeCamera } from './PracticeCamera';
-import { mineduGuidePdf, recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
+import { recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
+import { getEducationalSignForClass } from '../data/library';
 import { loadEducationModel } from '../features/sign-recognition/educationModel';
 import { useRecognition } from '../features/sign-recognition/useRecognition';
 import { RECOGNITION_STATES } from '../features/sign-recognition/liveRecognition';
@@ -31,7 +32,8 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
   const { mode, result, modelState, cameraActive } = recognition;
   const targetId = mode.type === 'directed' ? mode.targetId : '';
   const confirmed = result.confirmation && recognitionSignsById.get(result.confirmation.signId);
-  const reference = targetId ? recognitionSignsById.get(targetId) : confirmed;
+  const entry = getEducationalSignForClass(targetId || confirmed?.id || '');
+  const reference = guided?.reference ?? entry?.reference;
 
   function selectTarget(signId: string) {
     setShowUnavailable(false);
@@ -91,13 +93,12 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
           </>}
         </section>
         <section className="practice-panel practice-recognition-result">
-          <h2>{reference ? `Cómo hacer «${reference.name}»` : 'Cómo practicar'}</h2>
-          {reference ? <>
-            <p>{guided?.instruction ?? reference.instructions}</p>
-            {guided ? <a className="practice-reference-link" href={guided.reference.url} target="_blank" rel="noopener noreferrer">
-              <BookOpen size={18} aria-hidden="true" /> {guided.reference.title} (nueva pestaña)
-            </a> : reference.sourceReference && <a className="practice-reference-link" href={`${mineduGuidePdf}#page=${reference.sourceReference.page}`}
-              target="_blank" rel="noopener noreferrer"><BookOpen size={18} aria-hidden="true" /> Ver la guía ilustrada del MINEDU, pág. {reference.sourceReference.page} (nueva pestaña)</a>}
+          <h2>{entry ? `Cómo hacer «${entry.word}»` : 'Cómo practicar'}</h2>
+          {entry ? <>
+            <p>{guided?.instruction ?? entry.instructions}</p>
+            {reference && <a className="practice-reference-link" href={reference.url} target="_blank" rel="noopener noreferrer">
+              <BookOpen size={18} aria-hidden="true" /> {reference.title} (nueva pestaña)
+            </a>}
           </> : <p>Mantén las posturas estáticas hasta la confirmación. Para las señas dinámicas, realiza el movimiento completo.</p>}
         </section>
       </div>

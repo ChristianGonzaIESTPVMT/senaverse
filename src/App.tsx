@@ -16,7 +16,6 @@ import { LibraryPage } from './pages/LibraryPage';
 import { MinigamesPage } from './pages/MinigamesPage';
 import { SituationResultsPage } from './pages/SituationResultsPage';
 import { SituationsPage } from './pages/SituationsPage';
-import { useSituationProgress } from './hooks/useSituationProgress';
 import { useLearningActivity } from './hooks/useLearningActivity';
 import './App.css';
 import './components/StudentLayout.css';
@@ -35,7 +34,6 @@ const RecognitionLabPage = import.meta.env.DEV && import.meta.env.MODE === 'deve
   ? lazy(() => import('./pages/RecognitionLabPage')) : null;
 
 function StudentApp() {
-  const situationProgress = useSituationProgress();
   const learning = useLearningActivity();
   const { progress, recordActivity } = useStudentProgress();
   const { completed } = summarizeProgress(progress);
@@ -60,10 +58,10 @@ function StudentApp() {
         <Route path="/camara/desafio" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo el desafío…</p>}><SignChallengePage /></Suspense></StudentLayout>} />
         <Route path="/camara/*" element={<Navigate to="/camara" replace />} />
         <Route path="/minijuegos" element={<StudentLayout><MinigamesPage /></StudentLayout>} />
-        <Route path="/simulador" element={<StudentLayout><SituationsPage progress={situationProgress} /></StudentLayout>} />
-        <Route path="/simulador/:situationId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage progress={situationProgress} /></Suspense></StudentLayout>} />
-        <Route path="/simulador/:situationId/escena/:sceneId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage progress={situationProgress} /></Suspense></StudentLayout>} />
-        <Route path="/simulador/:situationId/resultados" element={<StudentLayout><SituationResultsPage progress={situationProgress} /></StudentLayout>} />
+        <Route path="/simulador" element={<StudentLayout><SituationsPage /></StudentLayout>} />
+        <Route path="/simulador/:situationId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage /></Suspense></StudentLayout>} />
+        <Route path="/simulador/:situationId/escena/:sceneId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage /></Suspense></StudentLayout>} />
+        <Route path="/simulador/:situationId/resultados" element={<StudentLayout><SituationResultsPage /></StudentLayout>} />
         <Route path="/simulador/*" element={<Navigate to="/simulador" replace />} />
         <Route path="/progreso" element={<StudentLayout><ProgressPage /></StudentLayout>} />
         <Route path="/perfil" element={<StudentLayout><ProfilePage /></StudentLayout>} />

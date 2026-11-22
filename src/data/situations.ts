@@ -6,7 +6,7 @@ export type SituationScene = {
   title: string;
   context: string;
   question: string;
-  optionIds: [string, string, string];
+  optionIds: readonly [string, string, ...string[]];
   expectedSignId: string;
   explanation: string;
 };
@@ -16,19 +16,25 @@ export type Situation = {
   title: string;
   difficulty: SituationDifficulty;
   description: string;
-  illustration: 'institute' | 'meeting' | 'shop' | 'library';
+  context: string;
+  objectives: readonly string[];
+  rewardXp?: number;
+  illustration: 'institute' | 'meeting' | 'shop' | 'library' | 'food' | 'numbers';
   illustrationSrc?: string;
   scenes: SituationScene[];
 };
 
-// Escenarios de demostración. La verificación de las señas está pendiente.
-// Para sustituir una ilustración, agrega su ruta local en illustrationSrc.
-export const situations: Situation[] = [
+const SITUATION_XP = 40;
+
+// Preserve original URLs and saved responses from the questionnaire prototype.
+const originalSituations: Situation[] = [
   {
     id: 'instituto',
     title: 'Un día en el instituto',
     difficulty: 'basico',
     description: 'Saluda, despídete, agradece y pide ayuda en el instituto.',
+    context: 'Encuentros breves con tus compañeros durante un día de clases.',
+    objectives: ['Distinguir saludos, agradecimientos y despedidas.'],
     illustration: 'institute',
     scenes: [
       {
@@ -65,6 +71,8 @@ export const situations: Situation[] = [
     title: 'Conociendo a alguien',
     difficulty: 'basico',
     description: 'Preséntate, conoce a otras personas y utiliza expresiones de cortesía.',
+    context: 'Una amiga te presenta a alguien de su grupo de estudio.',
+    objectives: ['Identificar cuándo saludar, aceptar una invitación o agradecer.'],
     illustration: 'meeting',
     scenes: [
       {
@@ -81,8 +89,8 @@ export const situations: Situation[] = [
         title: 'Una invitación a participar',
         context: 'Lucía te pregunta si quieres unirte a su grupo de estudio. Te gustaría participar.',
         question: '¿Cómo expresarías que aceptas su invitación?',
-        optionIds: ['no', 'adios', 'si'],
-        expectedSignId: 'si',
+        optionIds: ['no', 'adios', 'LSP-006'],
+        expectedSignId: 'LSP-006',
         explanation: 'Quieres aceptar la invitación. «Sí» permite expresar una respuesta afirmativa.',
       },
       {
@@ -100,7 +108,10 @@ export const situations: Situation[] = [
     id: 'tienda',
     title: 'Comprando en una tienda',
     difficulty: 'intermedio',
-    description: 'Pregunta por productos, cantidades y finaliza una compra.',
+    description: 'Identifica un producto, elige la cantidad y agradece la atención.',
+    context: 'En la tienda del barrio buscas agua para ti y para un amigo.',
+    objectives: ['Identificar el vocabulario de una compra.', 'Indicar dos unidades en el contexto de la compra.'],
+    rewardXp: SITUATION_XP,
     illustration: 'shop',
     scenes: [
       {
@@ -126,8 +137,8 @@ export const situations: Situation[] = [
         title: 'Una para ti y otra para tu amigo',
         context: 'Decides comprar una botella para ti y una para tu amigo. Te preguntan cuántas necesitas.',
         question: '¿Qué cantidad debes indicar?',
-        optionIds: ['uno', 'dos', 'tres'],
-        expectedSignId: 'dos',
+        optionIds: ['LSP-001', 'LSP-002', 'LSP-003'],
+        expectedSignId: 'LSP-002',
         explanation: 'Una botella para cada persona suma dos botellas. La cantidad que necesitas indicar es «Dos».',
       },
       {
@@ -146,6 +157,8 @@ export const situations: Situation[] = [
     title: 'Necesito ayuda',
     difficulty: 'intermedio',
     description: 'Utiliza expresiones para solicitar orientación y resolver dudas.',
+    context: 'Buscas un libro y pides orientación al personal de la biblioteca.',
+    objectives: ['Identificar una solicitud de ayuda, una confirmación y un agradecimiento.'],
     illustration: 'library',
     scenes: [
       {
@@ -162,8 +175,8 @@ export const situations: Situation[] = [
         title: 'Una pregunta para confirmar',
         context: 'Te muestran el libro que buscabas y te preguntan si es el correcto. Reconoces que sí lo es.',
         question: '¿Qué respuesta permite confirmar que es el libro correcto?',
-        optionIds: ['si', 'no', 'adios'],
-        expectedSignId: 'si',
+        optionIds: ['LSP-006', 'no', 'adios'],
+        expectedSignId: 'LSP-006',
         explanation: 'Has encontrado el libro correcto. «Sí» permite confirmar que es el que necesitas.',
       },
       {
@@ -178,6 +191,100 @@ export const situations: Situation[] = [
     ],
   },
 ];
+
+export const situations: Situation[] = [
+  originalSituations[2],
+  {
+    id: 'comida', title: 'Pidiendo comida', difficulty: 'intermedio', illustration: 'food',
+    description: 'Elige una porción y describe cuánto queda.',
+    context: 'En el comedor eliges una porción y miras qué queda en las bandejas.',
+    objectives: ['Indicar una porción.', 'Distinguir ausencia de abundancia.'], rewardXp: SITUATION_XP,
+    scenes: [
+      { id: 'porcion', title: 'Una porción para el almuerzo',
+        context: 'Almuerzas por tu cuenta y pides exactamente una porción de sopa.',
+        question: '¿Qué número indica cuántas porciones pides?', optionIds: ['LSP-002', 'LSP-003', 'LSP-001'],
+        expectedSignId: 'LSP-001', explanation: 'Has pedido una sola porción, por eso corresponde «Uno».' },
+      { id: 'bandeja-vacia', title: 'Se acabó el pan',
+        context: 'La bandeja de pan está vacía y no hay más pan en la cocina.',
+        question: '¿Qué palabra expresa que no queda pan?', optionIds: ['LSP-007', 'LSP-008', 'LSP-001'],
+        expectedSignId: 'LSP-007', explanation: 'Como la bandeja está vacía, «Nada» expresa que no queda pan.' },
+      { id: 'bandeja-llena', title: 'Arroz para todos',
+        context: 'Ves una bandeja de arroz casi llena. Hay suficiente para todas las personas de la mesa.',
+        question: '¿Qué palabra describe la cantidad abundante de arroz?', optionIds: ['LSP-007', 'LSP-001', 'LSP-008'],
+        expectedSignId: 'LSP-008', explanation: 'Hay arroz en abundancia, así que corresponde «Mucho».' },
+    ],
+  },
+  {
+    id: 'preguntas', title: 'Respondiendo preguntas', difficulty: 'basico', illustration: 'library',
+    description: 'Confirma un dato e indica cuando una cantidad es cero.',
+    context: 'En la biblioteca confirmas tu reserva y revisas tus préstamos.',
+    objectives: ['Reconocer una respuesta afirmativa.', 'Identificar el número cero.'], rewardXp: SITUATION_XP,
+    scenes: [
+      { id: 'confirmacion', title: 'El libro reservado',
+        context: 'Te muestran el libro que reservaste. Reconoces la portada y compruebas que es el correcto.',
+        question: 'Te preguntan si ese es tu libro reservado. ¿Qué respuesta afirma que lo es?',
+        optionIds: ['no', 'LSP-006'], expectedSignId: 'LSP-006', explanation: 'El libro coincide con tu reserva. «Sí» expresa esa confirmación.' },
+      { id: 'prestamos', title: 'Préstamos devueltos',
+        context: 'Ya devolviste todos tus libros. Tu cuenta no muestra ningún préstamo pendiente.',
+        question: '¿Qué número indica cuántos préstamos quedan pendientes?', optionIds: ['LSP-001', 'cero'],
+        expectedSignId: 'cero', explanation: 'Devolviste todos los libros. Quedan cero préstamos pendientes.' },
+    ],
+  },
+  {
+    id: 'actividad', title: 'Organizando una actividad', difficulty: 'intermedio', illustration: 'meeting',
+    description: 'Distingue entre participar por tu cuenta y hacerlo en compañía.',
+    context: 'En tu grupo de estudio están repartiendo las tareas de una exposición.',
+    objectives: ['Distinguir si una persona realiza una tarea sola o en compañía.'], rewardXp: SITUATION_XP,
+    scenes: [
+      { id: 'individual', title: 'Una tarea individual',
+        context: 'Te toca preparar el cartel por tu cuenta. Nadie más trabaja contigo en esa tarea.',
+        question: '¿Qué palabra describe que haces la tarea sin compañía?', optionIds: ['LSP-010', 'LSP-009'],
+        expectedSignId: 'LSP-009', explanation: 'Preparas el cartel sin compañía. La opción adecuada es «Solo».' },
+      { id: 'equipo', title: 'Un ensayo en pareja',
+        context: 'Ana estará a tu lado durante el ensayo. Ensayarán juntos.',
+        question: '¿Qué palabra indica que ensayas en compañía de Ana?', optionIds: ['LSP-010', 'LSP-009'],
+        expectedSignId: 'LSP-010', explanation: 'Ana te acompaña durante el ensayo, así que corresponde «Con».' },
+    ],
+  },
+  {
+    id: 'utiles', title: 'Comprando útiles escolares', difficulty: 'basico', illustration: 'institute',
+    description: 'Usa la lista del aula para elegir cuántos útiles comprar.',
+    context: 'Vas a la papelería con la lista de útiles para un trabajo de clase.',
+    objectives: ['Distinguir las cantidades tres y cuatro en una lista de compra.'], rewardXp: SITUATION_XP,
+    scenes: [
+      { id: 'cuadernos', title: 'Cuadernos por curso',
+        context: 'Necesitas un cuaderno para Matemática, uno para Comunicación y uno para Ciencia.',
+        question: '¿Cuántos cuadernos debes comprar?', optionIds: ['LSP-002', 'LSP-003', 'LSP-004'],
+        expectedSignId: 'LSP-003', explanation: 'Necesitas un cuaderno para cada uno de los tres cursos.' },
+      { id: 'lapices', title: 'Materiales para el grupo',
+        context: 'La profesora te pide un lápiz para cada una de las cuatro personas de tu grupo.',
+        question: '¿Qué cantidad de lápices debes llevar?', optionIds: ['LSP-004', 'LSP-005', 'LSP-003'],
+        expectedSignId: 'LSP-004', explanation: 'Hay cuatro personas en el grupo y cada una necesita un lápiz.' },
+    ],
+  },
+  {
+    id: 'cantidad', title: 'Eligiendo una cantidad', difficulty: 'basico', illustration: 'numbers',
+    description: 'Cuenta los materiales entregados y los que faltan.',
+    context: 'Preparas materiales para las personas de un taller.',
+    objectives: ['Elegir el número que representa el total.', 'Indicar una unidad pendiente.'], rewardXp: SITUATION_XP,
+    scenes: [
+      { id: 'total', title: 'Hojas para el taller',
+        context: 'Al taller llegaron cinco personas. Quieres entregar una hoja a cada persona.',
+        question: '¿Cuántas hojas necesitas en total?', optionIds: ['LSP-001', 'LSP-004', 'LSP-005'],
+        expectedSignId: 'LSP-005', explanation: 'Con cinco personas y una hoja para cada una, necesitas cinco hojas.' },
+      { id: 'faltante', title: 'La última hoja',
+        context: 'Has entregado cuatro de las cinco hojas. Todavía queda una persona sin su hoja.',
+        question: '¿Cuántas hojas te falta entregar?', optionIds: ['LSP-005', 'LSP-001', 'cero'],
+        expectedSignId: 'LSP-001', explanation: 'Ya entregaste cuatro hojas de un total de cinco. Falta una.' },
+    ],
+  },
+];
+
+export const allSituations = [...situations, ...originalSituations.filter(situation => situation.id !== 'tienda')];
+
+export function getSituation(id: unknown) {
+  return allSituations.find(situation => situation.id === id);
+}
 
 export function getSituationFilter(value: string | null): SituationFilter {
   return value === 'basico' || value === 'intermedio' ? value : 'todos';
@@ -200,4 +307,13 @@ export function getSituationScenePath(situationId: string, sceneId: string, filt
 export function getSituationResultsPath(situationId: string, filter: SituationFilter = 'todos') {
   const query = filter === 'todos' ? '' : `?nivel=${filter}`;
   return `/simulador/${encodeURIComponent(situationId)}/resultados${query}`;
+}
+
+export function getSituationReturnPath(value: unknown) {
+  if (!value || typeof value !== 'object' || !('situationId' in value) || !('sceneId' in value)) return;
+  const situation = getSituation(value.situationId);
+  const scene = situation?.scenes.find(item => item.id === value.sceneId);
+  if (!situation || !scene) return;
+  const filter = 'filter' in value && typeof value.filter === 'string' ? getSituationFilter(value.filter) : 'todos';
+  return getSituationScenePath(situation.id, scene.id, filter);
 }

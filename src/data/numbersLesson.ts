@@ -1,18 +1,11 @@
 import type { LessonPlan, Question, StudyStep } from './lessonPlan.ts';
+import { getEducationalSign, numbersReference as reference } from './library.ts';
 
-const reference = {
-  title: 'Ver la lámina del MINEDU · figura 2, página impresa 72',
-  url: 'https://formacionenservicio.minedu.gob.pe/sifods/centro-recurso/2022/Lineas-de-formacion-priorizadas/Mejora-de-Aprendizajes/Atencion-a-la-diversidad/Cartilla/orientaciones-discapacidad-auditiva.pdf#page=14',
-};
-
-// Descriptions checked against the five labeled drawings on the cited plate.
-const signs = [
-  { id: 'LSP-001', name: 'Uno', explanation: 'Queda extendido el índice. Los demás dedos se mantienen flexionados.' },
-  { id: 'LSP-002', name: 'Dos', explanation: 'Quedan extendidos el índice y el medio, uno al lado del otro.' },
-  { id: 'LSP-003', name: 'Tres', explanation: 'Se extienden el pulgar, el índice y el medio.' },
-  { id: 'LSP-004', name: 'Cuatro', explanation: 'Se extienden índice, medio, anular y meñique, con el pulgar recogido.' },
-  { id: 'LSP-005', name: 'Cinco', explanation: 'Se abre la mano y quedan extendidos los cinco dedos.' },
-];
+const signs = ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005'].map(id => {
+  const entry = getEducationalSign(id);
+  if (!entry?.instructions) throw new Error(`Falta la descripción educativa de ${id}.`);
+  return { id, name: entry.word, explanation: entry.instructions };
+});
 
 const options = signs.map(({ id, name }) => ({ id, label: name }));
 const configurations = [

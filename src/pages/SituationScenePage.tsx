@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Camera, CheckCircle2, ClipboardList, Info, Messa
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
-import { libraryEntries } from '../data/library';
+import { getEducationalSign } from '../data/library';
 import { getSituationFilter, getSituationPath, getSituationResultsPath, getSituationScenePath, getSituationsPath, situations, type Situation, type SituationFilter, type SituationScene } from '../data/situations';
 import type { SituationProgress } from '../hooks/useSituationProgress';
 
@@ -29,7 +29,7 @@ function SituationSceneContent({ situation, scene, filter, progress }: { situati
   const sceneIndex = situation.scenes.findIndex(item => item.id === scene.id);
   const answer = progress.sessions[situation.id]?.answers[scene.id];
   const isCorrect = answer?.checked && answer.choiceId === scene.expectedSignId;
-  const expectedSign = libraryEntries.find(sign => sign.id === scene.expectedSignId);
+  const expectedSign = scene.expectedSignId ? getEducationalSign(scene.expectedSignId) : undefined;
 
   return (
     <div className="situation-scene-page">
@@ -63,7 +63,7 @@ function SituationSceneContent({ situation, scene, filter, progress }: { situati
             <fieldset className="situation-options">
               <legend className="sr-only">Elige una alternativa</legend>
               {scene.optionIds.map((id, index) => {
-                const option = libraryEntries.find(sign => sign.id === id);
+                const option = getEducationalSign(id);
                 const selected = answer?.choiceId === id;
                 const feedbackClass = selected && answer?.checked ? isCorrect ? ' is-correct' : ' is-incorrect' : '';
                 return (

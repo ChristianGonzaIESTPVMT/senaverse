@@ -10,6 +10,7 @@ export const ProfileContext = createContext<{
   saveAvatar: (avatarId: AvatarId) => Promise<void>;
   savePhoto: (blob: Blob) => Promise<void>;
   resetProfile: () => Promise<void>;
+  toggleFavorite: (signId: string) => readonly string[] | null;
 } | null>(null);
 
 export function useStudentProfile() {

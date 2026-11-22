@@ -6,6 +6,7 @@ import { gradeAnswers, type Answers, type LessonPlan, type LessonReference, type
 import { nextStudyStep, type Attempt, type StepProgress, type StudyInput, type StudyRun } from '../data/lessonStudy';
 import { useStudentProgress } from '../hooks/progressContext';
 import { recognitionSignsById } from '../features/sign-recognition/recognitionCatalog';
+import { getEducationalSign, getLibrarySignPath } from '../data/library';
 
 const DirectedLessonPractice = lazy(() => import('./DirectedLessonPractice'));
 const emptyResponses: Record<string, string> = {};
@@ -132,9 +133,14 @@ export function LessonSequence({ lessonId, plan, unitPath }: { lessonId: string;
           <p>Tu finalización anterior sigue registrada. Puedes recorrer esta versión de la lección.</p>}</>}
       {step?.kind === 'study' && <>
         <p>{step.text}</p><Reference reference={step.reference} />
-        <dl className="lesson-number-list">{step.signs.map(sign => <div key={sign.id}><dt>{sign.name}</dt><dd>{sign.explanation}</dd>
-          <dd className="lesson-sign-availability">{recognitionSignsById.has(sign.id) ? 'Reconocimiento experimental disponible' : 'Contenido de estudio'}</dd>
-        </div>)}</dl>
+          <dl className="lesson-number-list">{step.signs.map(sign => {
+            const entry = getEducationalSign(sign.id);
+            return <div key={sign.id}>
+              <dt>{sign.name}</dt><dd>{sign.explanation}</dd>
+              <dd className="lesson-sign-availability">{entry?.recognitionClassId ? 'Reconocimiento experimental disponible' : 'Contenido de estudio'}</dd>
+              {entry && <dd><Link to={getLibrarySignPath(entry.id)} aria-label={`Ver ficha de ${sign.name} en Biblioteca`}>Ver ficha en Biblioteca</Link></dd>}
+            </div>;
+          })}</dl>
         <p className="lesson-warning">La lección se basa en la lámina del MINEDU. La revisión lingüística del contenido en SeñaVerse está pendiente.</p>
       </>}
       {(step?.kind === 'question' || step?.kind === 'assessment') && <Questions questions={step.questions} method="answers"

@@ -1,6 +1,8 @@
 import { restoreProgress, summarizeProgress, type StudentProgress } from './progress.ts';
+import { getEducationalSign, normalizeLibrarySignIds } from './library.ts';
 
 export const PROFILE_KEY = 'senaverse-student-profile-v1';
+export const LEGACY_FAVORITES_KEY = 'senaverse-library-saved-v1';
 export const PROFILE_NAME_LIMIT = 40;
 export const PROFILE_BIO_LIMIT = 180;
 
@@ -16,7 +18,7 @@ export const profileAvatars = [
 export type AvatarId = typeof profileAvatars[number]['id'];
 export type PersonalInfo = { displayName: string; bio: string };
 export type PersonalInfoErrors = Partial<Record<keyof PersonalInfo, string>>;
-export type StudentProfile = PersonalInfo & { version: 1; avatarId: AvatarId; photoId?: string };
+export type StudentProfile = PersonalInfo & { version: 1; avatarId: AvatarId; photoId?: string; favoriteSignIds?: string[] };
 
 export const isPhotoId = (value: unknown): value is string => typeof value === 'string' && /^photo-[a-zA-Z0-9-]{8,80}$/.test(value);
 
@@ -39,9 +41,17 @@ export function validatePersonalInfo(input: PersonalInfo) {
   return { value, errors };
 }
 
+function readLegacyFavorites(stored: string | null) {
+  try {
+    const value: unknown = JSON.parse(stored ?? 'null');
+    if (Array.isArray(value)) return normalizeLibrarySignIds(value);
+  } catch { /* Unreadable bookmarks have no effect on profile recovery. */ }
+}
+
 /** Only known fields from the supported schema enter the shared profile. */
-export function restoreProfile(stored: string | null): StudentProfile {
-  const fallback = defaultProfile();
+export function restoreProfile(stored: string | null, legacyFavorites: string | null = null): StudentProfile {
+  const migrated = readLegacyFavorites(legacyFavorites);
+  const fallback = { ...defaultProfile(), ...(migrated && { favoriteSignIds: migrated }) };
   try {
     const parsed: unknown = JSON.parse(stored ?? 'null');
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !('version' in parsed) || parsed.version !== 1) return fallback;
@@ -56,8 +66,18 @@ export function restoreProfile(stored: string | null): StudentProfile {
       bio: errors.bio ? fallback.bio : value.bio,
       avatarId: isAvatarId(source.avatarId) ? source.avatarId : fallback.avatarId,
       ...(isPhotoId(source.photoId) ? { photoId: source.photoId } : {}),
+      ...(Array.isArray(source.favoriteSignIds) ? { favoriteSignIds: normalizeLibrarySignIds(source.favoriteSignIds) }
+        : migrated ? { favoriteSignIds: migrated } : {}),
     };
   } catch { return fallback; }
+}
+
+export function toggleFavoriteSign(profile: StudentProfile, id: string): StudentProfile {
+  const entry = getEducationalSign(id);
+  if (!entry) return profile;
+  const current = profile.favoriteSignIds ?? [];
+  const favoriteSignIds = current.includes(entry.id) ? current.filter(item => item !== entry.id) : [...current, entry.id];
+  return { ...profile, favoriteSignIds };
 }
 
 export function createProfileExport(profile: StudentProfile, progress: StudentProgress, exportedAt = new Date().toISOString()) {
