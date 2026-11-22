@@ -1,27 +1,27 @@
-import { ArrowLeft, ClipboardList, Info, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ClipboardList, RotateCcw } from 'lucide-react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs } from '../components/SituationContent';
-import { getSituationFilter, getSituationScenePath, getSituationsPath, situations } from '../data/situations';
-import type { SituationProgress } from '../hooks/useSituationProgress';
+import { getEducationalSign } from '../data/library';
+import { summarizeSituation } from '../data/situationStudy';
+import { getSituation, getSituationFilter, getSituationPath, getSituationScenePath, getSituationsPath } from '../data/situations';
+import { useStudentProgress } from '../hooks/progressContext';
 
-export function SituationResultsPage({ progress }: { progress: SituationProgress }) {
+export function SituationResultsPage() {
+  const { progress, recordActivity } = useStudentProgress();
   const { situationId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const filter = getSituationFilter(searchParams.get('nivel'));
-  const situation = situations.find(item => item.id === situationId);
+  const situation = getSituation(situationId);
   if (!situation) return <Navigate to={getSituationsPath(filter)} replace />;
 
-  const answers = progress.sessions[situation.id]?.answers;
-  const correctCount = situation.scenes.filter(scene => {
-    const answer = answers?.[scene.id];
-    return answer?.checked && answer.choiceId === scene.expectedSignId;
-  }).length;
+  const run = progress.situationStudy?.[situation.id];
+  const summary = summarizeSituation(situation, run);
+  const reward = progress.activities.find(activity => activity.id === `situation:${situation.id}`)?.rewardXp;
 
-  function repeatSituation() {
-    if (!situation) return;
-    progress.resetSituation(situation.id);
-    navigate(getSituationScenePath(situation.id, situation.scenes[0].id, filter), { replace: true });
+  function repeatSituation(id: string, firstScene: string) {
+    recordActivity({ type: 'situation-repeat', situationId: id });
+    navigate(getSituationScenePath(id, firstScene, filter), { replace: true });
   }
 
   return (
@@ -29,18 +29,32 @@ export function SituationResultsPage({ progress }: { progress: SituationProgress
       <SituationBreadcrumbs situation={situation} current="Resumen" filter={filter} />
       <section className="situation-results-panel" aria-labelledby="situation-results-title">
         <span className="situation-results-icon" aria-hidden="true"><ClipboardList size={36} /></span>
-        <span className="situation-sample-label">Situación en preparación</span>
+        <span className="situation-sample-label">{run?.completedAt ? 'Situación finalizada' : run ? 'En curso' : 'Por comenzar'}</span>
         <h1 id="situation-results-title">Resumen de la situación</h1>
         <p className="situation-results-name">{situation.title}</p>
         <dl className="situation-results-metrics">
-          <div><dt>Estado de la situación</dt><dd>En preparación</dd></div>
-          <div><dt>Escenas superadas</dt><dd>Pendientes de verificación</dd></div>
-          <div><dt>Respuestas correctas</dt><dd>{correctCount} de {situation.scenes.length}</dd></div>
-          <div><dt>Señas verificadas</dt><dd>Reconocimiento pendiente</dd></div>
+          <div><dt>Interacciones completadas</dt><dd>{summary.completed} de {situation.scenes.length}</dd></div>
+          <div><dt>Comprensión del contexto</dt><dd>{summary.correct} {summary.correct === 1 ? 'adecuada' : 'adecuadas'} · {summary.incorrect} por revisar</dd>
+            {summary.errors > summary.incorrect && <small>{summary.errors} intentos incorrectos en total</small>}</div>
+          <div><dt>Coincidencias experimentales guardadas</dt><dd>{summary.camera}</dd></div>
+          <div><dt>Ejercicios sin cámara</dt><dd>{summary.alternative}</dd></div>
         </dl>
-        <p className="situation-results-note"><Info size={20} aria-hidden="true" /><span>Las respuestas reflejan las alternativas que has comprobado. Los resultados completos se habilitarán al integrar la verificación de señas.</span></p>
+        <ol className="situation-result-scenes" aria-label="Resultado por interacción">
+          {situation.scenes.map(scene => {
+            const answer = run?.scenes[scene.id];
+            const selected = answer && getEducationalSign(answer.choiceId);
+            return <li key={scene.id}>
+              <strong>{scene.title}</strong>
+              <span>{selected ? `${selected.word} · ${!answer.checked ? 'Por comprobar' : answer.choiceId === scene.expectedSignId ? 'Adecuada al contexto' : 'Por revisar'}` : 'Respuesta pendiente'}</span>
+              {answer?.practice && <span>{answer.practice.method === 'camera' ? 'Cámara experimental' : 'Ejercicio sin cámara'}</span>}
+            </li>;
+          })}
+        </ol>
+        {reward && <p className="situation-results-note">{reward} XP otorgados por la primera finalización de esta situación.</p>}
         <div className="situation-navigation">
-          <button className="button button-primary" type="button" onClick={repeatSituation}><RotateCcw size={18} aria-hidden="true" /> Repetir situación</button>
+          {run?.completedAt ? <button className="button button-primary" type="button" onClick={() => repeatSituation(situation.id, situation.scenes[0].id)}>
+            <RotateCcw size={18} aria-hidden="true" /> Repetir situación
+          </button> : <Link className="button button-primary" to={getSituationPath(situation.id, filter)}>{run ? 'Continuar situación' : 'Comenzar situación'}</Link>}
           <Link className="button button-outline" to={getSituationsPath(filter)}><ArrowLeft size={18} aria-hidden="true" /> Volver a Situaciones</Link>
         </div>
       </section>

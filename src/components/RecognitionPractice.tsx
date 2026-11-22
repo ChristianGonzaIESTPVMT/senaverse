@@ -14,7 +14,7 @@ const PracticePreview = memo(PracticeCamera);
 export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
   initialSign?: string;
   onConfirmed?: (event: RecognitionConfirmation) => void;
-  guided?: { targetId: string; instruction: string; reference: LessonReference; onAccept: (signId: string) => void };
+  guided?: { targetId: string; instruction: string; reference: LessonReference; onAccept: (signId: string) => void; acceptLabel?: string };
 }) {
   const initial = resolvePracticeSign(guided?.targetId ?? initialSign);
   const [confirmedMatch, setConfirmedMatch] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided }: {
           </button>
           {guided && confirmedMatch === guided.targetId && <>
             <p>Coincidencia experimental disponible para registrar en este intento.</p>
-            <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>Guardar práctica y continuar</button>
+            <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>{guided.acceptLabel ?? 'Guardar práctica y continuar'}</button>
           </>}
         </section>
         <section className="practice-panel practice-recognition-result">

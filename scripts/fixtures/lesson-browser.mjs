@@ -8,7 +8,7 @@ const route = '/academia/unidad/2/leccion/numeros';
 const storage = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
 const allReleased = 'window.labStreams.flatMap(s => s.getTracks()).every(t => t.readyState === "ended") && window.labWorkers.every(w => w.ended)';
 
-async function loadTraces(datasetPath) {
+export async function loadTraces(datasetPath) {
   const model = parseLabModel(JSON.parse(await readFile('public/models/lsp-v1.json', 'utf8')));
   const { samples } = JSON.parse(await readFile(datasetPath, 'utf8'));
   const aspect = sample => sample.captureMetadata.configuration.processingWidth / sample.captureMetadata.configuration.processingHeight;
@@ -30,6 +30,28 @@ async function loadTraces(datasetPath) {
   const traces = { correct: posture('LSP-001'), different: posture('LSP-002'), unknown };
   for (const key of Object.keys(traces)) assert.ok(traces[key], `Se requiere una captura real utilizable para ${key}.`);
   return traces;
+}
+
+export async function replayTrace(evaluate, until, sample, expected) {
+  const frames = sample.frames.map(frame => ({ time: frame.timestampMs, result: {
+    landmarks: frame.hands.map(hand => hand.landmarks), handedness: frame.hands.map(hand => hand.handedness),
+  } }));
+  await evaluate(`(() => {
+    const result = document.querySelector('.practice-student-result');
+    window.studentTrace = { frames: ${JSON.stringify(frames)}, cursor: 0, started: null, statuses: new Set() };
+    window.studentTrace.observer = new MutationObserver(() => window.studentTrace.statuses.add(result.textContent));
+    window.studentTrace.observer.observe(result, { subtree: true, childList: true, characterData: true });
+  })()`);
+  try {
+    await until(expected, () => evaluate(`[...window.studentTrace.statuses].some(status => status.includes(${JSON.stringify(expected)}))`));
+  } catch (error) {
+    const diagnostics = await evaluate(`({ statuses: [...window.studentTrace.statuses], cursor: window.studentTrace.cursor,
+      size: [...document.querySelectorAll('video')].map(video => [video.videoWidth, video.videoHeight]),
+      workers: window.labWorkers.map(worker => [worker.ended, worker.results]) })`);
+    throw new Error(`${error.message}. ${JSON.stringify(diagnostics)}`, { cause: error });
+  } finally {
+    await evaluate('window.studentTrace.observer.disconnect(); window.studentTrace = null');
+  }
 }
 
 export async function checkLesson({ send, evaluate, requests }, origin, until, datasetPath) {
@@ -101,21 +123,13 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
     await click('Practicar con cámara');
     await activate();
     await until('cámara reactivada', () => evaluate('document.querySelector(".practice-camera-button").textContent.includes("Desactivar")'));
-    async function replay(sample, expected) {
-      const frames = sample.frames.map(frame => ({ time: frame.timestampMs, result: {
-        landmarks: frame.hands.map(hand => hand.landmarks), handedness: frame.hands.map(hand => hand.handedness),
-      } }));
-      await evaluate(`window.studentTrace = { frames: ${JSON.stringify(frames)}, cursor: 0, started: null }`);
-      await status(expected);
-      await evaluate('window.studentTrace = null');
-    }
-    await replay(traces.different, 'confirmó una seña distinta');
+    await replayTrace(evaluate, until, traces.different, 'confirmó una seña distinta');
     assert.equal(await evaluate('document.body.textContent.includes("Guardar práctica y continuar")'), false);
     await click('Reintentar práctica');
-    await replay(traces.unknown, 'Gesto no reconocido');
+    await replayTrace(evaluate, until, traces.unknown, 'Gesto no reconocido');
     assert.equal(await evaluate('document.body.textContent.includes("Guardar práctica y continuar")'), false);
     await click('Reintentar práctica');
-    await replay(traces.correct, 'Coincide con la seña');
+    await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
     assert.equal(await evaluate(`(${storage}).lessonStudy.numeros.steps["practica-1"] === undefined`), true);
     await click('Guardar práctica y continuar');
     await step('Practica «Dos»');

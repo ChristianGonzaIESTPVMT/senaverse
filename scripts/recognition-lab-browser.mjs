@@ -10,12 +10,15 @@ import { simulate } from '../ml/scripts/replay_session.mjs';
 import { parseLabModel } from '../src/features/sign-recognition/labModel.ts';
 import { checkLesson } from './fixtures/lesson-browser.mjs';
 import { checkLibrary } from './fixtures/library-browser.mjs';
+import { checkSituations } from './fixtures/situation-browser.mjs';
+import { checkMinigames } from './fixtures/minigames-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
 const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
-  'library-development', 'library-production'].includes(mode));
+  'library-development', 'library-production', 'situation-development', 'situation-production',
+  'minigames-development', 'minigames-production'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -46,10 +49,11 @@ function protocol(socket) {
   function send(method, params = {}) {
     const next = ++id;
     return new Promise((resolve, reject) => {
+      const timeout = method === 'Page.navigate' || method === 'Page.reload' ? 30000 : 8000;
       const timer = setTimeout(() => {
         pending.delete(next);
         reject(new Error('Chromium no respondió a ' + method));
-      }, 8000);
+      }, timeout);
       pending.set(next, item => {
         clearTimeout(timer);
         if (item.error) reject(new Error(JSON.stringify(item.error))); else resolve(item.result);
@@ -218,6 +222,7 @@ try {
   const profile = join(directory, 'chrome-profile');
   browser = spawn(executable, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--disable-background-networking',
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-sync', '--disable-component-update', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
     '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost',
@@ -240,7 +245,7 @@ try {
     window.labWorkers = [];
     window.labWorkerErrors = [];
     window.labBlockModel = true;
-    window.studentBlockModel = ${!mode.startsWith('library-')};
+    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-'].some(prefix => mode.startsWith(prefix))};
     window.studentAttempts = 0;
     const fetchResource = window.fetch.bind(window);
     window.fetch = (resource, options) => (window.labBlockModel && String(resource).endsWith('/__senaverse/recognition-v1.json'))
@@ -286,7 +291,11 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('library-')) {
+  if (mode.startsWith('minigames-')) {
+    await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath);
+  } else if (mode.startsWith('situation-')) {
+    await checkSituations({ send, evaluate, requests }, origin, until, datasetPath);
+  } else if (mode.startsWith('library-')) {
     await checkLibrary({ send, evaluate, requests }, origin, until);
   } else if (mode.startsWith('lesson-')) {
     await checkLesson({ send, evaluate, requests }, origin, until, datasetPath);

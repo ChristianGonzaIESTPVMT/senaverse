@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Hand, Heart, LayoutGrid, Search, SearchX, Soup, Sparkles, UsersRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { SignHandDiagram } from '../components/SignHandDiagram';
 import { getEducationalSign, libraryCategories, searchLibrary, type LibraryCategory, type LibraryEntry } from '../data/library';
 import { getLessonPath } from '../data/curriculum';
 import { getFreePracticePath } from '../data/practice';
+import { getSituationReturnPath } from '../data/situations';
+import { getMinigameReturnPath } from '../data/minigames';
 import { useStudentProgress } from '../hooks/progressContext';
 import { useStudentProfile } from '../hooks/profileContext';
 
@@ -44,6 +47,8 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const requested = params.get('sena');
   const selected = requested === null ? undefined : getEducationalSign(requested);
+  const situationReturn = getSituationReturnPath(location.state?.situationReturn);
+  const minigameReturn = getMinigameReturnPath(location.state?.minigameReturn);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [compatible, setCompatible] = useState(false);
@@ -233,7 +238,8 @@ export function LibraryPage() {
               <source src={selected.videoSrc} />
               {selected.captionsSrc && <track kind="captions" src={selected.captionsSrc} srcLang="es" label="Español" default />}
               Tu navegador no admite la reproducción de este video.
-            </video> : selected.thumbnailSrc && <img className="library-video" src={selected.thumbnailSrc} alt={`Referencia de ${selected.word}`} />}
+            </video> : selected.thumbnailSrc ? <img className="library-video" src={selected.thumbnailSrc} alt={`Referencia de ${selected.word}`} />
+              : selected.handDiagram && <div className="game-diagram"><SignHandDiagram diagram={selected.handDiagram} /></div>}
             <div className="library-meaning">
               <BookOpen size={20} aria-hidden="true" />
               <div>
@@ -254,6 +260,8 @@ export function LibraryPage() {
               target="_blank" rel="noopener noreferrer">{selected.source.title}{selected.source.page && `, p. ${selected.source.page}`}</a></p>}
             {selected.reference && !selected.recognitionClassId && <p>Usa la lámina para repasar la postura a tu ritmo.</p>}
             <div className="library-dialog-actions">
+              {situationReturn && <Link className="button button-outline" to={situationReturn}>Volver a la situación</Link>}
+              {minigameReturn && <Link className="button button-outline" to={minigameReturn}>Volver al desafío</Link>}
               {selected.recognitionClassId && <Link className="button button-primary" to={getFreePracticePath(selected.recognitionClassId)}>
                 <Camera size={18} aria-hidden="true" /> Practicar con cámara
               </Link>}

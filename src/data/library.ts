@@ -11,6 +11,9 @@ export const libraryCategories = [
 ] as const;
 
 export type LibraryCategory = typeof libraryCategories[number]['id'];
+export type Finger = 'thumb' | 'index' | 'middle' | 'ring' | 'little';
+export type HandDiagram = { extended: readonly Finger[]; description: string };
+const fingerNames = { thumb: 'pulgar', index: 'índice', middle: 'medio', ring: 'anular', little: 'meñique' } satisfies Record<Finger, string>;
 
 export type LibraryEntry = {
   id: string;
@@ -24,6 +27,7 @@ export type LibraryEntry = {
   videoSrc?: string;
   captionsSrc?: string;
   instructions?: string;
+  handDiagram?: HandDiagram;
   type?: 'static' | 'dynamic';
   hands?: 1 | 2;
   source?: { title: string; publisher: string; url: string; page?: number };
@@ -61,12 +65,12 @@ export const numbersReference = {
 };
 const numbersSource = { title: 'Orientaciones para la atención de estudiantes con discapacidad auditiva',
   publisher: 'Ministerio de Educación del Perú', url: numbersReference.url, page: 72 };
-const numbersGuide = new Map<string, { number: string; tone: LibraryEntry['tone']; instructions: string }>([
-  ['LSP-001', { number: '1', tone: 'lavender', instructions: 'Queda extendido el índice. Los demás dedos se mantienen flexionados.' }],
-  ['LSP-002', { number: '2', tone: 'blue', instructions: 'Quedan extendidos el índice y el medio, uno al lado del otro.' }],
-  ['LSP-003', { number: '3', tone: 'mint', instructions: 'Se extienden el pulgar, el índice y el medio.' }],
-  ['LSP-004', { number: '4', tone: 'peach', instructions: 'Se extienden índice, medio, anular y meñique, con el pulgar recogido.' }],
-  ['LSP-005', { number: '5', tone: 'lavender', instructions: 'Se abre la mano y quedan extendidos los cinco dedos.' }],
+const numbersGuide = new Map<string, { number: string; tone: LibraryEntry['tone']; instructions: string; extended: Finger[] }>([
+  ['LSP-001', { number: '1', tone: 'lavender', instructions: 'Queda extendido el índice. Los demás dedos se mantienen flexionados.', extended: ['index'] }],
+  ['LSP-002', { number: '2', tone: 'blue', instructions: 'Quedan extendidos el índice y el medio, uno al lado del otro.', extended: ['index', 'middle'] }],
+  ['LSP-003', { number: '3', tone: 'mint', instructions: 'Se extienden el pulgar, el índice y el medio.', extended: ['thumb', 'index', 'middle'] }],
+  ['LSP-004', { number: '4', tone: 'peach', instructions: 'Se extienden índice, medio, anular y meñique, con el pulgar recogido.', extended: ['index', 'middle', 'ring', 'little'] }],
+  ['LSP-005', { number: '5', tone: 'lavender', instructions: 'Se abre la mano y quedan extendidos los cinco dedos.', extended: ['thumb', 'index', 'middle', 'ring', 'little'] }],
 ]);
 const numbersLink = { unitId: 2, lessonId: 'numeros', title: 'Números básicos' };
 const greetingsLink = { unitId: 1, lessonId: 'saludos', title: 'Saludos básicos' };
@@ -91,6 +95,7 @@ const recognizedEntries = recognitionSigns
     const numberSign = numbersGuide.get(sign.id);
     if (numberSign) {
       return { ...shared, tone: numberSign.tone, instructions: numberSign.instructions, category: 'numeros',
+        handDiagram: { extended: numberSign.extended, description: `Postura con ${numberSign.extended.map(finger => fingerNames[finger]).join(', ')} en extensión.` },
         description: `Número ${numberSign.number}`, meaning: `Representa la cantidad ${numberSign.number}.`,
         reference: numbersReference, source: numbersSource, lesson: numbersLink, keywords: [numberSign.number] };
     }

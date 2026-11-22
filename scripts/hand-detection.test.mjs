@@ -200,9 +200,13 @@ test('shared video and overlay use identical CSS mirrors and the educational vie
   const css = await readFile(new URL('../src/pages/CameraPage.css', import.meta.url), 'utf8');
   assert.match(css, /\.practice-camera-preview video \{[^}]*object-fit: cover;[^}]*transform: scaleX\(-1\)/);
   assert.match(css, /\.practice-hand-overlay \{[^}]*transform: scaleX\(-1\)/);
-  for (const path of ['pages/SignChallengePage.tsx', 'components/SituationPracticeStep.tsx']) {
-    assert.match(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'), /<PracticeCamera/);
+  assert.match(await readFile(new URL('../src/pages/SignChallengePage.tsx', import.meta.url), 'utf8'), /<MinigameRunPage viaCamera/);
+  for (const path of ['components/SituationPracticeStep.tsx', 'pages/MinigameRunPage.tsx']) {
+    assert.match(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'), /<GuidedSignPractice/);
   }
+  const practice = await readFile(new URL('../src/components/GuidedSignPractice.tsx', import.meta.url), 'utf8');
+  assert.match(practice, /mode === 'camera'[\s\S]*?<DirectedLessonPractice/);
+  assert.match(await readFile(new URL('../src/components/DirectedLessonPractice.tsx', import.meta.url), 'utf8'), /<RecognitionPractice/);
   assert.match(await readFile(new URL('../src/components/RecognitionPractice.tsx', import.meta.url), 'utf8'), /memo\(PracticeCamera\)/);
   for (const path of ['pages/CameraPage.tsx', 'pages/FreePracticePage.tsx']) {
     assert.match(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'), /<RecognitionPractice/);

@@ -1,10 +1,11 @@
 import { useRef } from 'react';
-import { ArrowRight, Hand, Info, LayoutGrid, MessageSquareText, UserRound, X } from 'lucide-react';
+import { ArrowRight, Info, LayoutGrid, MessageSquareText, UserRound, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
-import { getSituationFilter, getSituationScenePath, situations, type SituationFilter } from '../data/situations';
-import type { SituationProgress } from '../hooks/useSituationProgress';
+import { getSituationFilter, getSituationPath, situations, type SituationFilter } from '../data/situations';
+import { summarizeSituation } from '../data/situationStudy';
+import { useStudentProgress } from '../hooks/progressContext';
 
 const filters: { id: SituationFilter; label: string }[] = [
   { id: 'todos', label: 'Todos' },
@@ -12,7 +13,8 @@ const filters: { id: SituationFilter; label: string }[] = [
   { id: 'intermedio', label: 'Intermedio' },
 ];
 
-export function SituationsPage({ progress }: { progress: SituationProgress }) {
+export function SituationsPage() {
+  const { progress } = useStudentProgress();
   const [searchParams, setSearchParams] = useSearchParams();
   const helpRef = useRef<HTMLDialogElement>(null);
   const filter = getSituationFilter(searchParams.get('nivel'));
@@ -28,10 +30,10 @@ export function SituationsPage({ progress }: { progress: SituationProgress }) {
         <span className="situations-heading-icon" aria-hidden="true"><MessageSquareText strokeWidth={1.8} /></span>
         <div className="situations-heading-copy">
           <h1>Simulador de situaciones</h1>
-          <p>Aplica lo aprendido en conversaciones y contextos de la vida diaria.</p>
+          <p>Elige una respuesta en un contexto cotidiano y practica una seña a la vez.</p>
         </div>
         <div className="situations-heading-art" aria-hidden="true">
-          <UserRound className="situations-hero-person" /><Hand className="situations-hero-hand" />
+          <UserRound className="situations-hero-person" />
         </div>
       </header>
 
@@ -39,7 +41,7 @@ export function SituationsPage({ progress }: { progress: SituationProgress }) {
         <HomeVisual name="progress" />
         <div>
           <h2 id="situations-banner-title">¡Comunícate en la vida real!</h2>
-          <p>Enfrenta escenarios cotidianos, elige la respuesta adecuada y realiza la seña con tu cámara.</p>
+          <p>Consulta la ficha de la seña y elige entre cámara y un ejercicio sin cámara cuando ambos estén disponibles.</p>
         </div>
       </section>
 
@@ -55,13 +57,13 @@ export function SituationsPage({ progress }: { progress: SituationProgress }) {
         <button className="situations-help-button" type="button" aria-haspopup="dialog" aria-controls="situations-help" onClick={() => helpRef.current?.showModal()}><Info size={21} aria-hidden="true" /> ¿Cómo funciona?</button>
       </div>
 
-      <p className="situations-demo-note"><Info size={16} aria-hidden="true" /> Contenido de demostración. La verificación de señas está en preparación.</p>
+      <p className="situations-demo-note"><Info size={16} aria-hidden="true" /> El reconocimiento es experimental. Todas las situaciones se pueden completar sin cámara.</p>
       <span className="sr-only" role="status">{visibleSituations.length} situaciones disponibles en este filtro.</span>
 
       <section className="situations-grid" aria-label="Situaciones cotidianas">
         {visibleSituations.map(situation => {
-          const session = progress.sessions[situation.id];
-          const sceneId = session?.currentSceneId ?? situation.scenes[0].id;
+          const run = progress.situationStudy?.[situation.id];
+          const { completed } = summarizeSituation(situation, run);
           return (
             <article className="situation-card" key={situation.id} aria-labelledby={`situation-${situation.id}`}>
               <SituationIllustration situation={situation} />
@@ -69,11 +71,12 @@ export function SituationsPage({ progress }: { progress: SituationProgress }) {
                 <h2 id={`situation-${situation.id}`}>{situation.title}</h2>
                 <SituationDifficultyBadge difficulty={situation.difficulty} />
                 <p>{situation.description}</p>
+                <p className="situation-card-context">{situation.context}</p>
                 <div className="situation-card-progress">
-                  <span>Progreso · 0 de {situation.scenes.length} escenas</span>
-                  <progress value={0} max={situation.scenes.length} aria-label={`Escenas verificadas de ${situation.title}`} />
+                  <span>{completed} de {situation.scenes.length} interacciones{run?.completedAt && ' · Finalizada'}</span>
+                  <progress value={completed} max={situation.scenes.length} aria-label={`Interacciones completadas de ${situation.title}`} />
                 </div>
-                <Link className="button button-primary situation-start" to={getSituationScenePath(situation.id, sceneId, filter)}>{session ? 'Continuar' : 'Comenzar'}<ArrowRight size={19} aria-hidden="true" /></Link>
+                <Link className="button button-primary situation-start" to={getSituationPath(situation.id, filter)}>{run?.completedAt ? 'Ver resumen' : run ? 'Continuar' : 'Comenzar'}<ArrowRight size={19} aria-hidden="true" /></Link>
               </div>
             </article>
           );
@@ -88,10 +91,10 @@ export function SituationsPage({ progress }: { progress: SituationProgress }) {
           <ol>
             <li>Elige una situación y lee lo que sucede.</li>
             <li>Selecciona una alternativa y comprueba tu respuesta.</li>
-            <li>Practica la seña con la cámara y consulta su demostración.</li>
-            <li>La verificación real habilitará el avance y los resultados de las escenas.</li>
+            <li>Consulta la ficha de la seña elegida y practica con cámara o con un ejercicio alternativo.</li>
+            <li>Avanza por las interacciones y revisa por separado tus respuestas y métodos de práctica.</li>
           </ol>
-          <p>Las situaciones están en demostración mientras se integra el reconocimiento. Puedes guardar tus respuestas y retomarlas después.</p>
+          <p>Tu progreso se guarda en este navegador. Obtienes XP la primera vez que finalizas cada situación del catálogo.</p>
           <button className="button button-primary" type="button" onClick={() => helpRef.current?.close()}>Entendido</button>
         </div>
       </dialog>

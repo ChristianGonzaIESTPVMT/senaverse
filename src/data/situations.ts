@@ -21,13 +21,13 @@ export type Situation = {
   rewardXp?: number;
   illustration: 'institute' | 'meeting' | 'shop' | 'library' | 'food' | 'numbers';
   illustrationSrc?: string;
-  scenes: SituationScene[];
+  scenes: [SituationScene, ...SituationScene[]];
 };
 
 const SITUATION_XP = 40;
 
 // Preserve original URLs and saved responses from the questionnaire prototype.
-const originalSituations: Situation[] = [
+const archivedSituations: Situation[] = [
   {
     id: 'instituto',
     title: 'Un día en el instituto',
@@ -105,54 +105,6 @@ const originalSituations: Situation[] = [
     ],
   },
   {
-    id: 'tienda',
-    title: 'Comprando en una tienda',
-    difficulty: 'intermedio',
-    description: 'Identifica un producto, elige la cantidad y agradece la atención.',
-    context: 'En la tienda del barrio buscas agua para ti y para un amigo.',
-    objectives: ['Identificar el vocabulario de una compra.', 'Indicar dos unidades en el contexto de la compra.'],
-    rewardXp: SITUATION_XP,
-    illustration: 'shop',
-    scenes: [
-      {
-        id: 'llegada',
-        title: 'Al entrar en la tienda',
-        context: 'Entras en una tienda del barrio. La persona que atiende te recibe con un saludo.',
-        question: '¿Qué expresión utilizarías para iniciar la interacción?',
-        optionIds: ['adios', 'gracias', 'hola'],
-        expectedSignId: 'hola',
-        explanation: 'Acabas de llegar y vas a comenzar una interacción. Corresponde responder con «Hola».',
-      },
-      {
-        id: 'producto',
-        title: 'El producto que necesitas',
-        context: 'Después de una caminata tienes sed. Quieres comprar una botella de agua.',
-        question: '¿Qué palabra corresponde al producto que buscas?',
-        optionIds: ['agua', 'comida', 'ayuda'],
-        expectedSignId: 'agua',
-        explanation: 'Buscas una botella para beber agua. La palabra que corresponde a ese producto es «Agua».',
-      },
-      {
-        id: 'cantidad',
-        title: 'Una para ti y otra para tu amigo',
-        context: 'Decides comprar una botella para ti y una para tu amigo. Te preguntan cuántas necesitas.',
-        question: '¿Qué cantidad debes indicar?',
-        optionIds: ['LSP-001', 'LSP-002', 'LSP-003'],
-        expectedSignId: 'LSP-002',
-        explanation: 'Una botella para cada persona suma dos botellas. La cantidad que necesitas indicar es «Dos».',
-      },
-      {
-        id: 'fin-de-compra',
-        title: 'Al finalizar tu compra',
-        context: 'La persona que atiende te entrega tu compra y te ayuda a guardarla.',
-        question: '¿Qué expresión utilizarías para agradecer la atención?',
-        optionIds: ['no', 'hola', 'gracias'],
-        expectedSignId: 'gracias',
-        explanation: 'Has recibido atención y ayuda. Puedes expresar tu agradecimiento con «Gracias».',
-      },
-    ],
-  },
-  {
     id: 'necesito-ayuda',
     title: 'Necesito ayuda',
     difficulty: 'intermedio',
@@ -192,8 +144,57 @@ const originalSituations: Situation[] = [
   },
 ];
 
+const shopSituation: Situation = {
+  id: 'tienda',
+  title: 'Comprando en una tienda',
+  difficulty: 'intermedio',
+  description: 'Identifica un producto, elige la cantidad y agradece la atención.',
+  context: 'En la tienda del barrio buscas agua para ti y para un amigo.',
+  objectives: ['Identificar el vocabulario de una compra.', 'Indicar dos unidades en el contexto de la compra.'],
+  rewardXp: SITUATION_XP,
+  illustration: 'shop',
+  scenes: [
+    {
+      id: 'llegada',
+      title: 'Al entrar en la tienda',
+      context: 'Entras en una tienda del barrio. La persona que atiende te recibe con un saludo.',
+      question: '¿Qué expresión utilizarías para iniciar la interacción?',
+      optionIds: ['adios', 'gracias', 'hola'],
+      expectedSignId: 'hola',
+      explanation: 'Acabas de llegar y vas a comenzar una interacción. Corresponde responder con «Hola».',
+    },
+    {
+      id: 'producto',
+      title: 'El producto que necesitas',
+      context: 'Después de una caminata tienes sed. Quieres comprar una botella de agua.',
+      question: '¿Qué palabra corresponde al producto que buscas?',
+      optionIds: ['agua', 'comida', 'ayuda'],
+      expectedSignId: 'agua',
+      explanation: 'Buscas una botella para beber agua. La palabra que corresponde a ese producto es «Agua».',
+    },
+    {
+      id: 'cantidad',
+      title: 'Una para ti y otra para tu amigo',
+      context: 'Decides comprar una botella para ti y una para tu amigo. Te preguntan cuántas necesitas.',
+      question: '¿Qué cantidad debes indicar?',
+      optionIds: ['LSP-001', 'LSP-002', 'LSP-003'],
+      expectedSignId: 'LSP-002',
+      explanation: 'Una botella para cada persona suma dos botellas. La cantidad que necesitas indicar es «Dos».',
+    },
+    {
+      id: 'fin-de-compra',
+      title: 'Al finalizar tu compra',
+      context: 'La persona que atiende te entrega tu compra y te ayuda a guardarla.',
+      question: '¿Qué expresión utilizarías para agradecer la atención?',
+      optionIds: ['no', 'hola', 'gracias'],
+      expectedSignId: 'gracias',
+      explanation: 'Has recibido atención y ayuda. Puedes expresar tu agradecimiento con «Gracias».',
+    },
+  ],
+};
+
 export const situations: Situation[] = [
-  originalSituations[2],
+  shopSituation,
   {
     id: 'comida', title: 'Pidiendo comida', difficulty: 'intermedio', illustration: 'food',
     description: 'Elige una porción y describe cuánto queda.',
@@ -280,7 +281,7 @@ export const situations: Situation[] = [
   },
 ];
 
-export const allSituations = [...situations, ...originalSituations.filter(situation => situation.id !== 'tienda')];
+export const allSituations = [...situations, ...archivedSituations];
 
 export function getSituation(id: unknown) {
   return allSituations.find(situation => situation.id === id);

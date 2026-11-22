@@ -1,8 +1,8 @@
-import { ArrowLeft, Hand, LibraryBig, MessagesSquare, School, Store, UserRound } from 'lucide-react';
+import { ArrowLeft, Hash, LibraryBig, MessagesSquare, School, Store, UserRound, Utensils } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getSituationPath, getSituationsPath, type Situation, type SituationFilter } from '../data/situations';
 
-const sceneryIcons = { institute: School, meeting: MessagesSquare, shop: Store, library: LibraryBig };
+const sceneryIcons = { institute: School, meeting: MessagesSquare, shop: Store, library: LibraryBig, food: Utensils, numbers: Hash };
 
 export function SituationIllustration({ situation }: { situation: Situation }) {
   const Icon = sceneryIcons[situation.illustration];
@@ -12,7 +12,7 @@ export function SituationIllustration({ situation }: { situation: Situation }) {
       {situation.illustrationSrc ? <img src={situation.illustrationSrc} alt="" /> : <>
         <span className="situation-art-cloud" />
         <Icon className="situation-art-setting" strokeWidth={1.5} />
-        <span className="situation-art-person situation-art-person-left"><UserRound strokeWidth={1.4} /><Hand className="situation-art-hand" strokeWidth={1.6} /></span>
+        <span className="situation-art-person situation-art-person-left"><UserRound strokeWidth={1.4} /></span>
         <span className="situation-art-person situation-art-person-right"><UserRound strokeWidth={1.4} /></span>
       </>}
     </div>

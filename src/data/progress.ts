@@ -1,9 +1,10 @@
 import { getLessonLocation, initialCompletedLessonIds, totalLessons, units } from './curriculum.ts';
 import { getEducationalSign } from './library.ts';
 import { getSituation } from './situations.ts';
-import { minigames } from './minigames.ts';
+import { getMinigame, type Minigame, type GameSettings } from './minigames.ts';
+import { POINTS_PER_SUCCESS, validateGameOutcome, type GameOutcome } from './minigameRun.ts';
 import { nextStudyStep, restoreStudyRun, submitStudyStep, type StudyInput, type StudyRun } from './lessonStudy.ts';
-import { restoreLegacySituations, restoreSituationRun, summarizeSituation, updateSituationRun,
+import { restoreLegacySituations, restoreSituationRun, updateSituationRun,
   type SituationRun, type SituationStudyEvent } from './situationStudy.ts';
 
 export const PROGRESS_KEY = 'senaverse-student-progress-v1';
@@ -17,7 +18,7 @@ type ActivityEvent =
   | { type: 'lesson'; lessonId: string }
   | { type: 'camera'; sessionId: string; signId: string; result: Recognition }
   | { type: 'situation-scene'; situationId: string; sceneId: string; result: Recognition }
-  | { type: 'minigame'; runId: string; gameId: string; score: number; maxScore: number; completed: true };
+  | { type: 'minigame'; runId: string; gameId: string; score: number; maxScore: number; completed: true; details?: GameOutcome };
 type StudyEvent = { type: 'lesson-start' | 'lesson-finish'; lessonId: string }
   | { type: 'lesson-step'; lessonId: string; stepId: string; input: StudyInput };
 export type ProgressEvent = ActivityEvent | StudyEvent | SituationStudyEvent;
@@ -27,7 +28,7 @@ export type ProgressActivity = {
   type: ActivityEvent['type'] | 'situation';
   targetId: string;
   occurredAt: string | null;
-  result?: Recognition | { score: number; maxScore: number };
+  result?: Recognition | { score: number; maxScore: number; details?: GameOutcome };
   rewardXp?: number;
 };
 export type StudentProgress = { version: 1; activities: ProgressActivity[]; consultedSignIds: string[];
@@ -69,11 +70,17 @@ function normalizeActivity(value: unknown): ProgressActivity | null {
     const rewardXp = getSituation(value.targetId)?.rewardXp;
     if (rewardXp && value.rewardXp === rewardXp) return { ...base, type: 'situation', rewardXp };
   }
-  if (value.type === 'minigame' && value.id.startsWith('minigame:') && minigames.some(game => game.id === value.targetId)
+  const game = value.type === 'minigame' && getMinigame(value.targetId);
+  if (game && value.id.startsWith('minigame:') && value.id.length > 'minigame:'.length
     && record(value.result) && typeof value.result.score === 'number' && typeof value.result.maxScore === 'number'
     && Number.isFinite(value.result.score) && Number.isFinite(value.result.maxScore)
     && value.result.maxScore > 0 && value.result.score >= 0 && value.result.score <= value.result.maxScore) {
-    return { ...base, type: 'minigame', result: { score: value.result.score, maxScore: value.result.maxScore } };
+    const { score, maxScore } = value.result;
+    if (value.result.details === undefined) return { ...base, type: 'minigame', result: { score, maxScore } };
+    const details = validateGameOutcome(game, value.result.details);
+    if (details && score === details.correct * POINTS_PER_SUCCESS && maxScore === details.limit * POINTS_PER_SUCCESS) {
+      return { ...base, type: 'minigame', result: { score, maxScore, details } };
+    }
   }
   return null;
 }
@@ -85,6 +92,10 @@ function appendActivity(state: StudentProgress, activity: ProgressActivity): Stu
       return { ...state, activities: state.activities.map(item => item === existing ? activity : item) };
     }
     return state;
+  }
+  if (activity.type === 'minigame' && activity.result && 'details' in activity.result && activity.result.details?.correct
+    && !state.activities.some(item => item.type === 'minigame' && item.targetId === activity.targetId && item.rewardXp)) {
+    activity = { ...activity, rewardXp: getMinigame(activity.targetId)?.rewardXp };
   }
   const activities = [...state.activities, activity];
   if (activity.type === 'situation-scene') {
@@ -157,7 +168,8 @@ export function recordProgressEvent(state: StudentProgress, event: ProgressEvent
     case 'situation-scene': candidate = { id: `situation-scene:${event.situationId}/${event.sceneId}`, type: event.type, targetId: `${event.situationId}/${event.sceneId}`, result: event.result, occurredAt }; break;
     case 'minigame':
       if (event.completed !== true || !event.runId?.trim()) return state;
-      candidate = { id: `minigame:${event.runId}`, type: event.type, targetId: event.gameId, result: { score: event.score, maxScore: event.maxScore }, occurredAt }; break;
+      candidate = { id: `minigame:${event.runId}`, type: event.type, targetId: event.gameId,
+        result: { score: event.score, maxScore: event.maxScore, details: event.details }, occurredAt }; break;
     default: return state;
   }
   const activity = normalizeActivity(candidate);
@@ -193,12 +205,13 @@ export function restoreProgress(stored: string | null, legacy: string | null = n
         }
       }
       if (record(parsed.situationStudy)) {
-        state.situationStudy = {};
+        const runs: Record<string, SituationRun> = {};
+        state.situationStudy = runs;
         for (const [id, value] of Object.entries(parsed.situationStudy)) {
           const situation = getSituation(id);
           const run = situation && restoreSituationRun(situation, value);
           if (!run || !situation) continue;
-          state.situationStudy[id] = run;
+          runs[id] = run;
           if (run.completedAt) state = appendActivity(state, { id: `situation:${id}`, type: 'situation', targetId: id,
             occurredAt: run.completedAt, rewardXp: situation.rewardXp });
         }
@@ -232,20 +245,15 @@ export function summarizeProgress(state: StudentProgress) {
     const done = unit.lessons.filter(lesson => completed.includes(lesson.id)).length;
     return { unit, done, percent: unit.lessons.length ? Math.round(done / unit.lessons.length * 100) : 0 };
   });
-  let situationPractices = 0;
-  for (const [id, run] of Object.entries(state.situationStudy ?? {})) {
-    const situation = getSituation(id);
-    if (situation) situationPractices += summarizeSituation(situation, run).completed;
-  }
-  const situationXp = state.activities.reduce((total, item) => total + (item.rewardXp ?? 0), 0);
+  const activityXp = state.activities.reduce((total, item) => total + (item.rewardXp ?? 0), 0);
   return {
     completed,
     unitProgress,
     percent: totalLessons ? Math.round(completed.length / totalLessons * 100) : 0,
-    practices: state.activities.filter(item => item.type === 'camera').length + lessonCameraPractices + lessonAlternatives + situationPractices,
+    practices: state.activities.filter(item => item.type === 'camera').length + lessonCameraPractices + lessonAlternatives,
     lessonCameraPractices,
     lessonAlternatives,
-    xp: completed.length * LESSON_XP + situationXp,
+    xp: completed.length * LESSON_XP + activityXp,
     achievements: [
       { id: 'first-step', name: 'Primer paso', description: 'Completa tu primera lección.', obtained: completed.length >= 1 },
       { id: 'explorer', name: 'Explorador', description: `Consulta las fichas de ${EXPLORER_SIGN_COUNT} señas diferentes en la Biblioteca.`, obtained: state.consultedSignIds.length >= EXPLORER_SIGN_COUNT },
@@ -266,6 +274,22 @@ export function describeActivity(activity: ProgressActivity) {
       const scene = getSituation(situationId)?.scenes.find(item => item.id === sceneId);
       return `Completaste la escena “${scene?.title ?? sceneId}”`;
     }
-    case 'minigame': return `Finalizaste “${minigames.find(item => item.id === activity.targetId)?.title ?? activity.targetId}”`;
+    case 'minigame': return `Finalizaste “${getMinigame(activity.targetId)?.title ?? activity.targetId}”`;
   }
+}
+
+export function summarizeMinigame(state: StudentProgress, game: Minigame, settings?: GameSettings, limit?: number) {
+  const plays = state.activities.filter(item => item.type === 'minigame' && item.targetId === game.id);
+  let best: { score: number; details: GameOutcome } | undefined;
+  for (const play of plays) {
+    if (!play.result || !('score' in play.result) || !play.result.details) continue;
+    const { score, details } = play.result;
+    if (settings && (details.settings.category !== settings.category || details.settings.difficulty !== settings.difficulty
+      || details.settings.duration !== settings.duration || details.limit !== limit)) continue;
+    if (!best || score > best.score || (score === best.score && (details.errors < best.details.errors
+      || (game.kind === 'memory' && settings && details.errors === best.details.errors && details.elapsedMs < best.details.elapsedMs)))) {
+      best = { score, details };
+    }
+  }
+  return { plays: plays.length, best };
 }

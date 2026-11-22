@@ -15,7 +15,6 @@
 .situations-heading p { margin: 0; color: var(--muted); font-size: clamp(16px, 1.3vw, 21px); line-height: 1.45; }
 .situations-heading-art { position: absolute; right: 0; bottom: 0; width: 160px; height: 140px; overflow: hidden; border-radius: 46% 56% 0 0; background: #e8ddfc; color: #7343cc; transform: rotate(1deg); }
 .situations-hero-person { position: absolute; right: 8px; bottom: -19px; width: 119px; height: 147px; fill: #a78bdf; stroke-width: 1.2; }
-.situations-hero-hand { position: absolute; left: 14px; top: 47px; width: 48px; height: 55px; fill: #f7e3c7; stroke-width: 1.5; transform: rotate(-17deg); }
 
 .situations-banner { position: relative; isolation: isolate; display: flex; align-items: center; gap: 24px; min-height: 110px; overflow: hidden; padding: 21px 27px; border-radius: 22px; background: linear-gradient(115deg, light-dark(#8265df, var(--color-banner-start)), light-dark(#6442cc, var(--color-banner-start)) 58%, light-dark(#5634c5, var(--color-banner-end))); color: #fff; }
 .situations-banner::after { content: ''; position: absolute; z-index: -1; top: -65px; right: -80px; width: 310px; height: 240px; border-radius: 50%; background: light-dark(#b294f94a, color-mix(in srgb, var(--color-banner-end) 29%, transparent)); transform: rotate(-30deg); }
@@ -71,13 +70,15 @@
 .situation-art-person-left { left: -10px; transform: rotate(4deg); }
 .situation-art-person-right { right: -11px; bottom: -27px; width: 104px; height: 147px; color: #856296; transform: rotate(-5deg); }
 .situation-art-person-right > svg:first-child { fill: #d5b5ce; }
-.situation-art-hand { position: absolute; top: 45px; right: -18px; width: 35px; height: 42px; fill: #f6d9ba; color: #a27b7c; transform: rotate(-18deg); }
 .situation-illustration[data-setting='meeting'] { background: linear-gradient(#c6e0f9 0%, #e5f0fb 65%, #c6d9b2 65%); }
 .situation-illustration[data-setting='meeting'] .situation-art-setting { top: 22px; left: calc(50% - 45px); width: 83px; height: 65px; fill: #ede4fb; color: #a387ce; }
 .situation-illustration[data-setting='shop'] { background: linear-gradient(#f4e3cf 0%, #f7ecdf 66%, #dfc4aa 66%); }
 .situation-illustration[data-setting='shop'] .situation-art-setting { top: 8px; fill: #f5c6b2; color: #be8a79; width: 148px; height: 113px; left: calc(50% - 74px); }
 .situation-illustration[data-setting='library'] { background: linear-gradient(#eadccf 0%, #f1e7dc 67%, #d4b99b 67%); }
 .situation-illustration[data-setting='library'] .situation-art-setting { top: 14px; width: 142px; height: 100px; left: calc(50% - 71px); fill: #d8c8ad; color: #9a897b; }
+.situation-illustration[data-setting='food'] { background: linear-gradient(#fbe5d3 65%, #e6c4ab 65%); }
+.situation-illustration[data-setting='numbers'] { background: linear-gradient(#e1daf8 65%, #cec2e9 65%); }
+.situation-illustration:is([data-setting='food'], [data-setting='numbers']) .situation-art-setting { top: 20px; width: 76px; height: 76px; left: calc(50% - 38px); color: #704790; }
 
 .situations-help-dialog { width: min(540px, calc(100% - 28px)); max-height: calc(100svh - 40px); padding: 0; border: 1px solid light-dark(#e1d5f3, var(--color-line)); border-radius: 25px; background: light-dark(#fff, var(--color-card)); color: var(--ink); box-shadow: 0 20px 70px #31204d36; }
 .situations-help-dialog::backdrop { background: #25183f66; backdrop-filter: blur(4px); }
@@ -132,10 +133,22 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 .situation-question-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
 .situation-question-note { margin: 16px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .situation-navigation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 13px; margin-top: 23px; }
-.situation-practice-heading { margin: 0 0 21px; }
+.situation-practice-step { margin-top: 20px; padding: clamp(16px, 3vw, 26px); border: 1px solid var(--color-line); border-radius: 22px; background: var(--color-card); }
+.situation-practice-heading { margin: 0 0 12px; }
 .situation-practice-heading h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 11px; font-size: 26px; line-height: 1.3; font-weight: 950; letter-spacing: -.6px; }
 .situation-practice-heading h2 > svg { flex-shrink: 0; color: var(--violet); }
 .situation-practice-heading p { margin: 0; padding: 13px 16px; border: 1px solid light-dark(#e3d9f3, var(--color-line)); border-radius: 13px; background: light-dark(#f1ebfb, var(--color-surface)); color: var(--muted); font-size: 14px; line-height: 1.6; }
+.situation-practice-reference { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.situation-practice-reference a { color: var(--color-primary); font-weight: 750; text-decoration: underline; text-underline-offset: .16em; }
+.situation-practice-reference small, .situation-card-context, .situation-scene-heading p { color: var(--color-text-secondary); }
+.situation-question-actions > [aria-pressed='true'] { background: var(--color-hover); }
+.situation-alternative, .situation-directed-practice { margin-top: 18px; min-width: 0; }
+.situation-alternative .lesson-answer-fields { max-width: 620px; }
+.situation-scene-heading p { margin-bottom: 0; }
+.situation-objectives { margin-top: 15px; }
+.situation-objectives h3 { margin: 0; font-size: 1rem; }
+.situation-objectives ul { margin: 5px 0 0; padding-inline-start: 20px; color: var(--color-text-secondary); }
+.situation-option:has(input:disabled) { cursor: default; }
 
 .situation-results-panel { display: flex; flex-direction: column; align-items: center; max-width: 760px; margin-inline: auto; padding: 32px; border: 1.5px solid light-dark(#e2d6f5, var(--color-line)); border-radius: 25px; background: light-dark(#ffffffdf, color-mix(in srgb, var(--color-card) 87%, transparent)); box-shadow: 0 3px 7px #4c33810a; text-align: center; }
 .situation-results-icon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 16px; border-radius: 23px; background: light-dark(#eee5fc, var(--color-surface)); color: var(--violet); }
@@ -148,6 +161,8 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 .situation-results-note { display: flex; align-items: flex-start; gap: 10px; align-self: stretch; margin: 0; padding: 15px; border-radius: 13px; background: light-dark(#f2ecfb, var(--color-surface)); color: var(--muted); font-size: 14px; line-height: 1.6; text-align: left; }
 .situation-results-note svg { flex-shrink: 0; margin-top: 2px; color: light-dark(#8968b4, var(--color-text-muted)); }
 .situation-results-panel .situation-navigation { align-self: stretch; }
+.situation-result-scenes { display: grid; gap: 10px; align-self: stretch; margin: 0 0 18px; padding-inline-start: 24px; text-align: start; }
+.situation-result-scenes span { display: block; color: var(--color-text-secondary); }
 
 @media (max-width: 1250px) {
   .situations-heading { gap: 16px; padding-right: 115px; }
@@ -155,7 +170,6 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
   .situations-heading-icon svg { width: 49px; height: 49px; }
   .situations-heading-art { right: -4px; width: 120px; height: 125px; }
   .situations-hero-person { right: -6px; width: 105px; height: 133px; }
-  .situations-hero-hand { left: 4px; top: 39px; width: 41px; }
   .situations-banner { gap: 17px; padding: 20px 23px; }
   .situation-card { grid-template-columns: minmax(115px, .76fr) minmax(0, 1fr); gap: 13px; padding: 12px; border-radius: 21px; }
   .situation-card h2 { font-size: 21px; }

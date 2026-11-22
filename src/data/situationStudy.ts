@@ -1,10 +1,10 @@
-import type { LessonActivity } from './curriculum.ts';
 import { getEducationalSign, type LibraryEntry } from './library.ts';
+import { getHandCountExercise, type ChoiceExercise, type SignPractice } from './signExercises.ts';
 import { allSituations, type Situation, type SituationScene } from './situations.ts';
 
 export const LEGACY_SITUATION_KEY = 'senaverse-situation-answers-v1';
 
-export type SituationPractice = { method: 'camera'; signId: string } | { method: 'alternative'; response: string };
+export type SituationPractice = SignPractice;
 export type SceneStudy = { choiceId: string; attempts: string[]; checked: boolean; practice?: SituationPractice };
 export type SituationRun = { startedAt: string | null; scenes: Record<string, SceneStudy>; completedAt?: string };
 export type SituationStudyEvent = { type: 'situation-start' | 'situation-finish' | 'situation-repeat'; situationId: string }
@@ -25,12 +25,8 @@ function optionId(scene: SituationScene, value: unknown) {
   return sign && scene.optionIds.includes(sign.id) ? sign.id : undefined;
 }
 
-export function getSituationExercise(scene: SituationScene, sign: LibraryEntry): LessonActivity & { type: 'choice' } {
-  if (sign.hands) return {
-    type: 'choice', question: '¿Cuántas manos indica la ficha para esta seña?',
-    options: [{ id: 'one', label: 'Una mano' }, { id: 'two', label: 'Dos manos' }],
-    correctId: sign.hands === 1 ? 'one' : 'two', success: 'Identificaste la cantidad de manos indicada en la ficha.',
-  };
+export function getSituationExercise(scene: SituationScene, sign: LibraryEntry): ChoiceExercise {
+  if (sign.hands) return getHandCountExercise(sign.hands);
   return {
     type: 'choice', question: `¿Qué significado corresponde a «${sign.word}»?`,
     options: scene.optionIds.flatMap(id => {
@@ -112,7 +108,7 @@ export function restoreSituationRun(situation: Situation, value: unknown): Situa
     if (!choiceId || !object(saved)) { ordered = false; continue; }
     const attempts = Array.isArray(saved.attempts) ? saved.attempts.flatMap(id => optionId(scene, id) ?? []) : [];
     const checked = saved.checked === true && attempts.at(-1) === choiceId;
-    const practice = ordered && checked ? restorePractice(scene, choiceId, saved.practice) : undefined;
+    const practice: SituationPractice | undefined = ordered && checked ? restorePractice(scene, choiceId, saved.practice) : undefined;
     run.scenes[scene.id] = { choiceId, attempts, checked, ...(practice && { practice }) };
     ordered = !!practice;
   }

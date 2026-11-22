@@ -27,6 +27,7 @@ import './pages/SituationsPage.css';
 const CameraPage = lazy(() => import('./pages/CameraPage').then(module => ({ default: module.CameraPage })));
 const FreePracticePage = lazy(() => import('./pages/FreePracticePage').then(module => ({ default: module.FreePracticePage })));
 const SignChallengePage = lazy(() => import('./pages/SignChallengePage').then(module => ({ default: module.SignChallengePage })));
+const MinigameRunPage = lazy(() => import('./pages/MinigameRunPage').then(module => ({ default: module.MinigameRunPage })));
 const SituationScenePage = lazy(() => import('./pages/SituationScenePage').then(module => ({ default: module.SituationScenePage })));
 const DatasetStudioPage = import.meta.env.DEV && import.meta.env.MODE === 'development' && import.meta.env.VITE_ENABLE_DATA_COLLECTION === 'true'
   ? lazy(() => import('./pages/DatasetStudioPage')) : null;
@@ -58,6 +59,8 @@ function StudentApp() {
         <Route path="/camara/desafio" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo el desafío…</p>}><SignChallengePage /></Suspense></StudentLayout>} />
         <Route path="/camara/*" element={<Navigate to="/camara" replace />} />
         <Route path="/minijuegos" element={<StudentLayout><MinigamesPage /></StudentLayout>} />
+        <Route path="/minijuegos/:gameId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la partida…</p>}><MinigameRunPage /></Suspense></StudentLayout>} />
+        <Route path="/minijuegos/*" element={<Navigate to="/minijuegos" replace />} />
         <Route path="/simulador" element={<StudentLayout><SituationsPage /></StudentLayout>} />
         <Route path="/simulador/:situationId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage /></Suspense></StudentLayout>} />
         <Route path="/simulador/:situationId/escena/:sceneId" element={<StudentLayout><Suspense fallback={<p role="status">Abriendo la situación…</p>}><SituationScenePage /></Suspense></StudentLayout>} />

@@ -2,12 +2,14 @@ import { RecognitionPractice } from './RecognitionPractice';
 import { recognitionSignsById } from '../features/sign-recognition/recognitionCatalog';
 import type { LessonReference } from '../data/lessonPlan';
 
-export default function DirectedLessonPractice({ targetId, instruction, reference, onContinue }: {
-  targetId: string; instruction: string; reference: LessonReference; onContinue: (signId: string) => void;
+export default function DirectedLessonPractice({ targetId, instruction, reference, onContinue, continueLabel }: {
+  targetId: string; instruction: string; reference: LessonReference; onContinue: (signId: string) => void; continueLabel?: string;
 }) {
-  if (!recognitionSignsById.has(targetId)) return <p role="status">Esta seña está disponible como contenido de estudio. Puedes hacer el ejercicio sin cámara.</p>;
+  const sign = recognitionSignsById.get(targetId);
+  if (!sign) return <p role="status">Esta seña está disponible como contenido de estudio. Puedes hacer el ejercicio sin cámara.</p>;
+  const guidance = sign.type === 'static' ? 'Mantén la postura estable hasta ver el resultado del modelo.' : 'Realiza el movimiento completo con las manos visibles.';
   return <RecognitionPractice key={targetId} guided={{
-    targetId, instruction: `${instruction} Mantén la postura estable hasta ver el resultado del modelo.`,
-    reference, onAccept: onContinue,
+    targetId, instruction: `${instruction} ${guidance}`,
+    reference, onAccept: onContinue, acceptLabel: continueLabel,
   }} />;
 }
