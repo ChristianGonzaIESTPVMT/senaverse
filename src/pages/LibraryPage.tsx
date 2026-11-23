@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Hand, Heart, LayoutGrid, Search, SearchX, Soup, Sparkles, UsersRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { EducationalVisual, SignMediaViewer } from '../components/SignMediaViewer';
+import { ExternalReference } from '../components/ExternalReference';
 import { getEducationalSign, libraryCategories, searchLibrary, type LibraryCategory, type LibraryEntry } from '../data/library';
 import { getLessonLocation, getLessonPath } from '../data/curriculum';
 import { getFreePracticePath } from '../data/practice';
@@ -31,8 +32,8 @@ function LibraryReference({ entry }: { entry: LibraryEntry }) {
     <div className="library-thumbnail library-card-reference" data-tone={entry.tone}>
       {visual.availability === 'available' && visual.kind !== 'sequence' ? <EducationalVisual visual={visual} decorative />
         : <BookOpen size={31} aria-hidden="true" />}
-      {document ? <a href={document.location.url} target="_blank" rel="noopener noreferrer"
-        aria-label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</a>
+      {document ? <ExternalReference href={document.location.url}
+        label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</ExternalReference>
         : <span>{video.availability === 'available' ? 'Video en la ficha' : visual.availability === 'available'
           ? 'Referencia en la ficha' : 'Referencia pendiente'}</span>}
     </div>

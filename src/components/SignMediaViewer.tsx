@@ -3,12 +3,13 @@ import { BookOpen, Film, Maximize, RotateCcw, X } from 'lucide-react';
 import type { EducationalVideo, EducationalVisual as Visual, MediaLink } from '../data/educationalMedia';
 import type { LibraryEntry } from '../data/library';
 import { SignHandDiagram } from './SignHandDiagram';
+import { ExternalReference } from './ExternalReference';
 import './SignMediaViewer.css';
 
 export function MediaSourceLink({ reference }: { reference: MediaLink }) {
-  return <a className="practice-reference-link" href={reference.url} target="_blank" rel="noopener noreferrer">
+  return <ExternalReference className="practice-reference-link" href={reference.url}>
     <BookOpen size={18} aria-hidden="true" /> {reference.title} (nueva pestaña)
-  </a>;
+  </ExternalReference>;
 }
 
 function localOrExternal({ type, url }: { type: 'local' | 'external'; url: string }) {

@@ -32,13 +32,13 @@ function LearningTip() {
   return (
     <div className="app-learning-tip">
       <strong><Star size={23} aria-hidden="true" /> Aprende a tu ritmo.</strong>
-      <p>Las lecciones, videos y actividades estarán adaptados al recorrido del estudiante.</p>
+      <p>Practica con las lecciones, los diagramas y los ejercicios guiados.</p>
     </div>
   );
 }
 
 export function StudentLayout({ children }: { children: ReactNode }) {
-  const { progress } = useStudentProgress();
+  const { progress, storageAvailable } = useStudentProgress();
   const { profile, photoUrl } = useStudentProfile();
   const { xp } = getProgressTotals(progress);
   const location = useLocation();
@@ -100,7 +100,10 @@ export function StudentLayout({ children }: { children: ReactNode }) {
             <Link className="app-avatar" to="/perfil" aria-label={`Ver mi perfil: ${profile.displayName}`} aria-current={location.pathname === '/perfil' ? 'page' : undefined} title={`Mi perfil · ${profile.displayName}`}><StudentAvatar avatarId={profile.avatarId} photoUrl={photoUrl} /></Link>
           </div>
         </header>
-        <main id="contenido" className="app-content" tabIndex={-1}>{children}</main>
+        <main id="contenido" className="app-content" tabIndex={-1}>
+          {storageAvailable === false && <p className="lesson-warning" role="status">El progreso de esta sesión no se puede guardar en el navegador.</p>}
+          {children}
+        </main>
       </div>
 
       <nav className="app-bottom-nav" aria-label="Navegación móvil">

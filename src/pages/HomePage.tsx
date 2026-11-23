@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, Camera, CheckCircle2, GraduationCap, HeartHandshake, Play, Sparkles, Target } from 'lucide-react';
+import { ArrowRight, BookOpen, Camera, CheckCircle2, GraduationCap, HeartHandshake, Sparkles, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -31,7 +31,7 @@ export function HomePage() {
             <div className="hero-spark spark-a"/><div className="hero-spark spark-b"/>
             <div className="lesson-teaser">
               <div className="teaser-top"><span className="teaser-dots"><i/><i/><i/></span><span className="teaser-label">ACADEMIA SEÑAVERSE</span></div>
-              <div className="teaser-video"><div className="play-circle"><Play size={28} fill="currentColor" /></div><strong>Observa, aprende y practica</strong><span>Espacio para video validado de LSP</span></div>
+              <div className="teaser-video"><div className="play-circle"><BookOpen size={28} aria-hidden="true" /></div><strong>Observa, aprende y practica</strong><span>Diagramas y ejercicios de los números en LSP</span></div>
               <div className="teaser-bottom"><strong>Números básicos</strong><Link to="/academia/unidad/2/leccion/numeros">Ver lección</Link></div>
             </div>
             <div className="float-pill float-one"><span className="float-symbol"><GraduationCap size={19}/></span> Aprende a tu ritmo</div>
@@ -43,7 +43,7 @@ export function HomePage() {
           <h2>Aprender LSP puede ser una experiencia cercana y dinámica.</h2>
           <div className="feature-grid">
             <article className="feature-card"><span className="feature-symbol"><BookOpen size={25}/></span><h3>Lecciones paso a paso</h3><p>Unidades organizadas para avanzar desde los conceptos básicos.</p></article>
-            <article className="feature-card"><span className="feature-symbol mint"><Camera size={25}/></span><h3>Práctica interactiva</h3><p>Ejercicios y un simulador experimental de señas seleccionadas.</p></article>
+            <article className="feature-card"><span className="feature-symbol mint"><Camera size={25}/></span><h3>Práctica interactiva</h3><p>Ejercicios y reconocimiento experimental de señas seleccionadas.</p></article>
             <article className="feature-card"><span className="feature-symbol peach"><Target size={25}/></span><h3>Tu progreso importa</h3><p>Identifica tus logros y los temas que necesitas reforzar.</p></article>
           </div>
         </section>

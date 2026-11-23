@@ -13,7 +13,7 @@
 .minigame-art::before { content: ''; position: absolute; z-index: -1; width: 142px; height: 142px; border: 1px solid #ffffff8c; border-radius: 50%; background: #ffffff38; }
 .minigame-art[data-tone='mint'] { background: #e3f5f0; }
 .minigame-art[data-tone='peach'] { background: #fff1da; }
-.minigame-illustration { display: block; width: clamp(60px, 6.8vw, 90px); height: auto; color: var(--color-primary); filter: drop-shadow(0 7px 0 #43305f0b); transform: rotate(-7deg); }
+.minigame-illustration { display: block; width: clamp(60px, 6.8vw, 90px); height: auto; color: #6330da; filter: drop-shadow(0 7px 0 #43305f0b); transform: rotate(-7deg); }
 .minigame-art[data-tone='mint'] .minigame-illustration { transform: rotate(9deg); }
 .minigame-art[data-tone='peach'] .minigame-illustration { transform: rotate(-12deg); }
 

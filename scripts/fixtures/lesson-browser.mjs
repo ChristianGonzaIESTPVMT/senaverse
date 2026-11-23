@@ -131,6 +131,17 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
     await click('Reintentar práctica');
     await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
     assert.equal(await evaluate(`(${storage}).lessonStudy.numeros.steps["practica-1"] === undefined`), true);
+    await until('coincidencia disponible antes de apagar', () => evaluate('document.body.textContent.includes("Guardar práctica y continuar")'));
+    await activate();
+    await released();
+    assert.equal(await evaluate('document.body.textContent.includes("Guardar práctica y continuar")'), false);
+    await activate();
+    await until('cámara reanudada después de apagar', () => evaluate('window.labWorkers.some(worker => !worker.ended && worker.results > 0)'), 30000);
+    await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
+    await replayTrace(evaluate, until, traces.different, 'confirmó una seña distinta');
+    assert.equal(await evaluate('document.body.textContent.includes("Guardar práctica y continuar")'), false);
+    await click('Reintentar práctica');
+    await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
     await click('Guardar práctica y continuar');
     await step('Practica «Dos»');
     await released();
@@ -198,5 +209,5 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
   assert.equal(await evaluate('document.body.textContent.includes("Finalizar lección")'), false);
   assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
   console.log(JSON.stringify({ route, assessment: '4/5', completions: 1,
-    cameraRecognitionsVerifiedFromRecordings: !!datasetPath, deniedPermission: true, released: true, responsive: true }));
+    cameraRecognitionsVerifiedFromRecordings: !!datasetPath, staleMatchDismissed: !!datasetPath, deniedPermission: true, released: true, responsive: true }));
 }

@@ -15,6 +15,7 @@ import { checkMinigames } from './fixtures/minigames-browser.mjs';
 import { checkStudentOverview } from './fixtures/student-overview-browser.mjs';
 import { checkCurriculum } from './fixtures/curriculum-browser.mjs';
 import { checkMedia, mediaFixturePlugin } from './fixtures/media-browser.mjs';
+import { checkFairAudit, checkFairJourneys } from './fixtures/fair-audit-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
@@ -22,7 +23,7 @@ const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
   'library-development', 'library-production', 'situation-development', 'situation-production',
   'minigames-development', 'minigames-production', 'progress-development', 'progress-production',
-  'curriculum-development', 'curriculum-production', 'media-development', 'media-production'].includes(mode));
+  'curriculum-development', 'curriculum-production', 'media-development', 'media-production', 'audit-production', 'audit-functional'].includes(mode));
 const datasetPath = process.argv[4];
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
@@ -41,10 +42,13 @@ async function until(description, check, timeout = 18000) {
 function protocol(socket) {
   const pending = new Map();
   const requests = [];
+  const errors = [];
   let id = 0;
   socket.addEventListener('message', event => {
     const item = JSON.parse(event.data);
     if (item.method === 'Network.requestWillBeSent') requests.push(item.params.request.url);
+    if (item.method === 'Runtime.exceptionThrown') errors.push(item.params.exceptionDetails.exception?.description ?? item.params.exceptionDetails.text);
+    if (item.method === 'Log.entryAdded' && item.params.entry.level === 'error') errors.push(item.params.entry.text);
     const callback = pending.get(item.id);
     if (!callback) return;
     pending.delete(item.id);
@@ -70,11 +74,12 @@ function protocol(socket) {
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
     return result.result.value;
   }
-  return { send, evaluate, requests };
+  return { send, evaluate, requests, errors };
 }
 
 async function checkStudent({ send, evaluate, requests }, origin) {
   let rejectedTake = false;
+  await send('Performance.enable');
   await send('Page.navigate', { url: origin + '/camara' });
   await until('mensaje de recurso ausente', () => evaluate('!!document.querySelector(".practice-recognition-error")'));
   assert.equal(await evaluate('document.querySelector(".practice-camera-button").disabled'), true);
@@ -97,7 +102,14 @@ async function checkStudent({ send, evaluate, requests }, origin) {
   await until('permiso denegado', () => evaluate('document.querySelector(".practice-camera-error")?.textContent.includes("permiso de cámara")'));
   assert.equal(await evaluate('window.labStreams.length'), 0);
   assert.equal(await evaluate('window.labWorkers.length'), 0);
-  await evaluate('window.studentDeny = false; window.studentHold = true');
+  await evaluate('window.studentDeny = false');
+  for (const [name, message] of [['NotFoundError', 'No se encontró una cámara'], ['NotReadableError', 'Puede estar ocupada']]) {
+    await evaluate(`window.studentFailure = ${JSON.stringify(name)}`);
+    await activate();
+    await until(name, () => evaluate(`document.querySelector(".practice-camera-error")?.textContent.includes(${JSON.stringify(message)})`));
+    assert.equal(await evaluate('window.labStreams.length + window.labWorkers.length'), 0);
+  }
+  await evaluate('window.studentFailure = null; window.studentHold = true');
   await activate();
   await until('permiso pendiente', () => evaluate('typeof window.studentRelease === "function"'));
   await evaluate('document.querySelector(\'a[href="/biblioteca"]\').click()');
@@ -106,10 +118,12 @@ async function checkStudent({ send, evaluate, requests }, origin) {
   await until('regreso a Cámara', ready);
   await activate();
   await until('reserva de cámara única', () => evaluate('document.querySelector(".practice-camera-error")?.textContent.includes("Otra vista")'));
-  assert.equal(await evaluate('window.studentAttempts'), 2);
+  assert.equal(await evaluate('window.studentAttempts'), 4);
   await evaluate('window.studentHold = false; window.studentRelease()');
   await until('pista tardía liberada', () => evaluate('window.labStreams[0]?.getTracks().every(track => track.readyState === "ended")'));
 
+  const beforeCamera = Object.fromEntries((await send('Performance.getMetrics')).metrics.map(({ name, value }) => [name, value]));
+  const startedAt = await evaluate('performance.now()');
   await activate();
   let detectorRetries = 0;
   await until('MediaPipe procesando sin manos', async () => {
@@ -132,6 +146,8 @@ async function checkStudent({ send, evaluate, requests }, origin) {
     throw new Error(`${error.message}. ${JSON.stringify(diagnostics)}`, { cause: error });
   });
   assert.equal(await evaluate('Math.max(...window.labWorkers.map(worker => worker.maxActive))'), 1);
+  const firstResultAt = await evaluate('window.labWorkers.find(worker => typeof worker.firstResultAt === "number").firstResultAt');
+  const duringCamera = Object.fromEntries((await send('Performance.getMetrics')).metrics.map(({ name, value }) => [name, value]));
   const workerCount = await evaluate('window.labWorkers.length');
   await choose('LSP-009');
   await evaluate('document.querySelector(".practice-overlay-toggle input").click()');
@@ -193,6 +209,7 @@ async function checkStudent({ send, evaluate, requests }, origin) {
   assert.equal(await evaluate('Math.max(...window.labWorkers.map(worker => worker.maxActive))'), 1);
   await evaluate('document.querySelector(\'a[href="/academia"]\').click()');
   await until('liberación al navegar', released);
+  const afterCamera = Object.fromEntries((await send('Performance.getMetrics')).metrics.map(({ name, value }) => [name, value]));
   await send('Page.navigate', { url: origin + '/camara/libre?sena=si' });
   await until('enlace previo a Sí', () => evaluate('document.querySelector(".practice-select-field select")?.value === "LSP-006"'));
   assert.equal(await evaluate('!!document.querySelector(".recognition-diagnostics")'), false);
@@ -209,6 +226,8 @@ async function checkStudent({ send, evaluate, requests }, origin) {
   assert.ok(requests.some(url => url.endsWith('/models/lsp-v1.json')));
   assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
   console.log(JSON.stringify({ mode, chromium: await evaluate('navigator.userAgent'), detectorRetries, recordedTake: datasetPath ? 'Con' : null, rejectedTake,
+    deviceErrors: ['NotAllowedError', 'NotFoundError', 'NotReadableError'], activationToFirstWorkerResultMs: Math.round(firstResultAt - startedAt),
+    jsHeapBytes: { before: beforeCamera.JSHeapUsedSize, active: duringCamera.JSHeapUsedSize, after: afterCamera.JSHeapUsedSize },
     assertions: 'modelo público, gestión de cámara, permiso denegado, reserva única, MediaPipe, cero manos, catálogo, práctica dirigida, claro/oscuro, navegación y liberación' }));
 }
 
@@ -217,7 +236,7 @@ try {
   const debug = mode === 'student-development' ? 'VITE_HAND_DEBUG=true\n' : '';
   await writeFile(join(directory, '.env.development.local'), 'VITE_ENABLE_RECOGNITION_LAB=true\nVITE_ENABLE_DATA_COLLECTION=true\n' + debug);
   const common = { envDir: directory, cacheDir: join(directory, 'vite-cache'), logLevel: 'silent' };
-  if (mode.endsWith('-production')) server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
+  if (mode.endsWith('-production') || mode === 'audit-functional') server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
   else {
     server = await createServer({ ...common, plugins: mode === 'media-development' ? [mediaFixturePlugin()] : [],
       server: { host: '127.0.0.1', port: 0, ws: false } });
@@ -242,7 +261,7 @@ try {
   const list = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
   socket = new WebSocket(list.find(target => target.type === 'page').webSocketDebuggerUrl);
   await once(socket, 'open');
-  const { send, evaluate, requests } = protocol(socket);
+  const { send, evaluate, requests, errors } = protocol(socket);
   await send('Page.enable');
   await send('Network.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
@@ -250,7 +269,7 @@ try {
     window.labWorkers = [];
     window.labWorkerErrors = [];
     window.labBlockModel = true;
-    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-', 'progress-', 'media-'].some(prefix => mode.startsWith(prefix))};
+    window.studentBlockModel = ${!['library-', 'situation-', 'minigames-', 'progress-', 'media-', 'audit-'].some(prefix => mode.startsWith(prefix))};
     window.studentAttempts = 0;
     const fetchResource = window.fetch.bind(window);
     window.fetch = (resource, options) => (window.labBlockModel && String(resource).endsWith('/__senaverse/recognition-v1.json'))
@@ -261,6 +280,7 @@ try {
     navigator.mediaDevices.getUserMedia = async options => {
       window.studentAttempts++;
       if (window.studentDeny) throw new DOMException('Prueba de permiso denegado.', 'NotAllowedError');
+      if (window.studentFailure) throw new DOMException('Prueba de disponibilidad de cámara.', window.studentFailure);
       if (window.studentHold) await new Promise(resolve => { window.studentRelease = resolve; });
       const stream = await openCamera(options);
       window.labStreams.push(stream);
@@ -277,7 +297,10 @@ try {
         this.addEventListener('error', event => window.labWorkerErrors.push(event.message));
         this.addEventListener('message', event => {
           if (event.data.type === 'error') window.labWorkerErrors.push(event.data.message);
-          if (event.data.type === 'result') this.results++;
+          if (event.data.type === 'result') {
+            this.results++;
+            this.firstResultAt ??= performance.now();
+          }
         });
       }
       postMessage(message, transfer) {
@@ -296,7 +319,11 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode.startsWith('media-')) {
+  if (mode === 'audit-functional') {
+    await checkFairJourneys({ send, evaluate, requests }, origin, until);
+  } else if (mode === 'audit-production') {
+    await checkFairAudit({ send, evaluate, requests, errors }, origin, until, process.argv[4]);
+  } else if (mode.startsWith('media-')) {
     await checkMedia({ send, evaluate, requests }, origin, until, mode === 'media-development');
   } else if (mode.startsWith('curriculum-')) {
     await checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath);

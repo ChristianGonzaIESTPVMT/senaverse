@@ -26,7 +26,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
     initialMode: initial ? { type: 'directed', targetId: initial.id } : { type: 'free' },
     onConfirmed(event) {
       onConfirmed?.(event);
-      if (event.outcome === 'matched' && event.signId === guided?.targetId) setConfirmedMatch(event.signId);
+      if (guided) setConfirmedMatch(event.outcome === 'matched' && event.signId === guided.targetId ? event.signId : null);
       if (onSave) setSaveableSignId(event.outcome === 'different' ? null : event.signId);
     },
   });
@@ -47,8 +47,11 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   const { onSessionState } = recognition.cameraBindings;
   const trackPracticeState = useCallback((state: PracticeCameraSessionState) => {
     onSessionState(state);
-    if (state.cameraStatus !== 'active') clearSavedPractice();
-  }, [clearSavedPractice, onSessionState]);
+    if (state.cameraStatus !== 'active' || state.detector.status === 'error' || state.detector.status === 'loading') {
+      setConfirmedMatch(null);
+      if (onSave) clearSavedPractice();
+    }
+  }, [clearSavedPractice, onSave, onSessionState]);
 
   function selectTarget(signId: string) {
     clearSavedPractice();
@@ -80,7 +83,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
     </div>}
     <div className="practice-workspace">
       <div className="practice-recognition-column">
-        <PracticePreview {...recognition.cameraBindings} onSessionState={onSave ? trackPracticeState : onSessionState} disabled={modelState.status !== 'ready' && !cameraActive}
+        <PracticePreview {...recognition.cameraBindings} onSessionState={onSave || guided ? trackPracticeState : onSessionState} disabled={modelState.status !== 'ready' && !cameraActive}
           disabledReason="La cámara estará disponible cuando cargue el reconocimiento." showLandmarks={showLandmarks} />
         <label className="practice-panel practice-overlay-toggle">
           <input type="checkbox" checked={showLandmarks} onChange={event => setShowLandmarks(event.target.checked)} />
@@ -112,7 +115,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
               setPracticeSaved(true);
               onSave(saveableSignId);
             }}>Guardar práctica con cámara</button></>)}
-          {guided && confirmedMatch === guided.targetId && <>
+          {cameraActive && guided && confirmedMatch === guided.targetId && <>
             <p>Coincidencia experimental disponible para registrar en este intento.</p>
             <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>{guided.acceptLabel ?? 'Guardar práctica y continuar'}</button>
           </>}

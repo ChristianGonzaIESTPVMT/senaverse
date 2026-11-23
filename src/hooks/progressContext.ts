@@ -3,6 +3,7 @@ import type { ProgressEvent, StudentProgress } from '../data/progress';
 
 export const ProgressContext = createContext<{
   progress: StudentProgress;
+  storageAvailable?: boolean;
   recordActivity: (event: ProgressEvent) => void;
   consultSign: (signId: string) => void;
 } | null>(null);

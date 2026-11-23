@@ -3,6 +3,7 @@ import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { GuidedSignPractice } from '../components/GuidedSignPractice';
 import { EducationalVisual } from '../components/SignMediaViewer';
+import { ExternalReference } from '../components/ExternalReference';
 import { getQuizVisual } from '../data/educationalMedia';
 import { getEducationalSign, libraryCategories, numbersReference } from '../data/library';
 import { CHALLENGE_CHECKPOINT_KEY, createGameRun, gameOutcome, gameSize, POINTS_PER_SUCCESS, restoreChallenge,
@@ -219,7 +220,7 @@ function GameResults({ game, run, visual, reward, record, onRepeat, onSettings }
       </>}
     </dl>
     {reward ? <p className="success-message">Ganaste {reward} XP por tu primera partida con aciertos.</p> : <p>La recompensa de {game.rewardXp} XP se otorga una vez por juego al terminar con aciertos.</p>}
-    {visual && <a className="game-back" href={numbersReference.url} rel="noopener noreferrer" target="_blank">Consultar la lámina original del MINEDU (nueva pestaña)</a>}
+    {visual && <ExternalReference className="game-back" href={numbersReference.url}>Consultar la lámina original del MINEDU (nueva pestaña)</ExternalReference>}
     <div className="game-actions"><button className="button button-primary" type="button" onClick={onRepeat}>Volver a jugar</button>
       <button className="button button-outline" type="button" onClick={onSettings}>Cambiar opciones</button></div>
   </section>;
