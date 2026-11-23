@@ -65,7 +65,9 @@
 .library-thumbnail[data-tone='peach'] { background: light-dark(#fae9e9, var(--color-surface)); }
 .library-thumbnail[data-tone='mint'] { background: light-dark(#e2f1ed, var(--color-surface)); }
 .library-thumbnail[data-tone='blue'] { background: light-dark(#e8edf9, var(--color-surface)); }
-.library-thumbnail .sign-media-diagram, .library-thumbnail img { height: 100px; }
+.library-thumbnail .sign-media-diagram { height: 100px; }
+.library-thumbnail .sign-media-image { max-width: 100%; }
+.library-thumbnail img { height: auto; max-height: 124px; border-radius: 9px; }
 .library-thumbnail::after { content: ''; position: absolute; z-index: -1; top: -18px; right: -20px; width: 75px; height: 75px; border-radius: 50%; background: #ffffff40; }
 
 .library-pagination { display: flex; align-items: center; justify-content: center; gap: 17px; margin-top: 24px; }

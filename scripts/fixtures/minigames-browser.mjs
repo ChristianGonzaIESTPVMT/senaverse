@@ -184,6 +184,8 @@ export async function checkMinigames({ send, evaluate, requests }, origin, until
   await select('Vocabulario', 'numeros');
   await start();
   await contains('#game-challenge-title', '«Uno»');
+  assert.equal(await evaluate('!!document.querySelector(\'.sign-media[data-sign="LSP-001"] img[src*="lsp-001-uno"]\')'), true);
+  assert.equal(await evaluate('!!document.querySelector(".sign-media video")'), false);
   assert.equal(await evaluate('!!document.querySelector("[role=timer]")'), false);
   await button('Practicar con cámara');
   const activate = async () => {

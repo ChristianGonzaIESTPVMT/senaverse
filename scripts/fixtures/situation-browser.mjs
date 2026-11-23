@@ -68,6 +68,8 @@ export async function checkSituations({ send, evaluate, requests }, origin, unti
   assert.equal(await evaluate('window.studentAttempts'), 0);
   await answer('LSP-001', false);
   assert.match(await evaluate('document.querySelector("#situation-practice-title").textContent'), /«Uno»/);
+  assert.equal(await evaluate('!!document.querySelector(\'.sign-media[data-sign="LSP-001"] img[src*="lsp-001-uno"]\')'), true);
+  assert.equal(await evaluate('!!document.querySelector(".sign-media video")'), false);
   await visitCard();
   assert.ok(!requests.some(url => url.endsWith('/models/lsp-v1.json') || /handDetection\.worker/.test(url)));
 

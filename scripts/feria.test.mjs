@@ -88,6 +88,37 @@ test('producción sirve recursos y enlaces educativos por loopback y excluye arc
   await assert.rejects(serveFairBuild(new Map(), port), { code: 'EADDRINUSE' });
 });
 
+test('el servidor local entrega fotos y permite saltar a un tramo de video', async t => {
+  const { root } = await fixture(t);
+  const directory = join(root, 'dist', 'media', 'signs');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'lsp-001-uno.jpeg'), 'photo');
+  await writeFile(join(directory, 'lsp-001-uno.mp4'), '0123456789');
+  const server = await serveFairBuild(await readFairBuild(root), 0);
+  t.after(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+  const origin = `http://127.0.0.1:${server.address().port}/media/signs/`;
+  const photo = await fetch(origin + 'lsp-001-uno.jpeg');
+  assert.equal(photo.headers.get('Content-Type'), 'image/jpeg');
+  assert.equal(await photo.text(), 'photo');
+  const video = origin + 'lsp-001-uno.mp4';
+  const head = await fetch(video, { method: 'HEAD' });
+  assert.equal(head.headers.get('Content-Type'), 'video/mp4');
+  assert.equal(head.headers.get('Accept-Ranges'), 'bytes');
+  for (const [range, contentRange, expected] of [['bytes=2-5', 'bytes 2-5/10', '2345'],
+    ['bytes=8-', 'bytes 8-9/10', '89'], ['bytes=-3', 'bytes 7-9/10', '789']]) {
+    const response = await fetch(video, { headers: { Range: range } });
+    assert.equal(response.status, 206);
+    assert.equal(response.headers.get('Content-Range'), contentRange);
+    assert.equal(await response.text(), expected);
+  }
+  const invalid = await fetch(video, { headers: { Range: 'bytes=10-' } });
+  assert.equal(invalid.status, 416);
+  assert.equal(invalid.headers.get('Content-Range'), 'bytes */10');
+  await invalid.text();
+  await writeFile(join(directory, 'video-privado.mp4'), 'private');
+  await assert.rejects(readFairBuild(root), /Archivo no esperado.*video-privado/);
+});
+
 test('las opciones aíslan el perfil de exposición y permiten ejecutar un ensayo', () => {
   assert.deepEqual(parseFairOptions([]), { port: 4173, profile: 'feria', browser: 'auto', verify: false, open: true });
   assert.deepEqual(parseFairOptions(['--puerto=4174', '--perfil=ensayo', '--navegador=chrome', '--verificar', '--solo-servidor']),

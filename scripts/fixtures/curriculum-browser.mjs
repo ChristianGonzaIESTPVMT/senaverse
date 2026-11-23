@@ -79,8 +79,13 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
         await press('Comenzar lección');
       } else if (step.kind === 'study' || step.kind === 'reading') {
         assert.match(await evaluate('document.querySelector(".lesson-sequence-step .practice-reference-link").href'), /minedu.gob.pe/);
+        if (['numeros', 'expresiones', 'elecciones-y-compania'].includes(lesson.id)) {
+          assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list .sign-media-preview img").length'), step.signs.length);
+          assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list .sign-media-load").length'), step.signs.length);
+          assert.equal(await evaluate('!!document.querySelector(".lesson-number-list video")'), false);
+        }
         if (lesson.id === 'cero') {
-          assert.equal(await evaluate('!!document.querySelector(".lesson-sequence canvas")'), true);
+          assert.equal(await evaluate('!!document.querySelector(".lesson-sequence .sign-media-image img")'), true);
           await click('.lesson-number-list a', 'Ver ficha en Biblioteca');
           await text('.library-dialog[open]', 'Cero');
           assert.match(await evaluate('document.querySelector(".library-meaning a").href'), /#page=14$/);

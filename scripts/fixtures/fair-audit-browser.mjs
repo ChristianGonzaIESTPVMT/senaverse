@@ -102,7 +102,7 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
   await navigate('/biblioteca?sena=LSP-001');
   await exists('.library-dialog[open] .sign-media-open');
   await evaluate('document.querySelector(".library-dialog .sign-media-open").click()');
-  await exists('.sign-media-dialog[open] canvas');
+  await exists('.sign-media-dialog[open] .sign-media-image img');
   await capture('visor', 390, 844, 'dark');
   await navigate('/academia/unidad/2/leccion/numeros');
   await exists('#study-step-title');
@@ -181,10 +181,10 @@ export async function checkFairJourneys({ send, evaluate, requests }, origin, un
   await keyboard('Escape');
 
   await navigate('/biblioteca?sena=LSP-001');
-  await exists('.library-dialog[open] canvas');
+  await exists('.library-dialog[open] .sign-media-image img');
   await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
   await exists('.library-dialog[open] .external-reference-status');
-  assert.equal(await evaluate('!!document.querySelector(".library-dialog[open] canvas")'), true);
+  assert.equal(await evaluate('!!document.querySelector(".library-dialog[open] .sign-media-image img")'), true);
   await send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await until('restauración del enlace externo', () => evaluate('!document.querySelector(".library-dialog[open] .external-reference-status")'));
 

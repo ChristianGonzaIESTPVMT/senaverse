@@ -1,5 +1,5 @@
 import { mineduGuidePdf, recognitionSigns } from '../features/sign-recognition/recognitionCatalog.ts';
-import type { Finger, HandDiagram, MediaSource, MediaValidation, PublishableMedia, SignMedia, Usage } from './educationalMedia.ts';
+import type { DiagramResource, Finger, HandDiagram, MediaSource, MediaValidation, PublishableMedia, SignMedia, Usage } from './educationalMedia.ts';
 export type { Finger, HandDiagram } from './educationalMedia.ts';
 
 export const libraryCategories = [
@@ -84,6 +84,25 @@ const numbersGuide = new Map<string, { number: string; tone: LibraryEntry['tone'
   ['LSP-004', { number: '4', tone: 'peach', instructions: 'Se extienden índice, medio, anular y meñique, con el pulgar recogido.', extended: ['index', 'middle', 'ring', 'little'] }],
   ['LSP-005', { number: '5', tone: 'lavender', instructions: 'Se abre la mano y quedan extendidos los cinco dedos.', extended: ['thumb', 'index', 'middle', 'ring', 'little'] }],
 ]);
+const originalMediaSlugs = new Map([
+  ['LSP-001', 'uno'], ['LSP-002', 'dos'], ['LSP-003', 'tres'], ['LSP-004', 'cuatro'], ['LSP-005', 'cinco'],
+  ['LSP-006', 'si'], ['LSP-007', 'nada'], ['LSP-008', 'mucho'], ['LSP-009', 'solo'], ['LSP-010', 'con'],
+]);
+const originalMediaSource: MediaSource = { title: 'Material audiovisual original', publisher: 'Autor del proyecto SeñaVerse' };
+const originalMediaUsage: Usage = { label: 'Uso educativo en SeñaVerse' };
+
+function originalMedia(signId: string, word: string): readonly PublishableMedia[] {
+  const slug = originalMediaSlugs.get(signId);
+  if (!slug) return [];
+  const path = `/media/signs/${signId.toLowerCase()}-${slug}` as const;
+  const common = { signId, availability: 'available' as const, validation: 'pending' as const, source: originalMediaSource, usage: originalMediaUsage };
+  return [
+    { ...common, id: `${signId}:foto`, kind: 'image', location: { type: 'local', url: `${path}.jpeg` }, width: 1200, height: 1600,
+      alt: `Fotografía de la configuración de manos de la seña «${word}».` },
+    { ...common, id: `${signId}:video`, kind: 'video', location: { type: 'local', url: `${path}.mp4` },
+      alt: `Demostración en video de la seña «${word}».` },
+  ];
+}
 const numbersLink = { unitId: 2, lessonId: 'numeros', title: 'Números básicos' };
 const greetingsLink = { unitId: 3, lessonId: 'saludos', title: 'Saludos básicos' };
 const courtesyLink = { unitId: 3, lessonId: 'cortesia', title: 'Expresiones de cortesía' };
@@ -108,7 +127,7 @@ const recognizedEntries = recognitionSigns
   .filter(sign => numbersGuide.has(sign.id) || recognitionDescriptions.has(sign.id))
   .map<LibraryDefinition>(sign => {
     const shared = { id: sign.id, word: sign.name, type: sign.type, hands: sign.expectedHands || undefined,
-      validation: 'pending' as const, recognitionClassId: sign.id };
+      validation: 'pending' as const, recognitionClassId: sign.id, assets: originalMedia(sign.id, sign.name) };
     const numberSign = numbersGuide.get(sign.id);
     if (numberSign) {
       return { ...shared, tone: numberSign.tone, instructions: numberSign.instructions, category: 'numeros',
@@ -199,17 +218,18 @@ function withMedia({ assets, ...entry }: LibraryDefinition): LibraryEntry {
     locator: locator ?? 'Consulta la figura identificada con el nombre de la seña.', alt: `Lámina oficial con la seña «${entry.word}».`,
   };
   const suppliedVisual = assets?.find(asset => asset.kind !== 'video');
-  const visual = suppliedVisual ?? (handDiagram && source ? {
-    id: `${id}:diagrama`, signId: id, validation, kind: 'diagram' as const, availability: 'available' as const,
-    location: { type: 'embedded' as const, module: 'SignHandDiagram' as const },
-    diagram: handDiagram, alt: handDiagram.description, usage: diagramUsage, source, quizSafe: true as const,
-  } : {
+  const diagram: DiagramResource | undefined = handDiagram && source ? {
+    id: `${id}:diagrama`, signId: id, validation, kind: 'diagram', availability: 'available',
+    location: { type: 'embedded', module: 'SignHandDiagram' },
+    diagram: handDiagram, alt: handDiagram.description, usage: diagramUsage, source, quizSafe: true,
+  } : undefined;
+  const visual = suppliedVisual ?? diagram ?? {
     id: `${id}:visual`, signId: id, validation, kind: 'visual' as const, availability: 'pending' as const,
-  });
+  };
   const video = assets?.find(asset => asset.kind === 'video') ?? {
     id: `${id}:video`, signId: id, validation, kind: 'video' as const, availability: 'pending' as const,
   };
-  return { ...entry, media: { document, visual, video } };
+  return { ...entry, media: { document, visual, video, ...(suppliedVisual && diagram && { quizVisual: diagram }) } };
 }
 
 /** The educational catalogue includes entries with no corresponding model class. */

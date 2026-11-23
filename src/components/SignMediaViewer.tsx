@@ -1,6 +1,6 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, Film, Maximize, RotateCcw, X } from 'lucide-react';
-import type { EducationalVideo, EducationalVisual as Visual, MediaLink } from '../data/educationalMedia';
+import type { EducationalVideo, EducationalVisual as Visual, IndividualImage, MediaLink, MediaSource, Usage } from '../data/educationalMedia';
 import type { LibraryEntry } from '../data/library';
 import { SignHandDiagram } from './SignHandDiagram';
 import { ExternalReference } from './ExternalReference';
@@ -14,6 +14,12 @@ export function MediaSourceLink({ reference }: { reference: MediaLink }) {
 
 function localOrExternal({ type, url }: { type: 'local' | 'external'; url: string }) {
   return type === 'local' ? import.meta.env.BASE_URL + url.slice(1) : url;
+}
+
+function MediaCredit({ source, usage }: { source: MediaSource; usage: Usage }) {
+  return <p className="sign-media-credit">{source.publisher} · {source.url
+    ? <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a>
+    : source.title}{source.page && ` · p. ${source.page}`}. {usage.label}.</p>;
 }
 
 export function EducationalVisual({ visual, decorative = false, onUnavailable }: {
@@ -58,19 +64,24 @@ function MediaPreview({ visual, word }: { visual: Visual; word: string }) {
             aria-label="Cerrar ampliación"><X size={20} aria-hidden="true" /></button>
         </header>
         {open && <EducationalVisual visual={visual} />}
-        <p>{visual.source.publisher}{visual.source.page && ` · p. ${visual.source.page}`}. {visual.usage.label}.</p>
+        <MediaCredit source={visual.source} usage={visual.usage} />
       </div>
     </dialog>
   </div>;
 }
 
-function VideoPlayer({ resource }: { resource: EducationalVideo }) {
+function VideoPlayer({ resource, poster, showCredit }: {
+  resource: EducationalVideo; poster?: IndividualImage['location']; showCredit: boolean;
+}) {
   const [requested, setRequested] = useState(false);
   const [failed, setFailed] = useState(false);
   const [playNotice, setPlayNotice] = useState('');
   const [rate, setRate] = useState(1);
   const player = useRef<HTMLVideoElement>(null);
   const rateId = useId();
+  useEffect(() => {
+    if (requested && !failed) player.current?.focus();
+  }, [requested, failed]);
 
   function repeat() {
     const video = player.current;
@@ -79,13 +90,13 @@ function VideoPlayer({ resource }: { resource: EducationalVideo }) {
     void video.play().catch(() => setPlayNotice('Usa el control de reproducción para volver a iniciar el video.'));
   }
 
-  if (!requested) return <button className="button button-outline" type="button" onClick={() => setRequested(true)}>
+  if (!requested) return <button className="button button-outline sign-media-load" type="button" onClick={() => setRequested(true)}>
     <Film size={17} aria-hidden="true" /> Cargar video{resource.location.type === 'external' && ' externo'}
   </button>;
 
   return <div className="sign-media-player">
     {failed ? <div className="sign-media-actions">
-      <p role="status">El video no se pudo cargar.</p>
+      <p role="status">El video no se pudo cargar. Puedes reintentar o consultar la referencia de la seña.</p>
       <button type="button" className="button button-outline" onClick={() => {
         setRequested(false);
         setFailed(false);
@@ -93,7 +104,8 @@ function VideoPlayer({ resource }: { resource: EducationalVideo }) {
         setPlayNotice('');
       }}>Volver a intentar</button>
     </div> : <>
-      <video controls playsInline preload="metadata" ref={player} src={localOrExternal(resource.location)}
+      <video controls playsInline preload="metadata" tabIndex={0} ref={player} src={localOrExternal(resource.location)}
+        poster={poster && localOrExternal(poster)}
         aria-label={resource.alt} onError={() => setFailed(true)} onPlay={() => setPlayNotice('')}>
         {resource.captionsUrl && <track kind="captions" src={localOrExternal({ type: 'local', url: resource.captionsUrl })}
           srcLang="es" label="Español" default />}
@@ -113,8 +125,7 @@ function VideoPlayer({ resource }: { resource: EducationalVideo }) {
       </div>
       {playNotice && <p role="status">{playNotice}</p>}
     </>}
-    <p className="sign-media-credit">{resource.source.publisher} · <a href={resource.source.url}
-      target="_blank" rel="noopener noreferrer">{resource.source.title}</a>. {resource.usage.label}.</p>
+    {showCredit && <MediaCredit source={resource.source} usage={resource.usage} />}
   </div>;
 }
 
@@ -122,13 +133,14 @@ export function SignMediaViewer({ sign, instruction = sign.instructions, showDoc
   sign: LibraryEntry; instruction?: string; showDocumentLink?: boolean; compact?: boolean;
 }) {
   const { visual, video, document } = sign.media;
+  const photo = visual.kind === 'image' ? visual : undefined;
   const needsReview = [sign, visual, video, document].some(resource =>
     resource?.validation === 'pending' && (!('availability' in resource) || resource.availability === 'available'));
   return <div className={`sign-media${compact ? ' sign-media-compact' : ''}`} data-sign={sign.id}>
     {visual.availability === 'available' && <MediaPreview key={visual.id} visual={visual} word={sign.word} />}
-    {visual.availability === 'available' && visual.kind !== 'diagram' && <p className="sign-media-credit">
-      {visual.source.publisher} · <a href={visual.source.url} target="_blank" rel="noopener noreferrer">{visual.source.title}</a>
-      {visual.source.page && ` · p. ${visual.source.page}`}. {visual.usage.label}.</p>}
+    {video.availability === 'available' && <VideoPlayer key={video.id} resource={video} poster={photo?.location}
+      showCredit={visual.availability !== 'available' || visual.kind === 'diagram' || visual.source !== video.source} />}
+    {visual.availability === 'available' && visual.kind !== 'diagram' && <MediaCredit source={visual.source} usage={visual.usage} />}
     {instruction && <p>{instruction}</p>}
     {document ? <div className="sign-media-document">
       <p>{document.locator}</p>
@@ -139,8 +151,7 @@ export function SignMediaViewer({ sign, instruction = sign.instructions, showDoc
       </p>}
     </div> : visual.availability === 'pending' && video.availability === 'pending' &&
       <p className="sign-media-credit">Referencia visual pendiente de incorporación.</p>}
-    {video.availability === 'available' ? <VideoPlayer key={video.id} resource={video} />
-      : !compact && <p className="sign-media-credit">Video demostrativo pendiente.</p>}
-    {needsReview && (showDocumentLink || !compact) && <p className="sign-media-credit">Validación lingüística pendiente.</p>}
+    {video.availability === 'pending' && !compact && <p className="sign-media-credit">Video demostrativo pendiente.</p>}
+    {needsReview && (showDocumentLink || !compact || photo) && <p className="sign-media-credit">Validación lingüística pendiente.</p>}
   </div>;
 }

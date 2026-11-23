@@ -20,11 +20,13 @@ const buildRequired = [
 ];
 const buildExtras = new Set(['fonts/OFL-Nunito.txt', 'models/README.md']);
 const generatedAsset = /^assets\/[A-Za-z0-9][A-Za-z0-9_.-]*-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
+const educationalMedia = /^media\/signs\/lsp-0(?:0[1-9]|10)-[a-z]+\.(?:jpeg|mp4)$/;
 const publicView = new Set(['', 'panel', 'presentacion', 'academia', 'biblioteca', 'camara', 'simulador', 'minijuegos', 'progreso', 'perfil', 'leccion']);
 const contentTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.wasm': 'application/wasm', '.task': 'application/octet-stream',
   '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
+  '.jpeg': 'image/jpeg', '.mp4': 'video/mp4',
 };
 
 export function sha256(content) {
@@ -37,10 +39,10 @@ async function enumerateBuild(directory, relative = '') {
     const name = relative + entry.name;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      if (!['assets', 'images', 'fonts', 'models', 'mediapipe', 'mediapipe/wasm'].includes(name)) throw new Error(`Carpeta no esperada en dist: ${name}.`);
+      if (!['assets', 'images', 'fonts', 'models', 'mediapipe', 'mediapipe/wasm', 'media', 'media/signs'].includes(name)) throw new Error(`Carpeta no esperada en dist: ${name}.`);
       for (const [key, file] of await enumerateBuild(path, `${name}/`)) files.set(key, file);
     } else {
-      if (!entry.isFile() || !(buildRequired.includes(name) || buildExtras.has(name) || generatedAsset.test(name))) {
+      if (!entry.isFile() || !(buildRequired.includes(name) || buildExtras.has(name) || generatedAsset.test(name) || educationalMedia.test(name))) {
         throw new Error(`Archivo no esperado en dist: ${name}. Genera un build limpio o recupera el paquete verificado.`);
       }
       const metadata = await lstat(path);
@@ -87,6 +89,14 @@ export async function readFairBuild(root = fairRoot) {
   return files;
 }
 
+function parseVideoRange(header, size) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header);
+  if (!match || !(match[1] || match[2])) return null;
+  const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+  const end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1;
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start < size && start <= end ? { start, end } : null;
+}
+
 export async function serveFairBuild(files, port = fairPort) {
   let authority;
   const server = createServer(async (request, response) => {
@@ -112,10 +122,25 @@ export async function serveFairBuild(files, port = fairPort) {
       && publicView.has(route.split('/')[0]) && !extname(route)) name = 'index.html';
     const file = files.get(name);
     if (!file) return reject(404, 'Recurso no disponible.');
-    response.writeHead(200, { 'Content-Type': contentTypes[extname(name)], 'Content-Length': file.size,
-      'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+    const extension = extname(name);
+    const headers = { 'Content-Type': contentTypes[extension], 'Content-Length': file.size,
+      'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' };
+    let range;
+    if (extension === '.mp4') {
+      headers['Accept-Ranges'] = 'bytes';
+      if (request.method === 'GET' && request.headers.range) {
+        range = parseVideoRange(request.headers.range, file.size);
+        if (!range) {
+          response.setHeader('Content-Range', `bytes */${file.size}`);
+          return reject(416, 'Tramo de video no disponible.');
+        }
+        headers['Content-Range'] = `bytes ${range.start}-${range.end}/${file.size}`;
+        headers['Content-Length'] = range.end - range.start + 1;
+      }
+    }
+    response.writeHead(range ? 206 : 200, headers);
     if (request.method === 'HEAD') return response.end();
-    await pipeline(createReadStream(file.path), response).catch(error => {
+    await pipeline(createReadStream(file.path, range), response).catch(error => {
       if (error.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error(`No se pudo servir dist/${name}: ${error.message}`);
     });
   });

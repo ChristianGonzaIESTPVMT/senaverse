@@ -38,6 +38,10 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   const navigate = path => send('Page.navigate', { url: origin + path });
   const exists = selector => until(selector, () => evaluate(`!!document.querySelector(${JSON.stringify(selector)})`));
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  const decodedPhoto = selector => until('foto cargada', () => evaluate(`(() => {
+    const image = document.querySelector(${JSON.stringify(selector)});
+    return image?.naturalWidth === 1200 && image?.naturalHeight === 1600;
+  })()`));
   const label = (selector, value) => evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].find(
     button => button.textContent.trim() === ${JSON.stringify(value)}).click()`);
   const escape = async () => {
@@ -46,21 +50,77 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
 
   await navigate('/');
   await exists('.home-banner .home-visual svg');
+  await navigate('/biblioteca');
+  await exists('.library-filters .library-numbers-icon');
+  await click('.library-filter:has(.library-numbers-icon)');
+  await decodedPhoto('.library-thumbnail img[src*="lsp-001-uno"]');
+  assert.ok(!requests.some(url => url.endsWith('.mp4')));
+  const originalClips = [];
+  for (let index = 1; index <= 10; index++) {
+    if (index === 6) await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 1 });
+    const id = `LSP-${String(index).padStart(3, '0')}`;
+    await navigate(`/biblioteca?sena=${id}`);
+    await decodedPhoto('.library-dialog[open] .sign-media-preview img');
+    const mediaRequests = requests.filter(url => url.endsWith('.mp4')).length;
+    assert.equal(await evaluate('!!document.querySelector(".library-dialog video")'), false);
+    await click('.library-dialog .sign-media-load');
+    const videoPath = await until(`metadatos de ${id}`, () => evaluate(`(() => {
+      const video = document.querySelector('.library-dialog video');
+      return video?.readyState >= 2 && video.currentSrc;
+    })()`));
+    assert.ok(requests.filter(url => url.endsWith('.mp4')).length > mediaRequests);
+    assert.match(videoPath, new RegExp(`/media/signs/${id.toLowerCase()}-`));
+    assert.deepEqual(await evaluate(`(() => {
+      const video = document.querySelector('.library-dialog video');
+      const photo = document.querySelector('.library-dialog .sign-media-preview img');
+      return [video.controls, video.playsInline, video.paused, video.autoplay, video.poster === photo.src,
+        video.videoWidth, video.videoHeight, video.preload, video.duration > 5 && video.duration < 8];
+    })()`), [true, true, true, false, true, 848, 478, 'metadata', true]);
+    await evaluate('document.querySelector(".library-dialog video").play().then(() => true)');
+    await until(`reproducción de ${id}`, () => evaluate('document.querySelector(".library-dialog video")?.currentTime > .1'));
+    await evaluate(`(() => {
+      const video = document.querySelector('.library-dialog video');
+      video.pause();
+      video.currentTime = video.duration - .35;
+    })()`);
+    await until(`búsqueda de tramo de ${id}`, () => evaluate(`(() => {
+      const video = document.querySelector('.library-dialog video');
+      return !video.seeking && video.readyState >= 2 && Math.abs(video.duration - video.currentTime - .35) < .07;
+    })()`));
+    if (index === 1 || index === 6) {
+      for (const rate of [.5, .75, 1]) {
+        assert.equal(await evaluate(`(() => {
+          const select = document.querySelector('.library-dialog .sign-media-actions select');
+          select.value = '${rate}';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          return document.querySelector('.library-dialog video').playbackRate;
+        })()`), rate);
+      }
+      await label('.library-dialog .sign-media-actions button', 'Repetir video');
+      await until('repetición del video original', () => evaluate(`(() => {
+        const video = document.querySelector('.library-dialog video');
+        return !video.paused && !video.seeking && video.currentTime < 1;
+      })()`));
+    }
+    originalClips.push(id);
+  }
+  assert.equal(new Set(requests.filter(url => url.endsWith('.mp4'))).size, 10);
   await navigate('/biblioteca?sena=LSP-001');
-  await exists('.library-dialog[open] .sign-media-diagram canvas');
+  await decodedPhoto('.library-dialog[open] .sign-media-preview img');
   assert.equal(await evaluate('!!document.querySelector(".library-dialog video")'), false);
   assert.match(await evaluate('document.querySelector(".library-dialog .practice-reference-link").href'), /minedu\.gob\.pe.*#page=14$/);
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 1 });
   await click('.theme-toggle');
   await until('tema oscuro', () => evaluate('document.documentElement.dataset.theme === "dark"'));
   await click('.library-dialog .sign-media-open');
-  await exists('.sign-media-dialog[open] canvas');
+  await decodedPhoto('.sign-media-dialog[open] img');
   assert.equal(await evaluate('document.activeElement.getAttribute("aria-label")'), 'Cerrar ampliación');
   assert.equal(await evaluate(`(() => {
     const dialog = document.querySelector('.sign-media-dialog[open]');
-    const canvas = dialog.querySelector('canvas');
-    return dialog.getBoundingClientRect().width <= 390 && canvas.getBoundingClientRect().width <= dialog.clientWidth
-      && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some(value => value !== 0);
+    const photo = dialog.querySelector('img');
+    const { width, height } = photo.getBoundingClientRect();
+    return dialog.getBoundingClientRect().width <= 390 && width <= dialog.clientWidth
+      && Math.abs(width / height - .75) < .01 && getComputedStyle(photo).objectFit === 'contain';
   })()`), true);
   await escape();
   await until('la ficha sigue abierta y se restaura el foco', () => evaluate(
@@ -74,8 +134,9 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   await navigate('/academia/unidad/2/leccion/numeros');
   await exists('#study-step-title');
   await label('.lesson-sequence button', 'Comenzar lección');
-  await exists('.lesson-sequence .sign-media-diagram canvas');
-  assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list .sign-media-preview > .sign-media-diagram").length'), 5);
+  await decodedPhoto('.lesson-sequence .sign-media-preview img');
+  assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list .sign-media-preview img").length'), 5);
+  assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list .sign-media-load").length'), 5);
   assert.equal(await evaluate('document.querySelectorAll(".lesson-sequence-step .practice-reference-link").length'), 1);
   const before = await evaluate('localStorage.getItem("senaverse-student-progress-v1")');
   await click('.lesson-number-list .sign-media-open');
@@ -85,7 +146,9 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
     `localStorage.getItem('senaverse-student-progress-v1') === ${JSON.stringify(before)} && !document.querySelector('.sign-media-dialog[open]')`));
 
   await navigate('/camara/libre?sena=LSP-001');
-  await exists('.practice-workspace .sign-media[data-sign="LSP-001"] canvas');
+  await decodedPhoto('.practice-workspace .sign-media[data-sign="LSP-001"] img');
+  await click('.practice-workspace .sign-media-load');
+  await until('video de práctica disponible', () => evaluate('document.querySelector(".practice-workspace video[poster]")?.readyState >= 2'));
   assert.equal(await evaluate('window.studentAttempts'), 0);
   await until('modelo local', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
   await click('.practice-camera-button');
@@ -104,7 +167,8 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   await exists('.practice-workspace .sign-media[data-sign="LSP-009"]');
   assert.match(await evaluate('document.querySelector(".practice-workspace .sign-media").textContent'), /flecha de giro/);
   assert.match(await evaluate('document.querySelector(".practice-workspace .practice-reference-link").href'), /#page=135$/);
-  assert.equal(await evaluate('!!document.querySelector(".practice-workspace .sign-media canvas")'), false);
+  await decodedPhoto('.practice-workspace .sign-media[data-sign="LSP-009"] img');
+  assert.equal(await evaluate('!!document.querySelector(".practice-workspace .sign-media video")'), false);
   await click('.practice-camera-button');
   await until('cámara y Worker liberados', () => evaluate(
     'window.labStreams.flatMap(stream => stream.getTracks()).every(track => track.readyState === "ended") && window.labWorkers.every(worker => worker.ended)'));
@@ -176,6 +240,7 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
     await exists('[data-sign="fixture-missing"] [role="status"]');
   }
 
-  console.log(JSON.stringify({ localDiagrams: 5, externalRequests: 0, width: 390, zoomKeyboard: true, studyProgressPreserved: true,
+  console.log(JSON.stringify({ localPhotos: 10, originalClips, desktopClips: 5, mobileWidth390Clips: 5,
+    externalRequests: 0, zoomKeyboard: true, studyProgressPreserved: true,
     cameraContinued: true, games: 5, scenarios: 6, nativeVideoFixture: testPlayer, sequenceFixture: testPlayer }));
 }

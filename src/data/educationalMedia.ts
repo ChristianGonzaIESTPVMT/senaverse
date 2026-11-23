@@ -6,7 +6,7 @@ export type MediaLink = { title: string; url: string };
 export type MediaSource = {
   title: string;
   publisher: string;
-  url: string;
+  url?: string;
   page?: number;
 };
 
@@ -49,11 +49,12 @@ export type SignMedia = {
   document?: IllustratedReference;
   visual: EducationalVisual | (PendingMedia & { kind: 'visual' });
   video: EducationalVideo | (PendingMedia & { kind: 'video' });
+  quizVisual?: DiagramResource;
 };
 
 export function getQuizVisual(media: SignMedia) {
   const { visual } = media;
-  return visual.availability === 'available' && visual.kind !== 'sequence' && visual.quizSafe ? visual : undefined;
+  return visual.availability === 'available' && visual.kind !== 'sequence' && visual.quizSafe ? visual : media.quizVisual;
 }
 
 export function hasEducationalMedia({ document, visual, video }: SignMedia) {
