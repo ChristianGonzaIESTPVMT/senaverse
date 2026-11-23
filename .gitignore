@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+/dist-feria/
 # Generated from the exact installed version by postinstall/predev/prebuild.
 public/mediapipe/wasm/
 *.local

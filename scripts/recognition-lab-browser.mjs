@@ -25,6 +25,12 @@ assert.ok(['lab', 'student-development', 'student-production', 'lesson-developme
   'minigames-development', 'minigames-production', 'progress-development', 'progress-production',
   'curriculum-development', 'curriculum-production', 'media-development', 'media-production', 'audit-production', 'audit-functional'].includes(mode));
 const datasetPath = process.argv[4];
+const externalOrigin = process.env.SENAVERSE_FERIA_ORIGEN;
+const productionMode = mode.endsWith('-production') || mode === 'audit-functional';
+if (externalOrigin) {
+  assert.ok(productionMode, 'El servidor de feria solo se usa en pruebas de producción.');
+  assert.match(externalOrigin, /^http:\/\/127\.0\.0\.1:\d{4,5}$/);
+}
 const base = await realpath(tmpdir());
 const directory = await realpath(await mkdtemp(join(base, 'senaverse-lab-browser-')));
 assert.match(relative(base, directory), /^senaverse-lab-browser-[^/\\]+$/);
@@ -219,8 +225,13 @@ async function checkStudent({ send, evaluate, requests }, origin) {
       assert.ok(response.status >= 400, path);
     }
     for (const path of ['/herramientas/reconocimiento', '/herramientas/dataset']) {
-      await send('Page.navigate', { url: origin + path });
-      await until('ruta interna excluida', () => evaluate('location.pathname === "/" && !document.querySelector(".recognition-lab, .dataset-studio")'));
+      if (externalOrigin) {
+        const response = await fetch(origin + path, { headers: { Accept: 'text/html' } });
+        assert.equal(response.status, 404, path);
+      } else {
+        await send('Page.navigate', { url: origin + path });
+        await until('ruta interna excluida', () => evaluate('location.pathname === "/" && !document.querySelector(".recognition-lab, .dataset-studio")'));
+      }
     }
   }
   assert.ok(requests.some(url => url.endsWith('/models/lsp-v1.json')));
@@ -236,13 +247,14 @@ try {
   const debug = mode === 'student-development' ? 'VITE_HAND_DEBUG=true\n' : '';
   await writeFile(join(directory, '.env.development.local'), 'VITE_ENABLE_RECOGNITION_LAB=true\nVITE_ENABLE_DATA_COLLECTION=true\n' + debug);
   const common = { envDir: directory, cacheDir: join(directory, 'vite-cache'), logLevel: 'silent' };
-  if (mode.endsWith('-production') || mode === 'audit-functional') server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
-  else {
+  if (!externalOrigin && productionMode) {
+    server = await preview({ ...common, preview: { host: '127.0.0.1', port: 0 } });
+  } else if (!externalOrigin) {
     server = await createServer({ ...common, plugins: mode === 'media-development' ? [mediaFixturePlugin()] : [],
       server: { host: '127.0.0.1', port: 0, ws: false } });
     await server.listen();
   }
-  const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+  const origin = externalOrigin ?? ('http://127.0.0.1:' + server.httpServer.address().port);
   const profile = join(directory, 'chrome-profile');
   browser = spawn(executable, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--disable-background-networking',
