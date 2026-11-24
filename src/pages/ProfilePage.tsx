@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { Award, BookOpen, ChevronRight, Download, Pencil, RotateCcw, Settings2, ShieldCheck, Smile, UserRound, Zap } from 'lucide-react';
+import { Award, BookOpen, ChevronRight, CircleCheck, Download, Pencil, RotateCcw, Settings2, ShieldCheck, Smile, UserRound, Zap } from 'lucide-react';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { createProfileBackup } from '../data/profileBackup';
@@ -80,7 +80,7 @@ export function ProfilePage() {
   const badges = summary.latestAchievements.slice(0, 3);
 
   return (
-    <div className="profile-page">
+    <div className="profile-page sv-motion">
       <header className="profile-heading">
         <h1>Mi perfil</h1>
         <p>Personaliza tu experiencia de aprendizaje en SeñaVerse</p>
@@ -99,7 +99,7 @@ export function ProfilePage() {
           <dd>{value.toLocaleString('es-PE')}</dd>
         </div>)}</dl>
         <div className="profile-learning">
-          <StudentLevel level={summary.level} xp={summary.xp} />
+          <StudentLevel level={summary.level} xp={summary.xp} motion />
           <div>
             <h3>Actividad y logros</h3>
             <p>Racha actual de {summary.calendar.current} {summary.calendar.current === 1 ? 'día' : 'días'}.</p>
@@ -114,7 +114,7 @@ export function ProfilePage() {
         <section className="profile-panel profile-personal" aria-labelledby="profile-personal-title">
           <div className="profile-section-heading">
             <h2 id="profile-personal-title"><UserRound size={21} aria-hidden="true" />Información personal</h2>
-            {!editing && <button type="button" className="profile-edit" onClick={startEditing}><Pencil size={15} aria-hidden="true" />Editar</button>}
+            {!editing && <button type="button" className="profile-edit sv-motion-action" onClick={startEditing}><Pencil size={15} aria-hidden="true" />Editar</button>}
           </div>
           {editing ? <form className="profile-form" onSubmit={saveInfo} noValidate>
             <div className="profile-field">
@@ -129,7 +129,7 @@ export function ProfilePage() {
               <p id="profile-bio-help" className="profile-field-help profile-character-count">{draft.bio.length}/{PROFILE_BIO_LIMIT} caracteres</p>
               {errors.bio && <p id="profile-bio-error" className="profile-error" role="alert">{errors.bio}</p>}
             </div>
-            <div className="profile-actions"><button type="submit" className="button button-primary">Guardar cambios</button><button type="button" className="button button-outline" onClick={() => { setEditing(false); setErrors({}); }}>Cancelar</button></div>
+            <div className="profile-actions"><button type="submit" className="button button-primary sv-motion-action">Guardar cambios</button><button type="button" className="button button-outline sv-motion-action" onClick={() => { setEditing(false); setErrors({}); }}>Cancelar</button></div>
           </form> : <dl className="profile-info">
             <div><dt>Nombre visible</dt><dd>{profile.displayName}</dd></div>
             <div><dt>Biografía breve</dt><dd className={profile.bio ? '' : 'profile-empty-bio'}>{profile.bio || 'Aún no has añadido una biografía.'}</dd></div>
@@ -139,30 +139,30 @@ export function ProfilePage() {
         <section className="profile-panel profile-settings" aria-labelledby="profile-settings-title">
           <div className="profile-section-heading"><h2 id="profile-settings-title"><Settings2 size={21} aria-hidden="true" />Configuración</h2></div>
           <div className="profile-setting-list">
-            <button type="button" className="profile-setting" aria-haspopup="dialog" aria-controls="profile-avatar-dialog" onClick={() => { avatarRef.current?.showModal(); }}>
+            <button type="button" className="profile-setting sv-motion-action" aria-haspopup="dialog" aria-controls="profile-avatar-dialog" onClick={() => { setFeedback(''); avatarRef.current?.showModal(); }}>
               <span className="profile-setting-icon"><Smile size={22} aria-hidden="true" /></span><span className="profile-setting-copy"><strong>Cambiar avatar</strong><span>Elige el que más te represente.</span></span><ChevronRight size={19} aria-hidden="true" />
             </button>
-            <button type="button" className="profile-setting" disabled={exporting} onClick={() => { void exportData(); }}>
+            <button type="button" className="profile-setting sv-motion-action" disabled={exporting} aria-busy={exporting} onClick={() => { void exportData(); }}>
               <span className="profile-setting-icon"><Download size={22} aria-hidden="true" /></span><span className="profile-setting-copy"><strong>Exportar mis datos</strong><span>Descarga tu perfil y progreso en JSON.</span></span><ChevronRight size={19} aria-hidden="true" />
             </button>
-            <button type="button" className="profile-setting profile-setting-reset" aria-haspopup="dialog" aria-controls="profile-reset-dialog" onClick={() => { setResetError(''); resetRef.current?.showModal(); }}>
+            <button type="button" className="profile-setting profile-setting-reset sv-motion-action" aria-haspopup="dialog" aria-controls="profile-reset-dialog" onClick={() => { setFeedback(''); setResetError(''); resetRef.current?.showModal(); }}>
               <span className="profile-setting-icon"><RotateCcw size={21} aria-hidden="true" /></span><span className="profile-setting-copy"><strong>Restablecer perfil</strong><span>Tu progreso se conserva.</span></span><ChevronRight size={19} aria-hidden="true" />
             </button>
           </div>
         </section>
       </div>
 
-      <p className="profile-feedback" role="status">{feedback}</p>
+      <p className="profile-feedback" role="status">{feedback && <span className="profile-confirmation" key={feedback}><CircleCheck size={18} aria-hidden="true" />{feedback}</span>}</p>
       {!storageAvailable && <p className="profile-storage-warning" role="status">El almacenamiento del navegador no está disponible. Tus cambios se conservarán solo durante esta sesión.</p>}
       {exportError && <p className="profile-error" role="alert">{exportError}</p>}
 
       <AvatarPicker dialogRef={avatarRef} onSaved={setFeedback} />
 
-      <dialog id="profile-reset-dialog" className="profile-dialog profile-reset-dialog" ref={resetRef} aria-labelledby="profile-reset-title" aria-describedby="profile-reset-description" onCancel={event => { if (resetting) event.preventDefault(); }} onClick={event => { if (event.target === event.currentTarget && !resetting) resetRef.current?.close(); }}>
+      <dialog id="profile-reset-dialog" className="profile-dialog profile-reset-dialog sv-motion-dialog" ref={resetRef} aria-labelledby="profile-reset-title" aria-describedby="profile-reset-description" onCancel={event => { if (resetting) event.preventDefault(); }} onClick={event => { if (event.target === event.currentTarget && !resetting) resetRef.current?.close(); }}>
         {resetError && <p className="profile-error" role="alert">{resetError}</p>}
         <h2 id="profile-reset-title">¿Restablecer tu perfil?</h2>
         <p id="profile-reset-description">Tu nombre volverá a «Estudiante», se vaciará la biografía, se eliminará tu foto y recuperarás el avatar inicial. Tus XP, lecciones y logros se conservarán.</p>
-        <div className="profile-actions"><button type="button" className="button button-outline" autoFocus disabled={resetting} onClick={() => resetRef.current?.close()}>Cancelar</button><button type="button" className="button button-primary" disabled={resetting} onClick={() => { setResetting(true); setResetError(''); void resetProfile().then(() => { setEditing(false); setErrors({}); resetRef.current?.close(); setFeedback('Perfil restablecido. Tu progreso se conserva.'); }).catch(cause => setResetError(cause instanceof Error ? cause.message : 'No se pudo restablecer el perfil.')).finally(() => setResetting(false)); }}>Restablecer perfil</button></div>
+        <div className="profile-actions"><button type="button" className="button button-outline sv-motion-action" autoFocus disabled={resetting} onClick={() => resetRef.current?.close()}>Cancelar</button><button type="button" className="button button-primary sv-motion-action" disabled={resetting} onClick={() => { setResetting(true); setResetError(''); void resetProfile().then(() => { setEditing(false); setErrors({}); resetRef.current?.close(); setFeedback('Perfil restablecido. Tu progreso se conserva.'); }).catch(cause => setResetError(cause instanceof Error ? cause.message : 'No se pudo restablecer el perfil.')).finally(() => setResetting(false)); }}>Restablecer perfil</button></div>
       </dialog>
     </div>
   );

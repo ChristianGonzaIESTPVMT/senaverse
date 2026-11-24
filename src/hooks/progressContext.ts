@@ -1,8 +1,11 @@
 import { createContext, useContext } from 'react';
 import type { ProgressEvent, StudentProgress } from '../data/progress';
 
+export type AchievementMotion = { previous: StudentProgress; shown: Set<string> };
+
 export const ProgressContext = createContext<{
   progress: StudentProgress;
+  achievementMotion?: AchievementMotion;
   storageAvailable?: boolean;
   recordActivity: (event: ProgressEvent) => void;
   consultSign: (signId: string) => void;

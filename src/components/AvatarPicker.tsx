@@ -64,14 +64,14 @@ export function AvatarPicker({ dialogRef, onSaved }: { dialogRef: RefObject<HTML
     finally { setBusy(false); }
   };
 
-  return <dialog id="profile-avatar-dialog" className="profile-dialog" ref={dialogRef} aria-labelledby="profile-avatar-title" aria-describedby="profile-avatar-description" onClose={clearDraft} onCancel={event => { if (busy) event.preventDefault(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
+  return <dialog id="profile-avatar-dialog" className="profile-dialog sv-motion-dialog" ref={dialogRef} aria-labelledby="profile-avatar-title" aria-describedby="profile-avatar-description" onClose={clearDraft} onCancel={event => { if (busy) event.preventDefault(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
     <div className="profile-dialog-heading"><h2 id="profile-avatar-title">Elige tu avatar</h2><button type="button" className="profile-dialog-close" aria-label="Cerrar selector de avatar" autoFocus disabled={busy} onClick={close}><X size={21} /></button></div>
     <p id="profile-avatar-description">Elige un avatar o usa una foto que se guardará solo en este navegador.</p>
     <div className="avatar-modes" role="group" aria-label="Tipo de avatar">
-      <button type="button" aria-pressed={mode === 'preset'} disabled={busy} onClick={() => setMode('preset')}>Avatares prediseñados</button>
-      <button type="button" aria-pressed={mode === 'photo'} disabled={busy} onClick={() => setMode('photo')}>Foto personalizada</button>
+      <button type="button" className="sv-motion-action" aria-pressed={mode === 'preset'} disabled={busy} onClick={() => setMode('preset')}>Avatares prediseñados</button>
+      <button type="button" className="sv-motion-action" aria-pressed={mode === 'photo'} disabled={busy} onClick={() => setMode('photo')}>Foto personalizada</button>
     </div>
-    <div hidden={mode !== 'preset'} className="profile-avatar-options" role="group" aria-label="Avatares disponibles">{profileAvatars.map(avatar => <button key={avatar.id} type="button" disabled={busy} className={`profile-avatar-option${(selected ?? profile.avatarId) === avatar.id ? ' is-selected' : ''}`} aria-pressed={(selected ?? profile.avatarId) === avatar.id} onClick={() => setSelected(avatar.id)}>
+    <div hidden={mode !== 'preset'} className="profile-avatar-options" role="group" aria-label="Avatares disponibles">{profileAvatars.map(avatar => <button key={avatar.id} type="button" disabled={busy} className={`profile-avatar-option sv-motion-action${(selected ?? profile.avatarId) === avatar.id ? ' is-selected' : ''}`} aria-pressed={(selected ?? profile.avatarId) === avatar.id} onClick={() => setSelected(avatar.id)}>
       <StudentAvatar avatarId={avatar.id} /><span>{avatar.label}</span>{(selected ?? profile.avatarId) === avatar.id && <Check className="profile-avatar-check" size={17} aria-hidden="true" />}
     </button>)}</div>
     <div hidden={mode !== 'photo'} className="avatar-photo-editor">
@@ -89,6 +89,6 @@ export function AvatarPicker({ dialogRef, onSaved }: { dialogRef: RefObject<HTML
       {profile.photoId && <button type="button" className="avatar-remove-photo" disabled={busy || loading} onClick={() => { void save(true); }}>Eliminar foto y volver a mi avatar</button>}
     </div>
     {error && <p className="profile-error" role="alert">{error}</p>}
-    <div className="profile-actions"><button type="button" className="button button-primary" disabled={busy || loading || (mode === 'photo' && !decoded)} onClick={() => { void save(); }}>{busy ? 'Guardando…' : mode === 'photo' ? 'Guardar foto' : 'Guardar avatar'}</button><button type="button" className="button button-outline" disabled={busy} onClick={close}>Cancelar</button></div>
+    <div className="profile-actions"><button type="button" className="button button-primary sv-motion-action" disabled={busy || loading || (mode === 'photo' && !decoded)} onClick={() => { void save(); }}>{busy ? 'Guardando…' : mode === 'photo' ? 'Guardar foto' : 'Guardar avatar'}</button><button type="button" className="button button-outline sv-motion-action" disabled={busy} onClick={close}>Cancelar</button></div>
   </dialog>;
 }

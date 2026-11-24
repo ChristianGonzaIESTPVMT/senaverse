@@ -1,5 +1,5 @@
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { CameraOff, CircleAlert, CircleCheck, CircleHelp, Hand, RotateCcw, ScanLine } from 'lucide-react';
 import { PracticeCamera, type PracticeCameraSessionState } from './PracticeCamera';
 import { recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
 import { getEducationalSignForClass } from '../data/library';
@@ -12,6 +12,10 @@ import { createGestureGate } from '../data/gameGestures';
 import type { FreshHandInference } from '../features/sign-recognition/types';
 
 const PracticePreview = memo(PracticeCamera);
+const resultIcons = {
+  off: CameraOff, searching: ScanLine, collecting: Hand, analyzing: Hand,
+  recognized: CircleCheck, unknown: CircleHelp, tracking: CircleAlert, different: CircleAlert,
+};
 
 export function GameRecognitionPractice({ step, accepting, onReady, onGesture }: {
   step: number; accepting: boolean; onReady: (ready: boolean) => void; onGesture: (id: string, step: number) => void;
@@ -79,8 +83,9 @@ export function GameRecognitionPractice({ step, accepting, onReady, onGesture }:
   </div>;
 }
 
-export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave, assessment }: {
+export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave, assessment, cameraMotion = false }: {
   initialSign?: string;
+  cameraMotion?: boolean;
   onConfirmed?: (event: RecognitionConfirmation) => void;
   onSave?: (signId: string) => void;
   guided?: { targetId: string; instruction: string; onAccept: (signId: string) => void; acceptLabel?: string };
@@ -112,6 +117,9 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   const targetId = mode.type === 'directed' ? mode.targetId : '';
   const confirmed = result.confirmation && recognitionSignsById.get(result.confirmation.signId);
   const entry = getEducationalSignForClass(targetId || confirmed?.id || '');
+  const resultTone = result.confirmation?.outcome === 'different' ? 'different' : result.status;
+  const ResultIcon = resultIcons[resultTone];
+  const actionMotion = cameraMotion ? ' sv-motion-action' : '';
 
   const clearSavedPractice = useCallback(() => {
     savedAttempt.current = false;
@@ -153,12 +161,12 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
     {modelState.status === 'loading' && <p className="practice-feedback" role="status">Cargando el reconocimiento…</p>}
     {modelState.status === 'error' && <div className="practice-recognition-error">
       <p className="practice-feedback" role="alert">{modelState.message}</p>
-      <button type="button" className="button button-outline" onClick={recognition.reloadModel}>Reintentar carga</button>
+      <button type="button" className={'button button-outline' + actionMotion} onClick={recognition.reloadModel}>Reintentar carga</button>
     </div>}
     <div className="practice-workspace">
       <div className="practice-recognition-column">
         <PracticePreview {...recognition.cameraBindings} onSessionState={onSave || guided ? trackPracticeState : onSessionState} disabled={modelState.status !== 'ready' && !cameraActive}
-          disabledReason="La cámara estará disponible cuando cargue el reconocimiento." showLandmarks={showLandmarks} />
+          disabledReason="La cámara estará disponible cuando cargue el reconocimiento." showLandmarks={showLandmarks} motion={cameraMotion} />
         <label className="practice-panel practice-overlay-toggle">
           <input type="checkbox" checked={showLandmarks} onChange={event => setShowLandmarks(event.target.checked)} />
           Mostrar puntos de la mano
@@ -167,8 +175,8 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
       <div className="practice-recognition-column">
         <section className="practice-panel practice-recognition-result">
           <h2>Resultado de reconocimiento</h2>
-          <div className="practice-student-result" role="status" aria-atomic="true">
-            <p>{RECOGNITION_STATES[result.status]}</p>
+          <div className="practice-student-result" role="status" aria-atomic="true" data-result={cameraMotion ? resultTone : undefined}>
+            <p>{cameraMotion && <ResultIcon size={18} aria-hidden="true" />}{RECOGNITION_STATES[result.status]}</p>
             {confirmed && <><strong>{confirmed.name}</strong>
               {result.confirmation?.outcome === 'matched' && <p>Coincide con la seña que estás practicando.</p>}
               {result.confirmation?.outcome === 'different' && <p>El modelo confirmó una seña distinta de la elegida.</p>}
@@ -176,7 +184,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
           </div>
           {assessment ? <button type="button" className="button button-primary" disabled={!cameraActive || modelState.status !== 'ready' || !observation}
             onClick={() => { if (observation) assessment.onObserve(observation); }}>Comprobar intento con cámara</button>
-            : <button type="button" className="button button-outline" onClick={() => {
+            : <button type="button" className={'button button-outline' + actionMotion} onClick={() => {
             setConfirmedMatch(null);
             clearSavedPractice();
             recognition.reset();
@@ -210,7 +218,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
     {!guided && !assessment && <details className="practice-panel practice-catalog">
       <summary>Consultar las diez señas compatibles</summary>
       <ul>{recognitionSigns.map(sign => <li key={sign.id}>
-        <button type="button" className="button button-outline" aria-pressed={targetId === sign.id} onClick={() => {
+        <button type="button" className={'button button-outline' + actionMotion} aria-pressed={targetId === sign.id} onClick={() => {
           selectTarget(sign.id);
           selectRef.current?.focus();
         }}>{sign.name}</button>

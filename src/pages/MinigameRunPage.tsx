@@ -1,6 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Link2, RotateCcw, Trophy } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, CircleX, Link2, RotateCcw, Trophy } from 'lucide-react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { GameBeams } from '../components/GameBeams';
+import { MotionProgress } from '../components/MotionProgress';
+import { MotionValue } from '../components/MotionValue';
 import { QuizSignMedia } from '../components/QuizSignMedia';
 import { getEducationalSign } from '../data/library';
 import { signQuizMedia } from '../data/signQuizMedia';
@@ -54,6 +57,9 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
   const activeTimer = running && run.activeSince !== null;
   const result = run && playResult(run);
   const best = summarizeMinigame(progress, game, settings, playLimit(game, settings), run?.assisted).best;
+  const award = run && result && progress.activities.find(activity => activity.id === 'minigame:' + run.id);
+  const savedDetails = award?.result && 'details' in award.result ? award.result.details : undefined;
+  const newRecord = !!savedDetails && best?.details === savedDetails;
   const assistedBest = !run && game.id === 'senas' ? summarizeMinigame(progress, game, settings, playLimit(game, settings), true).best : undefined;
   const supportsCamera = game.id === 'senas' || game.id === 'desafio';
 
@@ -88,8 +94,9 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
   const elapsed = run ? playElapsed(run, now) : 0;
   const countdown = run?.board.kind === 'sprint' && run.activeSince !== null ? Math.ceil((run.activeSince - now) / 1000) : 0;
   const waitingCamera = run?.board.kind === 'sprint' && run.settings.mode === 'camera' && run.activeSince === null;
-  return <div className="minigames-page minigame-session" data-game={game.id}>
-    <Link className="game-back" to={viaCamera ? '/camara' : '/minijuegos'}><ArrowLeft size={18} aria-hidden="true" />{viaCamera ? 'Centro de práctica' : 'Minijuegos'}</Link>
+  const remaining = settings.duration ? Math.max(0, settings.duration * 1000 - elapsed) : 0;
+  return <div className="minigames-page minigame-session sv-motion" data-game={game.id}>
+    <Link className="game-back sv-motion-action" to={viaCamera ? '/camara' : '/minijuegos'}><ArrowLeft size={18} aria-hidden="true" />{viaCamera ? 'Centro de práctica' : 'Minijuegos'}</Link>
     <header className="minigames-heading"><h1>{game.title}</h1><p>{game.objective}</p></header>
     {!run && <section className="game-panel game-setup">
       <h2>Configura tu partida</h2>
@@ -107,45 +114,48 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
         </select></label>}
       </div>
       <p>{playLimit(game, settings)} {game.id === 'memoria' || game.id === 'relaciona' ? 'parejas' : game.id === 'senas' ? 'señas' : 'objetivos'} por partida.</p>
-      {best && <p>Récord de esta configuración{game.id === 'senas' && ' sin ayuda'} · {best.score} puntos{best.details.moves !== undefined && ' · ' + best.details.moves + ' movimientos'} · {durationLabel(best.details.elapsedMs)}</p>}
-      {assistedBest && <p>Récord con ayuda · {assistedBest.score} puntos · {durationLabel(assistedBest.details.elapsedMs)}</p>}
+      {best && <p className="minigame-record">Récord de esta configuración{game.id === 'senas' && ' sin ayuda'} · {best.score} puntos{best.details.moves !== undefined && ' · ' + best.details.moves + ' movimientos'} · {durationLabel(best.details.elapsedMs)}</p>}
+      {assistedBest && <p className="minigame-record">Récord con ayuda · {assistedBest.score} puntos · {durationLabel(assistedBest.details.elapsedMs)}</p>}
       <p className="game-source">Fotografías educativas de SeñaVerse y diagramas basados en el MINEDU. Revisión lingüística pendiente.</p>
-      <button type="button" className="button button-primary" onClick={start}>Iniciar partida</button>
+      <button type="button" className="button button-primary sv-motion-action" onClick={start}>Iniciar partida</button>
     </section>}
     {run && running && <>
       <div className="game-score" aria-label="Estado de la partida">
-        <span><strong data-score>{run.correct * pointsPerMatch}</strong> puntos</span>
+        <span><strong data-score><MotionValue value={run.correct * pointsPerMatch} /></strong> puntos</span>
         <span><strong>{run.correct}</strong> {game.id === 'memoria' || game.id === 'relaciona' ? (run.correct === 1 ? 'pareja' : 'parejas') : (run.correct === 1 ? 'acierto' : 'aciertos')}</span>
         <span><strong data-errors>{run.errors}</strong> {run.errors === 1 ? 'error' : 'errores'}</span>
-        {run.board.kind === 'memory' ? <span><strong>{run.correct + run.errors}</strong> movimientos</span>
-          : <span><strong>{run.streak}</strong> {run.board.kind === 'sprint' ? 'de combo' : 'de racha'}</span>}
-        <span role="timer" aria-label={settings.duration ? 'Tiempo restante' : 'Tiempo transcurrido'}><strong>
-          {durationLabel(settings.duration ? Math.ceil((settings.duration * 1000 - elapsed) / 1000) * 1000 : elapsed)}
-        </strong> {settings.duration ? 'restante' : 'transcurrido'}</span>
+        {run.board.kind === 'memory' ? <span><strong><MotionValue value={run.correct + run.errors} /></strong> movimientos</span>
+          : <span className="game-streak" data-combo={run.board.kind === 'sprint' && run.streak > 1}><strong><MotionValue value={run.streak} /></strong> {run.board.kind === 'sprint' ? 'de combo' : 'de racha'}</span>}
+        <span className="game-time" data-low={!!settings.duration && remaining <= 5000} role="timer" aria-label={settings.duration ? 'Tiempo restante' : 'Tiempo transcurrido'}><strong>
+          {durationLabel(settings.duration ? Math.ceil(remaining / 1000) * 1000 : elapsed)}
+        </strong> {settings.duration ? 'restante' : 'transcurrido'}
+          {!!settings.duration && <span className="game-time-fill" aria-hidden="true" style={{ '--game-time-left': remaining / (settings.duration * 1000) } as CSSProperties} />}
+        </span>
       </div>
-      <progress className="game-progress" value={run.correct} max={run.limit} aria-label="Aciertos de la partida" />
+      <div className="game-progress"><MotionProgress value={run.correct} max={run.limit} label="Aciertos de la partida" animateOnMount={false} /></div>
       {run.board.kind === 'association' && <Association key={run.id} board={run.board} send={send} />}
-      {run.board.kind === 'memory' && <Memory board={run.board} send={send} />}
+      {run.board.kind === 'memory' && <Memory key={run.id} board={run.board} send={send} />}
       {run.board.kind === 'guess' && <Interpretation key={run.id + ':' + run.board.step} board={run.board} send={send} />}
       {run.board.kind === 'sequence' && <Sequence key={run.id} run={run} board={run.board} send={send} ready={ready} gesture={gesture} />}
       {run.board.kind === 'sprint' && <section className="game-panel game-sprint" aria-label="Reto en curso">
         <div className="game-sprint-prompt">
           <p className="game-progress-label">Objetivo {run.board.step + 1} de {run.limit}</p>
-          {waitingCamera ? <h2>Prepara la cámara</h2> : countdown > 0 ? <h2 role="status" className="game-countdown">Empieza en {countdown}</h2>
-            : settings.mode === 'camera' ? <h2>Realiza «<span data-target>{word(run.board.targets[run.board.step])}</span>»</h2> : null}
+          {waitingCamera ? <h2>Prepara la cámara</h2> : countdown > 0 ? <h2 role="status" className="game-countdown">Empieza en <MotionValue value={countdown} /></h2>
+            : settings.mode === 'camera' ? <h2 key={run.board.step} className="game-step-entry">Realiza «<span data-target>{word(run.board.targets[run.board.step])}</span>»</h2> : null}
           {settings.mode === 'camera' && !waitingCamera && countdown <= 0 && <div className="game-gesture-reference"><Sign id={run.board.targets[run.board.step]} diagram /></div>}
         </div>
         {settings.mode === 'camera' ? <Suspense fallback={<p role="status">Cargando cámara…</p>}>
           <CameraGame key={run.id} step={run.board.step} accepting={!waitingCamera && countdown <= 0} onReady={ready} onGesture={gesture} />
         </Suspense> : countdown > 0 ? null : <Interpretation key={run.id + ':' + run.board.step} board={run.board} send={send} sprint />}
+        {settings.mode === 'camera' && <GestureFeedback run={run} />}
       </section>}
       <div className="game-actions">
-        <button className="button button-outline" type="button" onClick={start}><RotateCcw size={17} aria-hidden="true" /> Reiniciar partida</button>
-        <button className="button button-outline" type="button" onClick={() => setRun(undefined)}>Abandonar partida</button>
+        <button className="button button-outline sv-motion-action" type="button" onClick={start}><RotateCcw size={17} aria-hidden="true" /> Reiniciar partida</button>
+        <button className="button button-outline sv-motion-action" type="button" onClick={() => setRun(undefined)}>Abandonar partida</button>
       </div>
     </>}
-    {run && result && <Results game={game} run={run} result={result} best={best}
-      reward={progress.activities.find(activity => activity.id === 'minigame:' + run.id)?.rewardXp}
+    {run && result && <Results key={run.id} game={game} run={run} result={result} best={best}
+      reward={award?.rewardXp} newRecord={newRecord}
       repeat={start} options={() => setRun(undefined)} />}
   </div>;
 }
@@ -153,6 +163,8 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
 function Association({ board, send }: { board: Extract<GameBoard, { kind: 'association' }>; send: Send }) {
   const [selected, setSelected] = useState('');
   const [rejected, setRejected] = useState(false);
+  const [dragging, setDragging] = useState('');
+  const grid = useRef<HTMLDivElement>(null);
   const connect = (source: string, destination: string, at: number) => {
     if (!source || !board.sources.includes(source) || board.locked.includes(source) || board.locked.includes(destination)) return;
     send({ type: 'link', source, destination, at });
@@ -160,15 +172,16 @@ function Association({ board, send }: { board: Extract<GameBoard, { kind: 'assoc
     setRejected(false);
   };
 
-  return <section className="game-panel game-association" aria-label="Tablero de asociación">
+  return <section className="game-panel game-association" data-dragging={!!dragging} aria-label="Tablero de asociación">
     <h2>Conecta cada seña con una cantidad</h2>
     <p>Selecciona una seña y luego una cantidad. También puedes arrastrar la seña hacia su destino.</p>
-    <div className="game-association-grid">
+    <div className="game-association-grid" ref={grid}>
       <div><h3>Señas</h3>{board.sources.map((id, index) => <button key={id} type="button" className="game-association-item"
         data-source-index={index} data-pair={board.locked.includes(id) ? 'correct' : board.checked && board.pairs[id] ? 'wrong' : undefined}
-        aria-pressed={selected === id} aria-label={'Seña ' + (index + 1) + '. ' + explanation(id) + (board.pairs[id] ? ' Conectada con ' + word(board.pairs[id]) : '')}
+        aria-pressed={selected === id} data-drag-source={dragging === id} aria-label={'Seña ' + (index + 1) + '. ' + explanation(id) + (board.pairs[id] ? ' Conectada con ' + word(board.pairs[id]) : '')}
         disabled={board.locked.includes(id)} draggable={!board.locked.includes(id)}
-        onDragStart={event => { event.dataTransfer.effectAllowed = 'link'; event.dataTransfer.setData('text/plain', id); }}
+        onDragStart={event => { event.dataTransfer.effectAllowed = 'link'; event.dataTransfer.setData('text/plain', id); setDragging(id); }}
+        onDragEnd={() => setDragging('')}
         onClick={() => { setSelected(selected === id ? '' : id); setRejected(false); }}>
         <span className="game-connector">{index + 1}</span><Sign id={id} diagram={index % 2 === 1} />
         {board.pairs[id] && <Link2 size={17} aria-hidden="true" />}
@@ -178,19 +191,20 @@ function Association({ board, send }: { board: Extract<GameBoard, { kind: 'assoc
         return <button key={id} type="button" className="game-association-item" data-destination-index={index}
           data-pair={board.locked.includes(id) ? 'correct' : board.checked && origin ? 'wrong' : undefined}
           disabled={board.locked.includes(id)}
-          onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); connect(event.dataTransfer.getData('text/plain'), id, Date.now()); }}
+          onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); setDragging(''); connect(event.dataTransfer.getData('text/plain'), id, Date.now()); }}
           onClick={() => selected ? connect(selected, id, Date.now()) : setRejected(true)}>
           <span className="game-connector">{origin ? board.sources.indexOf(origin) + 1 : '–'}</span><Quantity id={id} />
-          {board.locked.includes(id) && <Check size={17} aria-hidden="true" />}
+          {board.locked.includes(id) ? <Check size={17} aria-hidden="true" /> : board.checked && origin && <CircleX size={17} aria-hidden="true" />}
         </button>;
       })}</div>
+      <GameBeams grid={grid} board={board} />
     </div>
     <p role="status">{rejected ? 'Selecciona primero una seña.' : selected ? 'Seña ' + (board.sources.indexOf(selected) + 1) + ' seleccionada. Elige una cantidad.'
       : board.checked ? 'Las conexiones marcadas se pueden corregir.' : Object.keys(board.pairs).length + ' conexiones de ' + board.sources.length}</p>
     {board.checked && <ul className="game-feedback-list">{board.sources.map((id, index) => <li key={id}>
       <strong>Seña {index + 1} · {board.locked.includes(id) ? 'Correcta' : 'Revisar'}</strong> {explanation(id)}
     </li>)}</ul>}
-    <button className="button button-primary" type="button" disabled={board.checked || Object.keys(board.pairs).length !== board.sources.length}
+    <button className="button button-primary sv-motion-action" type="button" disabled={board.checked || Object.keys(board.pairs).length !== board.sources.length}
       onClick={() => send({ type: 'check', at: Date.now() })}>Comprobar conexiones</button>
   </section>;
 }
@@ -205,15 +219,17 @@ function Memory({ board, send }: { board: Extract<GameBoard, { kind: 'memory' }>
       const matched = board.matched.includes(index);
       const visible = matched || board.open.includes(index);
       return <button className="game-memory-card" key={index} type="button" ref={node => { cards.current[index] = node; }}
-        data-state={matched ? 'matched' : visible ? 'open' : 'hidden'} aria-disabled={matched || visible || waiting}
+        data-state={matched ? 'matched' : visible ? 'open' : 'hidden'} data-outcome={waiting && visible && !matched ? 'wrong' : undefined} aria-disabled={matched || visible || waiting}
         aria-label={'Carta ' + (index + 1) + (matched ? ', pareja encontrada' : visible ? card.visual ? ', ' + explanation(card.id) : ', ' + word(card.id) : ' oculta')}
         onClick={() => send({ type: 'flip', index, at: Date.now() })}>
-        <span className="game-card-face">{visible ? card.visual ? <Sign id={card.id} diagram={quantity(card.id) % 2 === 0} />
-          : <Quantity id={card.id} /> : <span aria-hidden="true">?</span>}</span>
-        {matched && <Check className="game-match-check" size={17} aria-hidden="true" />}
+        <span className="game-card-rotor" aria-hidden="true">
+          <span className="game-card-face game-card-covered">?</span>
+          <span className="game-card-face game-card-revealed">{visible && (card.visual ? <Sign id={card.id} diagram={quantity(card.id) % 2 === 0} /> : <Quantity id={card.id} />)}</span>
+        </span>
+        {matched ? <Check className="game-match-check" size={17} aria-hidden="true" /> : waiting && visible && <CircleX className="game-match-error" size={17} aria-hidden="true" />}
       </button>;
     })}</div>
-    {waiting && <button className="button button-outline game-restart" type="button" onClick={() => {
+    {waiting && <button className="button button-outline game-restart sv-motion-action" type="button" onClick={() => {
       cards.current[board.open[0]]?.focus();
       send({ type: 'hide', at: Date.now() });
     }}>Ocultar tarjetas</button>}
@@ -231,19 +247,32 @@ function Interpretation({ board, send, sprint = false }: { board: Extract<GameBo
       <p className="game-progress-label">{sprint ? 'Interpretación rápida' : 'Ronda ' + (board.step + 1) + ' de ' + board.targets.length}</p>
       <h2 ref={heading} tabIndex={-1}>¿Qué seña observas?</h2>
       <div className="game-observation"><Sign id={id} diagram={diagram} /></div>
-      {answered && <button className="button button-outline game-restart" type="button" onClick={() => setDiagram(!diagram)}>{diagram ? 'Volver a la fotografía' : 'Volver a observar con el diagrama'}</button>}
+      {answered && <button className="button button-outline game-restart sv-motion-action" type="button" onClick={() => setDiagram(!diagram)}>{diagram ? 'Volver a la fotografía' : 'Volver a observar con el diagrama'}</button>}
     </div>
     <div>
       <div className="game-options" role="group" aria-label="Significados posibles">
-        {board.options[board.step].map(option => <button className="button button-outline" key={option} type="button" aria-disabled={answered}
+        {board.options[board.step].map(option => <button className="button button-outline" key={option} type="button" aria-disabled={answered} aria-pressed={answered ? board.answer === option : undefined}
           data-answer={answered && option === id ? 'correct' : option === board.answer ? 'wrong' : undefined}
-          onClick={() => send({ type: 'answer', id: option, step: board.step, at: Date.now() })}>{word(option)}</button>)}
+          onClick={() => send({ type: 'answer', id: option, step: board.step, at: Date.now() })}>
+          {word(option)}{answered && (option === id ? <Check size={16} aria-hidden="true" /> : option === board.answer && <CircleX size={16} aria-hidden="true" />)}
+        </button>)}
       </div>
-      {answered && <div className="game-quiz-feedback" role="status">
+      {answered && <div className="game-quiz-feedback" data-correct={board.answer === id} role="status">
         <p><strong>{board.answer === id ? 'Correcto.' : 'La respuesta era'} {word(id)}.</strong> {explanation(id)}</p>
-        <button className="button button-primary" type="button" onClick={() => send({ type: 'next', step: board.step, at: Date.now() })}>{board.step + 1 === board.targets.length ? 'Ver resultados' : 'Siguiente seña'}</button>
+        <button className="button button-primary sv-motion-action" type="button" onClick={() => send({ type: 'next', step: board.step, at: Date.now() })}>{board.step + 1 === board.targets.length ? 'Ver resultados' : 'Siguiente seña'}</button>
       </div>}
     </div>
+  </div>;
+}
+
+function GestureFeedback({ run }: { run: Play }) {
+  if (!run.correct && !run.errors) return null;
+  const matched = run.streak > 0;
+  return <div className="game-gesture-feedback" role="status">
+    <span key={run.correct + run.errors} data-correct={matched}>
+      {matched ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleX size={18} aria-hidden="true" />}
+      {matched ? 'Coincidencia experimental registrada.' : 'Se confirmó una seña distinta. Intenta de nuevo.'}
+    </span>
   </div>;
 }
 
@@ -252,12 +281,13 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
   const showing = board.phase !== 'recall';
   const camera = run.settings.mode === 'camera';
   const resumeCamera = useCallback((available: boolean) => ready(available && !showing), [ready, showing]);
-  return <section className="game-panel game-sequence" aria-label="Secuencia de señas">
+  return <section className="game-panel game-sequence" data-phase={board.phase} aria-label="Secuencia de señas">
     <h2>{showing ? 'Memoriza el orden' : camera ? 'Reproduce la secuencia' : 'Reconstruye la secuencia'}</h2>
     <ol className="game-sequence-track">{board.targets.map((id, index) => {
       const placed = board.ordered[index];
       const confirmed = index < board.step;
-      return <li key={index} className="game-sequence-slot" data-confirmed={confirmed} aria-current={!showing && index === (camera ? board.step : board.ordered.length) ? 'step' : undefined}>
+      return <li key={index} className="game-sequence-slot" style={{ '--game-entry-step': index } as CSSProperties}
+        data-confirmed={confirmed} aria-current={!showing && index === (camera ? board.step : board.ordered.length) ? 'step' : undefined}>
         <span>{index + 1}</span>
         {showing || placed ? <Sign id={showing ? id : placed} diagram /> : confirmed ? <Check size={24} aria-label="Confirmada" /> : <span aria-label="Por completar">·</span>}
       </li>;
@@ -268,37 +298,46 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
       <Suspense fallback={<p role="status">Cargando cámara…</p>}>
         <CameraGame accepting={!showing} step={board.step} onReady={resumeCamera} onGesture={gesture} />
       </Suspense>
+      <GestureFeedback run={run} />
     </div>}
-    {showing ? <button className="button button-primary" type="button" onClick={() => send({ type: 'recall', at: Date.now() })}>
+    {!camera && !showing && run.errors > 0 && <p className="game-sequence-error" key={run.errors}><CircleX size={17} aria-hidden="true" /> Errores de orden · {run.errors}</p>}
+    {showing ? <button className="button button-primary sv-motion-action" type="button" onClick={() => send({ type: 'recall', at: Date.now() })}>
       {board.phase === 'hint' ? 'Ocultar ayuda' : 'Ocultar secuencia y empezar'} <ArrowRight size={17} aria-hidden="true" />
     </button> : <>
       {!camera && <div className="game-sequence-choices" role="group" aria-label="Tarjetas para ordenar">{board.choices.map((id, index) => <button key={id} type="button"
-          className="button button-outline" data-choice-index={index} aria-pressed={board.ordered.includes(id)}
+          className="button button-outline sv-motion-action" data-choice-index={index} aria-pressed={board.ordered.includes(id)}
           disabled={board.ordered.includes(id) || board.ordered.length === run.limit}
           onClick={() => send({ type: 'pick', id, at: Date.now() })}><Sign id={id} diagram={index % 2 === 0} /></button>)}</div>}
       <div className="game-actions">
         {!camera && <>
-          <button className="button button-primary" type="button" disabled={board.ordered.length !== run.limit} onClick={() => send({ type: 'check', at: Date.now() })}>Comprobar secuencia</button>
-          <button className="button button-outline" type="button" disabled={board.ordered.length <= board.step} onClick={() => send({ type: 'undo', at: Date.now() })}>Quitar última tarjeta</button>
+          <button className="button button-primary sv-motion-action" type="button" disabled={board.ordered.length !== run.limit} onClick={() => send({ type: 'check', at: Date.now() })}>Comprobar secuencia</button>
+          <button className="button button-outline sv-motion-action" type="button" disabled={board.ordered.length <= board.step} onClick={() => send({ type: 'undo', at: Date.now() })}>Quitar última tarjeta</button>
         </>}
-        <button className="button button-outline" type="button" onClick={() => send({ type: 'hint', at: Date.now() })}>Ver ayuda</button>
+        <button className="button button-outline sv-motion-action" type="button" onClick={() => send({ type: 'hint', at: Date.now() })}>Ver ayuda</button>
       </div>
     </>}
   </section>;
 }
 
-function Results({ game, run, result, reward, best, repeat, options }: { game: Minigame; run: Play; result: NonNullable<ReturnType<typeof playResult>>;
-  reward?: number; best: ReturnType<typeof summarizeMinigame>['best']; repeat: () => void; options: () => void }) {
+function Results({ game, run, result, reward, best, newRecord, repeat, options }: { game: Minigame; run: Play; result: NonNullable<ReturnType<typeof playResult>>;
+  reward?: number; best: ReturnType<typeof summarizeMinigame>['best']; newRecord: boolean; repeat: () => void; options: () => void }) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => { title.current?.focus(); }, []);
   const points = result.correct * pointsPerMatch;
   return <section className="game-panel game-results" aria-labelledby="game-results-title">
-    <Trophy size={32} aria-hidden="true" /><h2 id="game-results-title" tabIndex={-1} ref={title}>Resultados de la partida</h2>
+    <span className="game-result-icon" aria-hidden="true">
+      <Trophy size={32} />
+      {!!reward && <svg className="game-reward-burst" width="76" height="76" viewBox="0 0 76 76" fill="none" focusable="false">
+        <path d="M38 3v6m25 4-5 5m15 20h-6m-4 25-5-5M38 73v-6M13 63l5-5M3 38h6m4-25 5 5" />
+      </svg>}
+    </span>
+    <h2 id="game-results-title" tabIndex={-1} ref={title}>Resultados de la partida</h2>
     <p>{run.settings.mode === 'camera' ? 'Cámara experimental' : 'Modalidad visual'}
       {game.id === 'senas' && (result.assisted ? ' · Con ayuda' : ' · Sin ayuda')}
       {run.settings.duration > 0 && result.elapsedMs === run.settings.duration * 1000 && ' · Tiempo agotado'}</p>
+    {newRecord && <p className="game-new-record" role="status"><Trophy size={18} aria-hidden="true" /> Nuevo récord personal</p>}
     <dl className="game-results-stats">
-      <div><dt>Puntos</dt><dd>{points}</dd></div><div><dt>Récord personal</dt><dd>{best?.score ?? points} puntos</dd></div>
+      <div className="game-result-points"><dt>Puntos</dt><dd>{points}</dd></div><div><dt>Récord personal</dt><dd>{best?.score ?? points} puntos</dd></div>
       <div><dt>Aciertos</dt><dd>{result.correct} / {result.limit}</dd></div><div><dt>Errores</dt><dd>{result.errors}</dd></div>
       <div><dt>Tiempo de juego</dt><dd>{durationLabel(result.elapsedMs)}</dd></div>
       {result.moves !== undefined ? <div><dt>Movimientos</dt><dd>{result.moves} · mejor {best?.details.moves ?? result.moves}</dd></div>
@@ -306,9 +345,9 @@ function Results({ game, run, result, reward, best, repeat, options }: { game: M
     </dl>
     {run.board.kind === 'association' && <ul className="game-feedback-list">{run.board.sources.map(id => <li key={id}><strong>{word(id)}</strong> · {explanation(id)}</li>)}</ul>}
     {run.board.kind === 'sequence' && <p>Secuencia completada · {run.board.targets.map(word).join(' → ')}</p>}
-    {reward ? <p className="success-message">Ganaste {reward} XP por tu primera partida con aciertos.</p>
+    {reward ? <p className="success-message game-new-reward"><CheckCircle2 size={18} aria-hidden="true" /> Ganaste {reward} XP por tu primera partida con aciertos.</p>
       : <p>La recompensa de {game.rewardXp} XP se otorga una vez por juego al terminar con aciertos.</p>}
-    <div className="game-actions"><button className="button button-primary" type="button" onClick={repeat}>Volver a jugar</button>
-      <button className="button button-outline" type="button" onClick={options}>Cambiar opciones</button></div>
+    <div className="game-actions"><button className="button button-primary sv-motion-action" type="button" onClick={repeat}>Volver a jugar</button>
+      <button className="button button-outline sv-motion-action" type="button" onClick={options}>Cambiar opciones</button></div>
   </section>;
 }

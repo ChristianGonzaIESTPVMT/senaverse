@@ -30,35 +30,16 @@ function AttemptFeedback({ attempt, explanation, visualExplanation }: {
   const recognized = observation?.status === 'recognized' && getEducationalSignForClass(observation.signId);
   const gestureIcon = attempt.matched ? CheckCircle2 : recognized ? Hand : observation?.status === 'unknown' ? CircleHelp : ScanLine;
   return <div className="situation-attempt-feedback" role="status" aria-atomic="true">
-<<<<<<< Updated upstream
-    <Result title={attempt.contextCorrect ? 'Contexto correcto' : 'Contexto por revisar'} passed={attempt.contextCorrect}>{explanation}</Result>
-    {attempt.method === 'visual' ? <Result title={attempt.matched ? 'Comprensión visual correcta' : 'Comprensión visual por revisar'} passed={attempt.matched}>
+    <Result key={'context-' + attempt.id} icon={attempt.contextCorrect ? CheckCircle2 : CircleX} title={attempt.contextCorrect ? 'Contexto correcto' : 'Contexto por revisar'} passed={attempt.contextCorrect}>{explanation}</Result>
+    {attempt.method === 'visual' ? <Result key={'visual-' + attempt.id} icon={Eye} title={attempt.matched ? 'Comprensión visual correcta' : 'Comprensión visual por revisar'} passed={attempt.matched}>
       {attempt.matched ? 'Identificaste la demostración de la opción que elegiste.' : 'La demostración seleccionada corresponde a otra seña.'}
       {visualExplanation && ` ${visualExplanation}`}
-    </Result> : <Result title={attempt.matched ? 'Coincidencia gestual' : recognized ? 'Seña diferente' : observation?.status === 'unknown'
+    </Result> : <Result key={'gesture-' + attempt.id} icon={gestureIcon} title={attempt.matched ? 'Coincidencia gestual' : recognized ? 'Seña diferente' : observation?.status === 'unknown'
       ? 'Gesto desconocido' : 'Seguimiento insuficiente'} passed={attempt.matched}>
       {recognized ? `V1 reconoció «${recognized.word}». ${attempt.matched ? 'Coincide con la opción que elegiste.' : `Vuelve a intentar «${getEducationalSign(attempt.choiceId)?.word}».`}`
         : 'Centra la mano completa, ilumínala de frente y mantenla visible. Puedes reintentar o elegir la práctica sin cámara.'}
     </Result>}
     {!attempt.passed && <p>{attempt.contextCorrect ? 'Conserva tu respuesta y repite la práctica.' : 'Revisa la situación y elige otra respuesta para avanzar.'}</p>}
-=======
-    <Result key={`context-${attempt.id}`} title={attempt.contextCorrect ? 'Contexto correcto' : 'Contexto por revisar'}
-      icon={attempt.contextCorrect ? CheckCircle2 : CircleX} passed={attempt.contextCorrect}>{explanation}</Result>
-    {attempt.method === 'visual' ? <Result key={`visual-${attempt.id}`} title={attempt.matched ? 'Comprensión visual correcta' : 'Comprensión visual por revisar'} passed={attempt.matched} icon={Eye}>
-      {attempt.matched ? 'Identificaste la demostración elegida.' : 'Compara las demostraciones y fíjate en la posición de la mano y su movimiento.'}
-      {visualExplanation && ` ${visualExplanation}`}
-    </Result> : <Result key={`gesture-${attempt.id}`} title={attempt.matched ? 'Coincidencia gestual' : recognized ? 'Seña diferente' : observation?.status === 'unknown'
-      ? 'Gesto desconocido' : 'Seguimiento insuficiente'} passed={attempt.matched} icon={gestureIcon}>
-      {recognized ? `V1 reconoció «${recognized.word}». ${attempt.matched ? 'Coincide con tu respuesta.' : 'Vuelve a realizar la seña elegida.'}`
-        : 'Centra la mano completa, ilumínala de frente y mantenla visible. Puedes reintentar o elegir la práctica sin cámara.'}
-    </Result>}
-    <div className="situation-dialogue-speaker situation-dialogue-reply" key={`reply-${attempt.id}`}>
-      <MessageSquareText size={20} aria-hidden="true" />
-      <div><strong>{speaker}</strong><p>
-        {attempt.passed ? 'De acuerdo, continuemos.' : !attempt.contextCorrect ? 'Revisemos lo que hace falta aquí.' : 'Veamos otra vez cómo expresar tu respuesta.'}
-      </p></div>
-    </div>
->>>>>>> Stashed changes
   </div>;
 }
 
@@ -106,11 +87,7 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
           : exercise ? 'Completa la segunda comprobación con el ejercicio sin cámara.'
             : 'Esta opción no tiene una demostración verificable aquí. Elige otra para continuar.'}</p>}
         <div className="situation-question-actions" role="group" aria-label="Método de práctica">
-<<<<<<< Updated upstream
-          {cameraTarget && <button className="button button-outline" type="button" disabled={active?.method === 'camera'} onClick={() => start('camera')}>
-=======
-          {cameraAvailable && <button className="button button-outline sv-motion-action" type="button" disabled={active?.method === 'camera'} onClick={() => start('camera')}>
->>>>>>> Stashed changes
+          {cameraTarget && <button className="button button-outline sv-motion-action" type="button" disabled={active?.method === 'camera'} onClick={() => start('camera')}>
             <Camera size={18} aria-hidden="true" />{last?.method === 'camera' ? 'Reintentar con cámara' : 'Practicar con cámara'}
           </button>}
           {exercise && <button className="button button-outline sv-motion-action" type="button" disabled={active?.method === 'visual'} onClick={() => start('visual')}>
@@ -120,13 +97,8 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
         </div>
       </>}
     </div>
-<<<<<<< Updated upstream
-    {active?.method === 'camera' && cameraTarget && <Suspense fallback={<p role="status">Abriendo la práctica con cámara…</p>}>
+    {active?.method === 'camera' && cameraTarget && <div className="situation-camera-entry"><Suspense fallback={<p role="status">Abriendo la práctica con cámara…</p>}>
       <CameraPractice key={active.id} assessment={{ targetId: cameraTarget,
-=======
-    {active?.method === 'camera' && selected?.recognitionClassId && <div className="situation-camera-entry"><Suspense fallback={<p role="status">Abriendo la práctica con cámara…</p>}>
-      <CameraPractice key={active.id} assessment={{ targetId: selected.recognitionClassId,
->>>>>>> Stashed changes
         onObserve: observation => onEvent({ type: 'situation-attempt-result', situationId, sceneId, attemptId: active.id,
           input: { method: 'camera', observation } }) }} />
     </Suspense></div>}

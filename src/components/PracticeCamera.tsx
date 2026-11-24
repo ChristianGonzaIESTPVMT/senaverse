@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, ScanLine } from 'lucide-react';
+import { Camera, CameraOff, CircleAlert, Hand, ScanLine } from 'lucide-react';
 import { useHandDetection } from '../features/sign-recognition/useHandDetection';
 import { handDetectionMessage, type FreshHandInference, type HandDetectionState, type HandDiagnosticSnapshot } from '../features/sign-recognition/types';
 import { CAMERA_VIDEO_CONSTRAINTS, DEFAULT_HAND_PROFILE, type HandDetectionProfile } from '../features/sign-recognition/config';
@@ -17,7 +17,8 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'No se pudo abrir la cámara seleccionada. Puede estar ocupada, desconectada o deshabilitada en el sistema. Revisa qué cámara está elegida en el navegador y cierra otras aplicaciones que la estén utilizando.',
 };
 
-export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', showLandmarks = true, onFreshInference, onSessionState, onDiagnostics }: { disabled?: boolean;
+export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona primero una seña para practicar.', showLandmarks = true, onFreshInference, onSessionState, onDiagnostics, motion = false }: { disabled?: boolean;
+  motion?: boolean;
   disabledReason?: string;
   showLandmarks?: boolean;
   onFreshInference?: (event: FreshHandInference) => void;
@@ -122,6 +123,9 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
 
   const isActive = status === 'active';
   const isRequesting = status === 'requesting';
+  const DetectorIcon = motion && detectorStatus === 'detected' ? Hand
+    : motion && (detectorStatus === 'error' || detectorStatus === 'lost') ? CircleAlert
+      : ScanLine;
   const buttonLabels: Record<CameraStatus, string> = {
     idle: 'Activar cámara',
     requesting: 'Cancelar activación',
@@ -130,11 +134,12 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
   };
 
   return (
-    <section className="practice-panel practice-camera-panel" aria-labelledby="practice-camera-title">
+    <section className="practice-panel practice-camera-panel" aria-labelledby="practice-camera-title"
+      data-camera={motion ? status : undefined} data-detector={motion ? detectorStatus : undefined}>
       <div className="practice-panel-heading">
         <h2 id="practice-camera-title"><Camera size={22} aria-hidden="true" /> Tu cámara</h2>
         <span className={`practice-camera-status${isActive ? ' is-active' : ''}`} role="status">
-          {isActive ? 'Activada' : isRequesting ? 'Solicitando permiso' : 'Desactivada'}
+          {isActive ? 'Activada' : isRequesting ? 'Solicitando permiso' : motion && status === 'error' ? 'Error de cámara' : 'Desactivada'}
         </span>
       </div>
       <div className="practice-camera-preview">
@@ -146,10 +151,10 @@ export function PracticeCamera({ disabled = false, disabledReason = 'Selecciona 
           <p id="practice-camera-help">{disabled ? disabledReason : isRequesting ? 'Responde a la solicitud de permisos de tu navegador.' : 'Actívala cuando estés listo para practicar.'}</p>
         </div>}
       </div>
-      <div className={`practice-recognition-state${detection.state.status === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" aria-atomic="true"><ScanLine size={20} aria-hidden="true" /><span>{handDetectionMessage(detection.state)}</span></div>
+      <div className={`practice-recognition-state${detectorStatus === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" aria-atomic="true"><DetectorIcon size={20} aria-hidden="true" /><span>{handDetectionMessage(detection.state)}</span></div>
       {isActive && detection.state.status === 'error' && <button className="button button-outline practice-detector-retry" type="button" onClick={detection.retry}>Reintentar detector</button>}
       {error && <p className="practice-camera-error" role="alert">{error}</p>}
-      <button className="button button-primary practice-camera-button" type="button" disabled={disabled} aria-describedby={!isActive ? 'practice-camera-help' : undefined} onClick={() => { if (isActive || isRequesting) stopCamera(); else void startCamera(); }}>
+      <button className={`button button-primary practice-camera-button${motion ? ' sv-motion-action' : ''}`} type="button" disabled={disabled} aria-describedby={!isActive ? 'practice-camera-help' : undefined} onClick={() => { if (isActive || isRequesting) stopCamera(); else void startCamera(); }}>
         {isActive || isRequesting ? <CameraOff size={19} aria-hidden="true" /> : <Camera size={19} aria-hidden="true" />}
         {buttonLabels[status]}
       </button>

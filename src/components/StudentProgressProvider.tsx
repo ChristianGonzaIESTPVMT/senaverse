@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { LEGACY_PROGRESS_KEY, PROGRESS_KEY, canWriteProgress, emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress, type ProgressEvent, type StudentProgress } from '../data/progress';
-import { ProgressContext } from '../hooks/progressContext';
+import { ProgressContext, type AchievementMotion } from '../hooks/progressContext';
 import { LEGACY_SITUATION_KEY } from '../data/situationStudy';
 
-type SavedProgress = { progress: StudentProgress; raw: string | null; storageAvailable: boolean };
+type SavedProgress = { progress: StudentProgress; raw: string | null; storageAvailable: boolean; achievementMotion?: AchievementMotion };
 
 function restore(raw: string | null) {
   return restoreProgress(raw, localStorage.getItem(LEGACY_PROGRESS_KEY), localStorage.getItem(LEGACY_SITUATION_KEY));
@@ -49,6 +49,8 @@ export function StudentProgressProvider({ children }: { children: ReactNode }) {
       if (storageAvailable && raw !== previous.raw) progress = restore(raw);
     } catch { storageAvailable = false; }
     const updated = change(progress);
+    const pending = progress === previous.progress ? previous.achievementMotion : undefined;
+    const achievementMotion = pending ?? (updated !== progress ? { previous: progress, shown: new Set<string>() } : undefined);
     if (storageAvailable && updated !== progress) {
       try {
         const encoded = JSON.stringify(updated);
@@ -56,7 +58,7 @@ export function StudentProgressProvider({ children }: { children: ReactNode }) {
         raw = encoded;
       } catch { storageAvailable = false; }
     }
-    publish({ raw, progress: updated, storageAvailable });
+    publish({ raw, progress: updated, storageAvailable, achievementMotion });
   }, [publish]);
 
   const recordActivity = useCallback((event: ProgressEvent) => {
@@ -68,5 +70,5 @@ export function StudentProgressProvider({ children }: { children: ReactNode }) {
     update(previous => recordSignConsultation(previous, signId, at));
   }, [update]);
 
-  return <ProgressContext value={{ progress: saved.progress, storageAvailable: saved.storageAvailable, recordActivity, consultSign }}>{children}</ProgressContext>;
+  return <ProgressContext value={{ progress: saved.progress, storageAvailable: saved.storageAvailable, achievementMotion: saved.achievementMotion, recordActivity, consultSign }}>{children}</ProgressContext>;
 }

@@ -43,15 +43,10 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
     {activity.media && <QuizSignMedia key={activity.media.signId} media={activity.media} />}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
-<<<<<<< Updated upstream
       const fieldId = `${name}-${pair.id}`;
       return <div className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
         <div><label htmlFor={fieldId}>{pair.label}</label>
-          {checked && <small id={`${fieldId}-feedback`}>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
-=======
-      return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
-        <span>{pair.label}{checked && <small className={motion ? 'lesson-answer-result' : undefined}>{motion && (correct ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
->>>>>>> Stashed changes
+          {checked && <small className={motion ? 'lesson-answer-result' : undefined} id={`${fieldId}-feedback`}>{motion && (correct ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
           {pair.media && <QuizSignMedia media={pair.media} />}
         </div>
         <select id={fieldId} aria-describedby={checked ? `${fieldId}-feedback` : undefined}

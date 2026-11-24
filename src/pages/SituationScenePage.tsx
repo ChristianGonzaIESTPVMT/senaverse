@@ -3,13 +3,9 @@ import { ArrowLeft, ArrowRight, CheckCircle2, CircleX, ClipboardList, Info, Mess
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
-<<<<<<< Updated upstream
 import { SituationDialogue, SituationLine } from '../components/SituationDialogue';
-=======
-import { SituationDialogue } from '../components/SituationDialogue';
 import { MotionProgress } from '../components/MotionProgress';
 import { rememberSituationFinish } from '../components/situationFinishMotion';
->>>>>>> Stashed changes
 import { getEducationalSign } from '../data/library';
 import { nextSituationScene, summarizeSituation } from '../data/situationStudy';
 import { getSituation, getSituationFilter, getSituationPath, getSituationResultsPath, getSituationScenePath, getSituationsPath,

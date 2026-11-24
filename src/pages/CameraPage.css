@@ -231,3 +231,57 @@
 .practice-catalog button[aria-pressed="true"] { border-color: var(--color-primary); color: var(--color-primary); }
 .practice-recognition-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .practice-recognition-error p { margin: 0; }
+
+.camera-center-heading.sv-motion-enter {
+  --sv-entry-duration: 300ms;
+  --sv-entry-distance: 5px;
+  --sv-entry-fade: sv-motion-soft-fade;
+}
+.camera-center .practice-select-field select:focus-visible { border-color: var(--color-primary); }
+.camera-center .practice-catalog button[aria-pressed='true'] { background: var(--color-highlight); }
+.camera-center .practice-camera-preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--camera-frame, var(--color-line-strong));
+  border-radius: inherit;
+  pointer-events: none;
+}
+.camera-center [data-camera='requesting'],
+.camera-center [data-detector='loading'] { --camera-frame: var(--color-info-line); }
+.camera-center [data-detector='detected'] { --camera-frame: var(--color-success-line); }
+.camera-center [data-detector='lost'],
+.camera-center [data-detector='out-of-frame'] { --camera-frame: var(--color-warning-line); }
+.camera-center [data-camera='error'],
+.camera-center [data-detector='error'] { --camera-frame: var(--color-error-line); }
+.camera-center :is([data-camera='requesting'], [data-detector='loading']) .practice-camera-status {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+}
+.camera-center [data-camera='error'] .practice-camera-status {
+  color: var(--color-error);
+  background: var(--color-error-bg);
+}
+.camera-center [data-detector='detected'] .practice-recognition-state,
+.camera-center .practice-student-result[data-result='recognized'] {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+.camera-center :is([data-detector='lost'], [data-detector='out-of-frame']) .practice-recognition-state,
+.camera-center .practice-student-result:is([data-result='tracking'], [data-result='unknown'], [data-result='different']) {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+.camera-center :is([data-detector='detected'], [data-detector='lost'], [data-detector='error']) .practice-recognition-state svg { color: currentColor; }
+.camera-center .practice-student-result[data-result] { padding: 8px 10px; border-radius: 10px; }
+.camera-center .practice-student-result > p:first-child { display: flex; align-items: center; gap: 8px; }
+.camera-center .practice-student-result > p:first-child > svg { flex: none; }
+.camera-center .practice-student-result[data-result='recognized'] strong { color: var(--color-success); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .camera-center .practice-camera-preview::after { transition: border-color var(--sv-motion-micro); }
+  .camera-center :is(.practice-camera-error, .practice-recognition-error, .practice-student-result[data-result='recognized'] > strong) {
+    --sv-entry-distance: 3px;
+    animation: sv-motion-rise 220ms var(--sv-motion-ease), sv-motion-soft-fade 220ms var(--sv-motion-ease);
+  }
+}

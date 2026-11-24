@@ -61,7 +61,7 @@
 .profile-feedback:empty { margin: 0; }
 .profile-storage-warning { margin: 12px 0 0; color: light-dark(#7b5425, var(--color-warning)); font-size: 13px; line-height: 1.5; }
 .profile-dialog { width: min(460px, calc(100% - 32px)); max-height: calc(100svh - 40px); padding: 26px; border: 1px solid light-dark(#e2d7f3, var(--color-line)); border-radius: 24px; background: light-dark(#fff, var(--color-card)); color: light-dark(#251d49, var(--color-text)); font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif; box-shadow: 0 20px 80px #22114030; }
-.profile-dialog::backdrop { background: #24174360; backdrop-filter: blur(4px); }
+.profile-dialog::backdrop { background: #24174372; }
 .profile-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profile-dialog h2 { margin: 0; font-size: 23px; font-weight: 900; line-height: 1.25; letter-spacing: -.5px; }
 .profile-dialog > p { margin: 12px 0 22px; color: light-dark(#625772, var(--color-text-secondary)); font-size: 14px; line-height: 1.65; }
@@ -76,6 +76,27 @@
 .profile-dialog .button-primary:hover { background: #4924a4; }
 .profile-dialog .button-outline { border-color: light-dark(#ded9ef, var(--color-line)); color: light-dark(#251d49, var(--color-text)); }
 body:has(.profile-dialog[open]) { overflow: hidden; }
+
+.profile-page.sv-motion { --sv-motion-progress: 480ms; }
+.profile-page .profile-setting:hover:not(:disabled) { background: var(--color-hover); }
+.profile-page .profile-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+.profile-confirmation > svg { flex: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .profile-field :is(input, textarea) { transition: border-color var(--sv-motion-micro), background-color var(--sv-motion-micro); }
+  .profile-page :is(.profile-confirmation, .profile-error, .profile-avatar-check) {
+    --sv-entry-distance: 3px;
+    animation: sv-motion-rise 210ms var(--sv-motion-ease), sv-motion-soft-fade 210ms var(--sv-motion-ease);
+  }
+}
 
 .profile-personal .profile-section-heading h2 svg, .profile-settings .profile-section-heading h2 svg { box-sizing: content-box; padding: 7px; border-radius: 11px; background: var(--color-surface); }
 

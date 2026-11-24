@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { Illustration } from '../components/Illustration';
@@ -10,17 +11,18 @@ import './MinigamesPage.css';
 export function MinigamesPage() {
   const { progress } = useStudentProgress();
   return (
-    <div className="minigames-page">
+    <div className="minigames-page sv-motion">
       <header className="minigames-heading">
         <h1>Zona de <span className="minigames-title-end">minijuegos <HomeVisual name="games" /></span></h1>
         <p>Actividades breves para repasar, divertirte y seguir aprendiendo a tu ritmo.</p>
       </header>
 
       <section className="minigames-grid" aria-label="Minijuegos disponibles">
-        {minigames.map(game => {
+        {minigames.map((game, index) => {
           const { plays, best } = summarizeMinigame(progress, game);
           return (
-            <article className="minigame-card" key={game.id} aria-labelledby={`minigame-${game.id}`}>
+            <article className="minigame-card sv-motion-lift" key={game.id} aria-labelledby={`minigame-${game.id}`}
+              style={{ '--game-entry-step': index } as CSSProperties}>
               <div className="minigame-art" aria-hidden="true">
                 <Illustration asset={game.cover} />
               </div>
@@ -29,7 +31,7 @@ export function MinigamesPage() {
                 <p>{game.description}</p>
               </div>
               {plays > 0 && <p className="minigame-record">{plays} {plays === 1 ? 'partida' : 'partidas'}{best && ` · Mejor puntuación ${best.score}`}</p>}
-              <Link className="button button-primary minigame-play" to={getMinigamePath(game.id)} aria-label={`Jugar a ${game.title}`}>
+              <Link className="button button-primary minigame-play sv-motion-action" to={getMinigamePath(game.id)} aria-label={`Jugar a ${game.title}`}>
                 Jugar <ArrowRight size={18} aria-hidden="true" />
               </Link>
             </article>
@@ -40,7 +42,7 @@ export function MinigamesPage() {
       <aside className="minigames-learning-note" aria-label="Continúa tu aprendizaje">
         <span className="minigames-note-icon" aria-hidden="true"><BookOpen size={25} /></span>
         <p>Los minijuegos complementan las lecciones y la práctica guiada de Lengua de Señas Peruana.</p>
-        <Link to="/academia">Seguir aprendiendo <ArrowRight size={18} aria-hidden="true" /></Link>
+        <Link className="sv-motion-action" to="/academia">Seguir aprendiendo <ArrowRight size={18} aria-hidden="true" /></Link>
       </aside>
     </div>
   );
