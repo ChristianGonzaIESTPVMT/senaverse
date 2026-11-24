@@ -182,9 +182,9 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   await navigate('/minijuegos/adivina');
   await exists('.game-panel');
   await label('.game-panel button', 'Iniciar partida');
-  await exists('.game-diagram canvas');
-  const alt = await evaluate('document.querySelector(".game-diagram canvas").getAttribute("aria-label")');
-  assert.match(alt, /^Postura con/);
+  await exists('.game-observation img');
+  const alt = await evaluate('document.querySelector(".game-observation img").alt');
+  assert.match(alt, /extendid|recogid/u);
   assert.doesNotMatch(alt, /\b(?:uno|dos|tres|cuatro|cinco)\b/iu);
   assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
 

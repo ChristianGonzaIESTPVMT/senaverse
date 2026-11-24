@@ -1,6 +1,8 @@
 import { gameVocabulary, normalizeGameSettings, type GameSettings, type Minigame } from './minigames.ts';
 import { getEducationalSign } from './library.ts';
 import { getHandCountExercise, type SignPractice } from './signExercises.ts';
+import { shuffle, validatePlayResult, type PlayResult } from './gameMechanics.ts';
+export { shuffle };
 
 export const POINTS_PER_SUCCESS = 10;
 export const TIMED_ROUNDS = 30;
@@ -20,17 +22,9 @@ type GameAction = { type: 'tick' | 'hide' | 'next'; at: number }
   | { type: 'answer'; at: number; choice: string; step: number }
   | { type: 'practice'; at: number; signId: string; input: SignPractice };
 
-export type GameOutcome = { settings: GameSettings; limit: number; elapsedMs: number; correct: number; errors: number; bestStreak: number;
+type LegacyGameOutcome = { rules?: undefined; assisted?: undefined; moves?: undefined; settings: GameSettings; limit: number; elapsedMs: number; correct: number; errors: number; bestStreak: number;
   camera: number; alternative: number; practicedSignIds?: string[] };
-
-export function shuffle<T>(items: readonly T[], random = Math.random): T[] {
-  const ordered = [...items];
-  for (let index = ordered.length - 1; index > 0; index--) {
-    const other = Math.floor(random() * (index + 1));
-    [ordered[index], ordered[other]] = [ordered[other], ordered[index]];
-  }
-  return ordered;
-}
+export type GameOutcome = LegacyGameOutcome | PlayResult;
 
 export function gameSize(game: Minigame, settings: GameSettings) {
   const available = gameVocabulary(game, settings.category).length;
@@ -146,6 +140,7 @@ export function restoreChallenge(game: Minigame, stored: string | null, now: num
 
 export function validateGameOutcome(game: Minigame, value: unknown): GameOutcome | undefined {
   if (!object(value) || !object(value.settings)) return;
+  if (value.rules !== undefined) return validatePlayResult(game, value);
   const settings = normalizeGameSettings(game, value.settings);
   if (settings.difficulty !== value.settings.difficulty || settings.duration !== value.settings.duration || settings.category !== value.settings.category) return;
   const { limit, elapsedMs, correct, errors, bestStreak, camera, alternative } = value;

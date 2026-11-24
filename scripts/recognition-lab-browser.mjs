@@ -350,7 +350,7 @@ try {
   } else if (mode.startsWith('progress-')) {
     await checkStudentOverview({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('minigames-')) {
-    await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath);
+    await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath, process.env.SENAVERSE_GAME_EVIDENCE ?? process.argv[5]);
   } else if (mode.startsWith('situation-')) {
     await checkSituations({ send, evaluate, requests }, origin, until, datasetPath, process.argv[5]);
   } else if (mode.startsWith('library-')) {

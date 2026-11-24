@@ -51,6 +51,64 @@
 .game-results-stats dt { color: var(--color-text-secondary); font-size: .85rem; }
 .game-results-stats dd { margin: 3px 0 0; font-size: 1.16rem; font-weight: 850; }
 
+.minigame-session { --game-wash: var(--color-surface); padding-bottom: 25px; }
+.minigame-session[data-game='relaciona'], .minigame-session[data-game='desafio'] { --game-wash: var(--color-success-bg); }
+.minigame-session[data-game='adivina'] { --game-wash: var(--color-info-bg); }
+.minigame-session .minigames-heading { margin-bottom: 18px; }
+.minigame-session .game-panel { max-width: 920px; box-shadow: var(--shadow); }
+.game-panel > p { line-height: 1.5; }
+.game-association-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 2.7vw, 30px); }
+.game-association-grid > div { min-width: 0; display: grid; align-content: start; gap: 7px; }
+.game-association-grid h3 { margin: 0 0 3px; font-size: 1rem; }
+.game-association-item { position: relative; display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: 100%; min-height: 82px; padding: 5px 9px; border: 1px solid var(--color-line-strong); border-radius: 13px; background: var(--game-wash); color: var(--color-text); text-align: left; font: inherit; }
+.game-connector { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: var(--color-canvas); font-weight: 900; font-size: .8rem; }
+.game-association-item[aria-pressed='true'], .game-sequence-slot[aria-current='step'] { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.game-association-item[data-pair='correct'], .game-sequence-slot[data-confirmed='true'] { color: var(--color-success); border-color: var(--color-success); background: var(--color-success-bg); opacity: 1; }
+.game-association-item[data-pair='wrong'] { border-color: var(--color-error); background: var(--color-error-bg); }
+.game-association-item .quiz-sign-image, .game-association-item .quiz-sign-diagram { height: 70px; width: 100%; object-fit: contain; }
+.game-association-item [draggable], .game-association-item img { pointer-events: none; }
+.game-quantity { display: grid; justify-items: center; text-align: center; gap: 1px; color: var(--color-text); }
+.game-quantity > span { color: var(--color-primary); font-size: clamp(.65rem, 1.3vw, .95rem); letter-spacing: .12em; }
+.game-feedback-list { padding: 14px 16px 14px 34px; border-radius: 12px; background: var(--game-wash); }
+.game-feedback-list li + li { margin-top: 7px; }
+.game-memory-card { position: relative; }
+.game-card-face { width: 100%; height: 100%; display: grid; place-items: center; }
+.game-card-face img { width: auto; height: auto; max-width: 100%; max-height: clamp(82px, 12vw, 130px); object-fit: contain; }
+.game-card-face .quiz-sign-diagram { height: clamp(82px, 12vw, 130px); max-height: 100%; }
+.game-memory-card:is([data-state='open'], [data-state='matched']) .game-card-face { animation: game-flip .23s ease-out both; }
+.game-memory-card[data-state='hidden']:hover { background: var(--color-hover); }
+.game-match-check { position: absolute; top: 6px; right: 6px; color: var(--color-success); }
+@keyframes game-flip { from { transform: perspective(420px) rotateY(-80deg); opacity: .3; } to { transform: perspective(420px) rotateY(0); opacity: 1; } }
+.game-interpretation { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; gap: 16px; }
+.game-observation { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; min-height: 225px; height: clamp(225px, 30vw, 360px); overflow: hidden; border-radius: 16px; background: var(--game-wash); }
+.game-observation .quiz-sign-image, .game-observation .quiz-sign-diagram { width: 100%; height: 100%; min-width: 0; min-height: 0; aspect-ratio: auto; object-fit: contain; }
+.game-interpretation .game-options { display: grid; }
+.game-quiz-feedback { margin-top: 15px; padding: 12px; background: var(--game-wash); border-radius: 12px; }
+.game-quiz-feedback p { margin-top: 0; }
+.game-sequence-track, .game-sequence-choices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.game-sequence-track { padding: 0; list-style: none; }
+.game-sequence-slot { display: grid; justify-items: center; align-content: center; min-height: 96px; padding: 4px; border: 1px dashed var(--color-line-strong); border-radius: 12px; background: var(--game-wash); color: var(--color-primary); font-weight: 850; }
+.game-sequence-slot .quiz-sign-diagram, .game-sequence-choices .quiz-sign-diagram, .game-sequence-choices img { width: 100%; height: clamp(42px, 8vw, 96px); object-fit: contain; }
+.game-sequence-choices button { min-width: 0; padding: 5px; }
+.game-sprint { border-top: 4px solid var(--color-success); }
+.game-sprint-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.game-countdown { color: var(--color-primary); }
+.game-gesture-reference .quiz-sign-diagram { width: 70px; height: 78px; }
+.game-camera { width: min(100%, 430px); }
+.game-camera-status { padding: 9px 12px; border-radius: 10px; background: var(--game-wash); }
+.game-results { border-top: 4px solid var(--color-primary); }
+@media (max-width: 620px) {
+  .game-interpretation { grid-template-columns: 1fr; gap: 4px; }
+  .game-interpretation .game-options { grid-template-columns: 1fr 1fr; }
+  .game-association-item { grid-template-columns: 20px minmax(0, 1fr); padding-inline: 4px; }
+  .game-association-item > svg { display: none; }
+  .game-connector { width: 19px; height: 19px; }
+  .game-sequence-track, .game-sequence-choices { gap: 5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-memory-card .game-card-face { animation: none !important; }
+}
+
 .minigames-learning-note { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 17px; margin-top: 23px; padding: 21px 23px; border: 1.5px solid var(--line); border-radius: 20px; background: light-dark(#ffffffb3, color-mix(in srgb, var(--color-card) 70%, transparent)); }
 .minigames-note-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--violet-soft); color: var(--violet); }
 .minigames-learning-note p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }

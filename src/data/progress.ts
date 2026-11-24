@@ -332,7 +332,7 @@ export function describeActivity(activity: ProgressActivity) {
   }
 }
 
-export function summarizeMinigame(state: StudentProgress, game: Minigame, settings?: GameSettings, limit?: number) {
+export function summarizeMinigame(state: StudentProgress, game: Minigame, settings?: GameSettings & { mode?: 'visual' | 'camera' }, limit?: number, assisted = false) {
   const plays = state.activities.filter(item => item.type === 'minigame' && item.targetId === game.id);
   let best: { score: number; details: GameOutcome } | undefined;
   let legacyBest: number | undefined;
@@ -342,6 +342,7 @@ export function summarizeMinigame(state: StudentProgress, game: Minigame, settin
     if (!details) { legacyBest = Math.max(legacyBest ?? 0, score); continue; }
     if (settings && (details.settings.category !== settings.category || details.settings.difficulty !== settings.difficulty
       || details.settings.duration !== settings.duration || details.limit !== limit)) continue;
+    if (settings && (details.rules === 2 ? details.settings.mode !== settings.mode || details.assisted !== assisted : settings.mode !== undefined)) continue;
     if (!best || score > best.score || (score === best.score && (details.errors < best.details.errors
       || (game.kind === 'memory' && settings && details.errors === best.details.errors && details.elapsedMs < best.details.elapsedMs)))) {
       best = { score, details };

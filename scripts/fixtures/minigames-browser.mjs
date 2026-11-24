@@ -1,256 +1,275 @@
 import assert from 'node:assert/strict';
-import { loadTraces, replayTrace } from './lesson-browser.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { loadStaticTraces } from './lesson-browser.mjs';
 
-const list = '/minijuegos';
-const selector = '.game-memory-card';
 const storage = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
-const released = 'window.labStreams.flatMap(item => item.getTracks()).every(track => track.readyState === "ended") && window.labWorkers.every(worker => worker.ended)';
+const released = 'window.labStreams.flatMap(stream => stream.getTracks()).every(track => track.readyState === "ended") && window.labWorkers.every(worker => worker.ended)';
+const words = ['Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco'];
+const ids = ['relaciona', 'memoria', 'adivina', 'senas', 'desafio'];
 
-export async function checkMinigames({ send, evaluate, requests }, origin, until, datasetPath) {
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-    Math.random = () => .999;
-    window.gameClockOffset = 0;
-    window.gameClocks = new Set();
-    const now = Date.now.bind(Date);
-    Date.now = () => now() + window.gameClockOffset;
-    const interval = setInterval.bind(window), cancel = clearInterval.bind(window);
-    window.setInterval = (callback, delay, ...args) => {
-      const id = interval(callback, delay, ...args);
-      if (delay === 200) window.gameClocks.add(id);
-      return id;
-    };
-    window.clearInterval = id => { window.gameClocks.delete(id); cancel(id); };
-  ` });
-  const contains = (target, value) => until(value, () => evaluate(`document.querySelector(${JSON.stringify(target)})?.textContent.includes(${JSON.stringify(value)})`));
-  const named = (kind, label) => until(label, () => evaluate(`(() => {
-    const node = Array.from(document.querySelectorAll(${JSON.stringify(kind)}))
-      .find(item => item.textContent.trim() === ${JSON.stringify(label)} && !item.disabled && item.getAttribute('aria-disabled') !== 'true');
-    if (!node) return false;
-    node.click();
-    return true;
-  })()`));
-  const button = label => named('button', label);
-  const link = label => named('a', label);
-  const result = () => contains('#game-results-title', 'Resultados de la partida');
-  const card = index => evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].click()`);
-  const enter = async index => {
-    await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].focus()`);
+export async function checkMinigames({ send, evaluate, requests }, origin, until, datasetPath, screenshots) {
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: [
+    'Math.random = () => .999;',
+    'window.gameClockOffset = 0;',
+    'const now = Date.now.bind(Date);',
+    'Date.now = () => now() + window.gameClockOffset;',
+  ].join('\n') });
+  const wait = (description, script) => until(description, () => evaluate(script), 30000);
+  const q = JSON.stringify;
+  const visible = selector => wait(selector, '!!document.querySelector(' + q(selector) + ')');
+  const contains = (selector, text) => wait(text, 'document.querySelector(' + q(selector) + ')?.textContent.includes(' + q(text) + ')');
+  const click = selector => wait(selector, '(() => { const node = document.querySelector(' + q(selector) + '); if (!node || node.disabled) return false; node.click(); return true; })()');
+  const button = (label, selector = 'button') => wait(label, '(() => { const node = [...document.querySelectorAll(' + q(selector) + ')].find(item => item.textContent.trim() === ' + q(label) + ' && !item.disabled && item.getAttribute("aria-disabled") !== "true"); if (!node) return false; node.click(); return true; })()');
+  const select = (name, value) => evaluate('(() => { const node = [...document.querySelectorAll(".game-settings label")].find(item => item.firstChild.textContent.trim() === ' + q(name) + ').querySelector("select"); node.value = ' + q(value) + '; node.dispatchEvent(new Event("change", { bubbles: true })); })()');
+  const score = () => evaluate('Number(document.querySelector("[data-score]").textContent)');
+  const errors = () => evaluate('Number(document.querySelector("[data-errors]").textContent)');
+  const record = id => evaluate('(' + storage + ').activities.filter(item => item.targetId === ' + q(id) + ')');
+  const start = () => button('Iniciar partida');
+  const results = () => visible('#game-results-title');
+
+  async function open(id, theme) {
+    await send('Page.navigate', { url: origin + '/minijuegos/' + id });
+    await visible('.game-setup');
+    await evaluate('localStorage.setItem("senaverse-theme-v1",' + q(theme) + '); document.documentElement.dataset.theme = ' + q(theme));
+  }
+
+  async function device(width, height, mobile) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, mobile, deviceScaleFactor: 1 });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
+  }
+
+  async function screenshot(name) {
+    if (!screenshots) return;
+    await mkdir(screenshots, { recursive: true });
+    await evaluate('document.fonts.ready.then(async () => { window.scrollTo({top:0,behavior:"instant"}); for (const img of document.querySelectorAll(".minigame-session img")) img.loading = "eager"; await Promise.all([...document.querySelectorAll(".minigame-session img")].map(img=>img.decode())); return true; })');
+    const { cssContentSize } = await send('Page.getLayoutMetrics');
+    const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width: cssContentSize.width, height: cssContentSize.height, scale: 1 } });
+    await writeFile(join(screenshots, name + '.png'), Buffer.from(data, 'base64'));
+  }
+
+  async function space(selector) {
+    await evaluate('document.querySelector(' + q(selector) + ').focus()');
     const key = { key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 };
     await send('Input.dispatchKeyEvent', { ...key, type: 'keyDown', text: ' ', unmodifiedText: ' ' });
     await send('Input.dispatchKeyEvent', { ...key, type: 'keyUp' });
-  };
-  const select = (name, value) => evaluate(`(() => {
-    const field = Array.from(document.querySelectorAll('.game-settings label')).find(label => label.firstChild.textContent.trim() === ${JSON.stringify(name)}).querySelector('select');
-    field.value = ${JSON.stringify(value)};
-    field.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-  const plays = game => evaluate(`(${storage}).activities.filter(item => item.type === 'minigame' && item.targetId === ${JSON.stringify(game)})`);
-  const start = () => button('Iniciar partida');
-  const listLink = () => link('Minijuegos');
-  const stopped = () => until('reloj detenido', () => evaluate('window.gameClocks.size === 0'));
-  const timer = () => until('reloj visible', () => evaluate('!!document.querySelector("[role=timer]") && window.gameClocks.size === 1'));
-  const cameraReleased = () => until('pistas y Worker liberados', () => evaluate(released));
-
-  await send('Page.navigate', { url: origin + list });
-  await until('cinco juegos disponibles', () => evaluate('document.querySelectorAll(".minigame-card a").length === 5'));
-  const open = async (id, path = list) => {
-    const target = JSON.stringify(`a[href="${path}/${id}"]`);
-    await until(`enlace a ${id}`, () => evaluate(`!!document.querySelector(${target})`));
-    await evaluate(`document.querySelector(${target}).click()`);
-    await contains('#game-setup-title', 'Configura tu partida');
-  };
-  await open('memoria');
-  await start();
-  await timer();
-  assert.equal(await evaluate('document.querySelectorAll(".game-memory-card[data-state=hidden]").length'), 6);
-  assert.equal(await evaluate('document.querySelectorAll(".game-memory-card canvas").length'), 0);
-  await enter(0);
-  await contains('.game-memory [role=status]', 'segunda tarjeta');
-  await card(2);
-  await contains('.game-memory [role=status]', 'diferentes');
-  await card(1);
-  assert.equal(await evaluate('document.querySelectorAll(".game-memory-card[data-state=open]").length'), 2);
-  await button('Ocultar tarjetas');
-  await until('cartas ocultas', () => evaluate('document.querySelectorAll(".game-memory-card[data-state=hidden]").length === 6'));
-  for (let index = 0; index < 6; index++) await card(index);
-  await result();
-  await stopped();
-  await contains('.game-results', 'Ganaste 20 XP');
-  assert.equal((await plays('memoria'))[0].result.details.errors, 1);
-  await button('Volver a jugar');
-  await timer();
-  await card(0);
-  await button('Reiniciar partida');
-  assert.equal(await evaluate('document.querySelectorAll(".game-memory-card[data-state=hidden]").length'), 6);
-  for (let index = 0; index < 6; index++) await card(index);
-  await result();
-  await until('segunda partida guardada', async () => (await plays('memoria')).length === 2);
-  assert.equal((await plays('memoria')).filter(item => item.rewardXp).length, 1);
-  await button('Cambiar opciones');
-  await contains('.game-setup', 'Récord de esta configuración');
-  await select('Nivel', 'intermedio');
-  await start();
-  await until('cinco parejas', () => evaluate('document.querySelectorAll(".game-memory-card[data-state=hidden]").length === 10'));
-  await listLink();
-  await stopped();
-
-  await open('adivina');
-  await select('Nivel', 'intermedio');
-  await start();
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 5');
-  assert.equal(await evaluate('document.querySelector(".game-options").children.length'), 4);
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.game-options button')).every(button => !button.hasAttribute('data-answer'))`), true);
-  assert.equal(await evaluate('document.querySelector(".game-diagram canvas").getAttribute("aria-label").includes("Uno")'), false);
-  await until('diagrama dibujado', () => evaluate(`(() => {
-    const canvas = document.querySelector('.game-diagram canvas');
-    return canvas?.getContext('2d').getImageData(140, 240, 100, 100).data.some(value => value !== 0);
-  })()`));
-  await button('Dos');
-  await contains('.game-quiz [role=status]', '«Uno»');
-  await button('Reiniciar partida');
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 5');
-  assert.equal(await evaluate('!!document.querySelector(".game-quiz [role=status]")'), false);
-  await button('Dos');
-  await contains('.game-quiz [role=status]', '«Uno»');
-  await button('Siguiente pregunta');
-  for (const [index, word] of ['Dos', 'Tres', 'Cuatro', 'Cinco'].entries()) {
-    await contains('.game-quiz .game-progress-label', `Pregunta ${index + 2} de 5`);
-    await button(word);
-    await contains('.game-quiz [role=status]', 'correcta');
-    await button(word === 'Cinco' ? 'Ver resultados' : 'Siguiente pregunta');
   }
-  await result();
-  await until('quiz registrado', async () => (await plays('adivina'))[0]?.result.score === 40);
-  assert.equal((await plays('adivina'))[0].result.details.bestStreak, 4);
-  await listLink();
 
-  await open('desafio');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".game-settings select:last-of-type option")).slice(-4).map(node => node.value)'), ['0', '30', '60', '90']);
-  await select('Duración', '30');
-  await start();
-  await timer();
-  await button('Uno');
-  await button('Reiniciar partida');
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 30');
-  await button('Uno');
-  await evaluate('window.gameClockOffset = 30000');
-  await result();
-  await contains('.game-results', 'Se acabó el tiempo');
-  await stopped();
-  await evaluate('window.gameClockOffset = 0');
-  await until('récord guardado', async () => (await plays('desafio'))[0]?.result.score === 10);
-  assert.equal((await plays('desafio'))[0].result.details.elapsedMs, 30000);
-  await button('Cambiar opciones');
-  await select('Duración', '0');
-  await start();
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 3');
-  await stopped();
-  assert.equal(await evaluate('!!document.querySelector("[role=timer]")'), false);
-  for (const word of ['Uno', 'Dos', 'Tres']) {
-    await button(word);
-    await button(word === 'Tres' ? 'Ver resultados' : 'Siguiente pregunta');
+  async function touch(selector) {
+    const point = await evaluate('(() => { const node = document.querySelector(' + q(selector) + '); node.scrollIntoView({block:"center",behavior:"instant"}); const rect = node.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }; })()');
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
-  await result();
-  await until('partida sin límite guardada', async () => (await plays('desafio')).length === 2);
-  await button('Cambiar opciones');
-  await select('Duración', '60');
-  await start();
-  await timer();
-  await listLink();
-  await stopped();
-  assert.equal((await plays('desafio')).length, 2);
 
-  await open('relaciona');
-  await select('Vocabulario', 'familia');
-  await start();
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 3');
-  assert.equal(await evaluate('!!document.querySelector(".game-quiz canvas")'), false);
-  await button('Familia');
-  await contains('.game-quiz [role=status]', 'correcta');
-  await button('Reiniciar partida');
-  await contains('.game-quiz .game-progress-label', 'Pregunta 1 de 3');
-  assert.equal(await evaluate('!!document.querySelector(".game-quiz [role=status]")'), false);
-  for (const word of ['Familia', 'Mamá', 'Papá']) {
-    await button(word);
-    await button(word === 'Papá' ? 'Ver resultados' : 'Siguiente pregunta');
+  async function drag(source, destination) {
+    await evaluate('(() => { const transfer = new DataTransfer(); for (const [selector, type] of ' + q([[source, 'dragstart'], [destination, 'dragover'], [destination, 'drop']])
+      + ') document.querySelector(selector).dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer })); })()');
   }
-  await result();
-  await until('asociaciones registradas', async () => (await plays('relaciona'))[0]?.result.score === 30);
-  assert.ok(!requests.some(url => /lsp-v1\.json|handDetection\.worker|mediapipe\/wasm/.test(url)));
-  assert.equal(await evaluate('window.studentAttempts'), 0);
-  await listLink();
 
-  await open('senas');
-  await select('Vocabulario', 'numeros');
-  await start();
-  await contains('#game-challenge-title', '«Uno»');
-  assert.equal(await evaluate('!!document.querySelector(\'.sign-media[data-sign="LSP-001"] img[src*="lsp-001-uno"]\')'), true);
-  assert.equal(await evaluate('!!document.querySelector(".sign-media video")'), false);
-  assert.equal(await evaluate('!!document.querySelector("[role=timer]")'), false);
-  await button('Practicar con cámara');
-  const activate = async () => {
-    await until('control disponible', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
-    await evaluate('document.querySelector(".practice-camera-button").click()');
-  };
-  await until('práctica cargada', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
-  assert.equal(await evaluate('window.studentAttempts'), 0);
+  await send('Page.navigate', { url: origin + '/minijuegos' });
+  await wait('cinco portadas', 'document.querySelectorAll(".minigame-card a").length === 5 && document.querySelectorAll(".minigame-art img").length === 5');
+
+  for (const [layout, width, height, mobile, theme] of [['escritorio', 1440, 980, false, 'light'], ['movil', 390, 844, true, 'dark']]) {
+    await device(width, height, mobile);
+    for (const id of ids) {
+      await open(id, theme);
+      await start();
+      const prefix = layout + '-' + theme + '-' + id;
+      if (id === 'relaciona') {
+        await visible('[data-source-index="0"]');
+        const input = mobile ? touch : space;
+        await input('[data-source-index="0"]');
+        await input('[data-destination-index="2"]');
+        await contains('.game-association [role="status"]', '1 conexiones');
+        await drag('[data-source-index="1"]', '[data-destination-index="1"]');
+        await click('[data-source-index="2"]');
+        await click('[data-destination-index="0"]');
+        await button('Comprobar conexiones');
+        await wait('dos conexiones incorrectas', 'document.querySelectorAll("[data-source-index][data-pair=wrong]").length === 2');
+        await screenshot(prefix + '-partida');
+        await click('[data-source-index="1"]'); await click('[data-destination-index="0"]');
+        await click('[data-source-index="2"]'); await click('[data-destination-index="1"]');
+        await button('Comprobar conexiones');
+      } else if (id === 'memoria') {
+        await visible('.game-memory-card');
+        assert.equal(await evaluate('document.querySelectorAll(".game-memory-card img").length'), 0);
+        const card = index => '.game-memory-card:nth-child(' + (index + 1) + ')';
+        await space(card(0)); await click(card(2));
+        await contains('.game-memory [role=status]', 'no forman pareja');
+        await button('Ocultar tarjetas');
+        await click(card(0)); await click(card(1)); await click(card(2));
+        await screenshot(prefix + '-partida');
+        for (const index of [3, 4, 5]) await click(card(index));
+      } else if (id === 'senas') {
+        await button('Ocultar secuencia y empezar');
+        assert.equal(await evaluate('document.querySelectorAll(".game-sequence-slot canvas, .game-sequence-slot img").length'), 0);
+        for (const index of [0, 2, 1]) await click('[data-choice-index="' + index + '"]');
+        await button('Comprobar secuencia');
+        await contains('.game-sequence [role=status]', 'posición 2');
+        await button('Ver ayuda'); await button('Ocultar ayuda');
+        await click('[data-choice-index="1"]');
+        await screenshot(prefix + '-partida');
+        await click('[data-choice-index="2"]'); await button('Comprobar secuencia');
+      } else {
+        const count = id === 'desafio' ? 5 : 3;
+        if (id === 'desafio') await contains('.game-countdown', 'Empieza en');
+        await visible('.game-observation img');
+        assert.equal(await evaluate(`(() => {
+          const box = document.querySelector('.game-observation').getBoundingClientRect();
+          const image = document.querySelector('.game-observation img');
+          const rect = image.getBoundingClientRect();
+          return getComputedStyle(image).objectFit === 'contain' && rect.height <= box.height && rect.width <= box.width;
+        })()`), true, 'La foto completa cabe en el visor de ' + id);
+        for (let index = 0; index < count; index++) {
+          await button(words[index], '.game-options button');
+          await contains('.game-quiz-feedback', 'Correcto.');
+          if (!index) {
+            if (id === 'adivina') { await button('Volver a observar con el diagrama'); await button('Volver a la fotografía'); }
+            await screenshot(prefix + '-partida');
+          }
+          await button(index === count - 1 ? 'Ver resultados' : 'Siguiente seña');
+        }
+      }
+      await results();
+      await screenshot(prefix + '-resultado');
+      const plays = await record(id);
+      assert.equal(plays.length, mobile ? 2 : 1);
+      assert.equal(plays.reduce((sum, item) => sum + (item.rewardXp ?? 0), 0), 20);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, prefix);
+      await button('Cambiar opciones');
+      if (id === 'senas') await contains('.game-setup', 'Récord con ayuda');
+      else await contains('.game-setup', 'Récord');
+      await start();
+      await button('Abandonar partida');
+      assert.equal((await record(id)).length, plays.length);
+    }
+  }
+
+  for (const [width, height, mobile, theme] of [[1440, 980, false, 'dark'], [390, 844, true, 'light']]) {
+    await device(width, height, mobile);
+    for (const id of ids) {
+      await open(id, theme); await start(); await visible('.game-score');
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, id + ' ' + theme);
+      await button('Abandonar partida');
+    }
+  }
+
+  await device(1440, 980, false);
+  await open('desafio', 'light');
+  await select('Modalidad', 'camera'); await select('Duración', '30'); await start();
   await evaluate('window.studentDeny = true');
-  await activate();
-  await contains('.practice-camera-error', 'permiso de cámara');
-  await evaluate('window.studentDeny = false');
-  await activate();
-  const worker = () => until('Worker activo', () => evaluate('window.labWorkers.some(item => !item.ended && item.results > 0)'), 30000);
-  await worker();
-  await link('Ver ficha de Uno en Biblioteca');
-  await contains('.library-dialog[open] h2', 'Uno');
-  await cameraReleased();
-  await link('Volver al desafío');
-  await contains('#game-challenge-title', '«Uno»');
-  assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
+  await click('.practice-camera-button');
+  await contains('.game-camera', 'permiso');
+  assert.equal(await score(), 0);
+  await evaluate('window.studentDeny = false; window.studentFailure = "NotFoundError"');
+  await click('.practice-camera-button');
+  await contains('.game-camera', 'No se encontró');
+  await evaluate('window.studentFailure = null');
+  await click('.practice-camera-button');
+  await wait('Worker y cámara listos', 'window.labWorkers.some(worker => !worker.ended && worker.results > 0)');
+  await visible('[data-target]');
+  await screenshot('escritorio-light-desafio-camara-partida');
+  assert.equal(await score(), 0);
+  assert.equal(await errors(), 0);
 
+  let recordedGestures = false;
   if (datasetPath) {
-    const traces = await loadTraces(datasetPath);
-    await button('Practicar con cámara');
-    await activate();
-    await worker();
-    await button('Reiniciar partida');
-    await cameraReleased();
-    assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
-    await button('Practicar con cámara');
-    await activate();
-    await worker();
-    assert.equal(await evaluate('Math.max(...window.labWorkers.map(item => item.maxActive))'), 1);
-    await replayTrace(evaluate, until, traces.different, 'confirmó una seña distinta');
-    assert.equal(await evaluate('document.querySelector(".game-challenge").textContent.includes("Guardar práctica con cámara")'), false);
-    await button('Reintentar práctica');
-    await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
-    await contains('#game-challenge-title', '«Uno»');
-    await button('Guardar práctica con cámara');
-    await contains('#game-challenge-title', '«Dos»');
-    await cameraReleased();
+    const traces = await loadStaticTraces(datasetPath, ['LSP-001', 'LSP-002', 'LSP-003']);
+    const useTrace = async id => {
+      const hands = id ? traces[id].frames[0].hands : [];
+      const trace = { frames: [{ time: 0, result: { landmarks: hands.map(hand => hand.landmarks),
+        handedness: hands.map(hand => hand.handedness), worldLandmarks: hands.map(hand => hand.worldLandmarks) } }], started: null, cursor: 0 };
+      await evaluate('window.studentTrace = ' + q(trace));
+    };
+    await useTrace('LSP-002');
+    await wait('gesto diferente registrado', 'Number(document.querySelector("[data-errors]").textContent) === 1');
+    await useTrace('LSP-001');
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    assert.equal(await score(), 0, 'Cambiar sin retirar la mano no rearma');
+    await useTrace(null);
+    await contains('.game-camera-status', 'Buscando manos');
+    await useTrace('LSP-001');
+    await wait('primer objetivo reconocido', 'Number(document.querySelector("[data-score]").textContent) === 10');
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    assert.equal(await score(), 10, 'Mantener la postura no repite puntos');
+    await useTrace(null);
+    await contains('.game-camera-status', 'Buscando manos');
+    await useTrace('LSP-002');
+    await wait('segundo objetivo reconocido', 'Number(document.querySelector("[data-score]").textContent) === 20');
+    recordedGestures = true;
+    await evaluate('window.studentTrace = null');
   }
-  for (const word of datasetPath ? ['Dos', 'Tres'] : ['Uno', 'Dos', 'Tres']) {
-    await contains('#game-challenge-title', `«${word}»`);
-    await button('Hacer ejercicio sin cámara');
-    await evaluate('document.querySelector(".situation-alternative input[value=one]").click()');
-    await button('Comprobar ejercicio sin cámara');
-  }
-  await result();
-  await until('desafío guardado', async () => (await plays('senas'))[0]?.result.score === 30);
-  const [challenge] = await plays('senas');
-  assert.equal(challenge.result.details.camera, datasetPath ? 1 : 0);
-  assert.equal(challenge.result.details.alternative, datasetPath ? 2 : 3);
-  await evaluate('document.querySelector(".theme-toggle").click()');
-  await until('tema oscuro', () => evaluate('document.documentElement.dataset.theme === "dark"'));
-  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 1 });
-  assert.equal(await evaluate('document.documentElement.scrollWidth === innerWidth'), true);
-  await send('Emulation.clearDeviceMetricsOverride');
+  await evaluate('window.gameClockOffset = 31000');
+  await results();
+  await screenshot('escritorio-light-desafio-camara-resultado');
+  await wait('cámara liberada', released);
 
-  await send('Page.navigate', { url: origin + '/camara/desafio?cantidad=5' });
-  await contains('.game-setup', '5 señas por partida');
-  assert.equal((await plays('senas')).length, 1);
-  assert.equal(await evaluate(`(${storage}).activities.reduce((sum, item) => sum + (item.rewardXp ?? 0), 0)`), 100);
-  assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
-  console.log(JSON.stringify({ games: 5, keyboard: true, timedAndUntimed: true, streak: 4, timersReleased: true,
-    cameraConfirmedFromRecordings: !!datasetPath, permissionDenied: true, cameraReleased: true, rewardXp: 100, darkMobile: true }));
+  await open('senas', 'dark'); await select('Modalidad', 'camera'); await start();
+  await button('Ocultar secuencia y empezar');
+  await click('.practice-camera-button');
+  await wait('cámara preparada en secuencia', 'window.labWorkers.some(worker => !worker.ended && worker.results > 0)');
+  await screenshot('escritorio-dark-senas-camara-partida');
+  await button('Abandonar partida');
+  await wait('cámara liberada al abandonar', released);
+  assert.equal((await record('senas')).length, 2);
+
+  // Feed an existing educational video through a browser capture track and the real Worker.
+  await open('desafio', 'dark'); await select('Modalidad', 'camera'); await start();
+  await evaluate(`(async () => {
+    const video = document.createElement('video');
+    video.src = '/media/signs/lsp-001-uno.mp4';
+    video.muted = video.loop = video.playsInline = true;
+    await video.play();
+    video.currentTime = video.duration * .55;
+    await new Promise(resolve => video.addEventListener('seeked', resolve, { once: true }));
+    video.pause();
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const context = canvas.getContext('2d');
+    const stream = canvas.captureStream(0);
+    const [track] = stream.getVideoTracks();
+    const draw = () => {
+      context.fillStyle = '#222';
+      context.fillRect(0, 0, 640, 480);
+      const width = video.videoWidth * 480 / video.videoHeight;
+      context.drawImage(video, (640 - width) / 2, 0, width, 480);
+      track.requestFrame();
+    };
+    draw();
+    const timer = setInterval(draw, 32);
+    navigator.mediaDevices.getUserMedia = async () => {
+      window.labStreams.push(stream);
+      return stream;
+    };
+    window.gameVideo = { video, timer };
+    return true;
+  })()`);
+  await click('.practice-camera-button');
+  try {
+    await wait('video educativo procesado por el Worker', 'window.gameVideo.video.currentTime > 0 && window.labWorkers.some(worker => !worker.ended && worker.results >= 3)');
+  } catch (error) {
+    const diagnostic = await evaluate('({videoTime: window.gameVideo.video.currentTime, preview: document.querySelector(".game-camera video")?.getVideoPlaybackQuality(), camera: document.querySelector(".game-camera")?.textContent, results: window.labWorkers.map(worker=>worker.results), errors: window.labWorkerErrors})');
+    throw new Error(error.message + ' · ' + JSON.stringify(diagnostic), { cause: error });
+  }
+  await visible('[data-target]');
+  const clipStart = Date.now();
+  let educationalVideoPoints = await score();
+  while (!educationalVideoPoints && Date.now() - clipStart < 6000) {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    educationalVideoPoints = await score();
+  }
+  await screenshot('escritorio-dark-desafio-video-educativo');
+  const educationalVideoDetector = await evaluate('document.querySelector(".game-camera .practice-recognition-state").textContent.trim()');
+  await button('Abandonar partida');
+  await wait('pista del video liberada', released);
+  await evaluate('clearInterval(window.gameVideo.timer); window.gameVideo.video.pause()');
+
+  await open('memoria', 'light');
+  await contains('.game-setup', 'Récord');
+  assert.equal((await record('memoria')).length, 2);
+  assert.ok(requests.some(url => url.includes('/media/signs/')));
+  console.log(JSON.stringify({ games: ids, layouts: 2, themes: 2, touch: true, keyboard: true, drag: true, syntheticCamera: true,
+    recordedGestures, educationalVideo: true, educationalVideoPoints, educationalVideoDetector, denied: true, absent: true, released: true }));
 }

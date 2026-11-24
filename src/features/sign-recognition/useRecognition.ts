@@ -91,9 +91,9 @@ export function useRecognition(loadModel: RecognitionModelLoader, {
     if (next) publish(next);
   }, [publish]);
 
-  function reset() {
+  const reset = useCallback(() => {
     if (session.current) publish(session.current.reset());
-  }
+  }, [publish]);
 
   function changeMode(next: RecognitionMode, resetAttempt = true) {
     currentMode.current = next;

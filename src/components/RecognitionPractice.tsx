@@ -1,4 +1,4 @@
-import { memo, useCallback, useId, useRef, useState } from 'react';
+import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { PracticeCamera, type PracticeCameraSessionState } from './PracticeCamera';
 import { recognitionSigns, recognitionSignsById, resolvePracticeSign } from '../features/sign-recognition/recognitionCatalog';
@@ -8,8 +8,76 @@ import { useRecognition } from '../features/sign-recognition/useRecognition';
 import { RECOGNITION_STATES } from '../features/sign-recognition/liveRecognition';
 import type { RecognitionConfirmation, RecognitionObservation } from '../features/sign-recognition/recognitionResult';
 import { SignMediaViewer } from './SignMediaViewer';
+import { createGestureGate } from '../data/gameGestures';
+import type { FreshHandInference } from '../features/sign-recognition/types';
 
 const PracticePreview = memo(PracticeCamera);
+
+export function GameRecognitionPractice({ step, accepting, onReady, onGesture }: {
+  step: number; accepting: boolean; onReady: (ready: boolean) => void; onGesture: (id: string, step: number) => void;
+}) {
+  const gate = useRef(createGestureGate());
+  const current = useRef({ step: -1, accepting: false, decided: false });
+  const [release, setRelease] = useState(false);
+  const [observed, setObserved] = useState<{ step: number; id: string }>();
+  const [detectorReady, setDetectorReady] = useState(false);
+  const recognition = useRecognition(loadEducationModel, {
+    onConfirmed(event) {
+      const objective = current.current;
+      if (!objective.accepting || objective.decided) return;
+      objective.decided = true;
+      gate.current.open(performance.now(), true);
+      setObserved({ step: objective.step, id: event.signId });
+      onGesture(event.signId, objective.step);
+    },
+  });
+  const ready = recognition.cameraActive && recognition.modelState.status === 'ready' && detectorReady;
+  const { reset } = recognition;
+  useLayoutEffect(() => {
+    const enabled = accepting && ready;
+    if (current.current.step === step && current.current.accepting === enabled) return;
+    current.current = { step, accepting: enabled, decided: false };
+    gate.current.open(enabled ? performance.now() : Infinity, step > 0);
+    reset();
+  }, [accepting, ready, reset, step]);
+
+  useLayoutEffect(() => { onReady(ready); }, [onReady, ready]);
+
+  const { onSessionState, onFreshInference } = recognition.cameraBindings;
+  const sessionState = useCallback((state: PracticeCameraSessionState) => {
+    onSessionState(state);
+    setDetectorReady(state.cameraStatus === 'active' && state.detector.status !== 'loading'
+      && state.detector.status !== 'error' && state.detector.status !== 'idle');
+  }, [onSessionState]);
+  const inference = useCallback((event: FreshHandInference) => {
+    if (!current.current.accepting || document.hidden) return;
+    const hadHands = event.result.landmarks.length > 0;
+    const allow = gate.current.accept(event.capturedAtMs, hadHands);
+    if (!allow) { setRelease(gate.current.needsRelease()); return; }
+    if (current.current.decided) {
+      current.current.decided = false;
+      gate.current.open(performance.now(), false);
+      reset();
+      setRelease(false);
+      return;
+    }
+    setRelease(gate.current.needsRelease());
+    onFreshInference(event);
+  }, [onFreshInference, reset]);
+
+  return <div className="game-camera">
+    <PracticePreview onSessionState={sessionState} onFreshInference={inference}
+      disabled={recognition.modelState.status !== 'ready' && !recognition.cameraActive}
+      disabledReason="La cámara se habilita cuando carga el modelo." />
+    <p className="game-camera-status" role="status">{!accepting ? 'Prepara la mano y espera el inicio.'
+      : release ? 'Retira la mano del encuadre y vuelve a realizar la seña.'
+        : RECOGNITION_STATES[recognition.result.status]}</p>
+    {accepting && observed?.step === step && <p role="status">El modelo observó «{recognitionSignsById.get(observed.id)?.name ?? 'seña sin nombre'}». Si la posición no avanzó, vuelve a intentarlo.</p>}
+    {recognition.modelState.status === 'error' && <p role="alert">{recognition.modelState.message}{' '}
+      <button type="button" className="button button-outline" onClick={recognition.reloadModel}>Reintentar carga</button></p>}
+    <p className="game-source">Reconocimiento experimental de V1. Una coincidencia indica lo que identificó el modelo.</p>
+  </div>;
+}
 
 export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave, assessment }: {
   initialSign?: string;
