@@ -1,14 +1,16 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, Info } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Illustration } from './Illustration';
 import { LessonAnswerFields } from './LessonActivity';
+import { MotionProgress } from './MotionProgress';
 import { MediaSourceLink, SignMediaViewer } from './SignMediaViewer';
 import { gradeAnswers, type Answers, type LessonPlan, type Question, type StudyStep } from '../data/lessonPlan';
 import { nextStudyStep, type Attempt, type StepProgress, type StudyInput, type StudyRun } from '../data/lessonStudy';
 import { useStudentProgress } from '../hooks/progressContext';
 import { recognitionSignsById } from '../features/sign-recognition/recognitionCatalog';
 import { getEducationalSign, getLibrarySignPath } from '../data/library';
+import { LESSON_XP } from '../data/progress';
 
 const DirectedLessonPractice = lazy(() => import('./DirectedLessonPractice'));
 const emptyResponses: Record<string, string> = {};
@@ -23,20 +25,22 @@ function Questions({ questions, method, previous, complete, submit }: {
   const grade = gradeAnswers(questions, answers);
   const checked = !!saved && !editing;
   const score = previous?.grade;
+  const passed = score?.score === score?.total;
 
   return <div className="lesson-sequence-questions">
     {questions.map(({ id, activity }) => <LessonAnswerFields key={id} activity={activity} responses={answers[id] ?? emptyResponses}
       onResponse={(field, value) => {
         setEditing(true);
         setAnswers(current => ({ ...current, [id]: { ...current[id], [field]: value } }));
-      }} checked={checked} disabled={complete} />)}
-    {!complete && <button className="button button-primary" type="button" disabled={!grade || checked} onClick={() => {
+      }} checked={checked} disabled={complete} motion />)}
+    {!complete && <button className="button button-primary sv-motion-action" type="button" disabled={!grade || checked} onClick={() => {
       if (!grade) return;
       setEditing(false);
       submit({ method, answers: grade.answers });
     }}>Comprobar respuestas</button>}
-    {checked && score && <p className={score.score === score.total ? 'success-message' : 'error-message'} role="status">
-      {score.score} de {score.total} correctas. {complete ? 'Puedes continuar.' : 'Revisa las respuestas marcadas y cambia tu elección para volver a intentar.'}
+    {checked && score && <p className={`lesson-motion-feedback ${passed ? 'success-message' : 'error-message'}`} role="status">
+      {passed ? <CheckCircle2 size={19} aria-hidden="true" /> : <Info size={19} aria-hidden="true" />}
+      <span>{score.score} de {score.total} correctas. {complete ? 'Puedes continuar.' : 'Revisa las respuestas marcadas y cambia tu elección para volver a intentar.'}</span>
     </p>}
   </div>;
 }
@@ -99,9 +103,28 @@ function Assessment({ step, result, submit, review }: {
   </div>;
 }
 
-function Summary({ plan, run, finish, onReview, nextPath }: {
-  plan: LessonPlan; run?: StudyRun; finish: () => void; onReview: (index: number) => void; nextPath?: string;
+function Summary({ plan, run, lessonId, onReview, nextPath }: {
+  plan: LessonPlan; run?: StudyRun; lessonId: string; onReview: (index: number) => void; nextPath?: string;
 }) {
+  const { progress, recordActivity } = useStudentProgress();
+  const [finishWindow, setFinishWindow] = useState<{ from: number; to: number; first: boolean }>();
+  const completionStatus = useRef<HTMLParagraphElement>(null);
+  const completion = progress.activities.find(activity => activity.id === `lesson:${lessonId}`);
+  const completedAt = run?.completedAt;
+  const completedTime = completedAt ? Date.parse(completedAt) : NaN;
+  const earnedReward = finishWindow?.first && completion?.occurredAt === completedAt
+    && completedTime >= finishWindow.from && completedTime <= finishWindow.to;
+
+  useEffect(() => {
+    if (finishWindow && completedAt) completionStatus.current?.focus({ preventScroll: true });
+  }, [finishWindow, completedAt]);
+
+  function finish() {
+    const from = Date.now();
+    recordActivity({ type: 'lesson-finish', lessonId });
+    setFinishWindow({ from, to: Date.now(), first: !completion });
+  }
+
   return <div className="lesson-sequence-stack">
     <ul className="lesson-result-list">{plan.steps.map((step, index) => {
       if (step.kind !== 'practice' && step.kind !== 'assessment') return null;
@@ -111,14 +134,21 @@ function Summary({ plan, run, finish, onReview, nextPath }: {
       return <li key={step.id}><strong>{step.title}</strong><span>{assessment
         ? `${assessment.score} de ${assessment.total} correctas`
         : result?.input.method === 'camera' ? 'Coincidencia experimental con cámara' : 'Ejercicio sin cámara'}</span>
-        {assessment && <><button type="button" className="button button-outline" onClick={() => onReview(index)}>Revisar evaluación</button>
+        {assessment && <><button type="button" className="button button-outline sv-motion-action" onClick={() => onReview(index)}>Revisar evaluación</button>
           {assessment.score < assessment.total && <p>Repasa las referencias y vuelve a intentar las preguntas que marcaste incorrectamente.</p>}</>}
       </li>;
     })}</ul>
     {plan.steps.some(step => step.kind === 'practice') && <p>Las coincidencias de cámara son orientativas. La evaluación se califica con las respuestas del ejercicio.</p>}
-    {run?.completedAt ? <><p role="status" className="success-message">Lección completada y guardada.</p>
-      {nextPath && <Link className="button button-primary" to={nextPath}>Siguiente lección <ArrowRight size={17} aria-hidden="true" /></Link>}</>
-      : <button className="button button-primary" type="button" onClick={finish}><Check size={17} aria-hidden="true" /> Finalizar lección</button>}
+    {completedAt ? <><p ref={completionStatus} tabIndex={-1} role="status" className={`success-message${earnedReward ? ' lesson-new-reward' : ''}`}>
+      {earnedReward && <span className="lesson-reward-icon" aria-hidden="true"><CheckCircle2 size={21} />
+        <svg className="lesson-completion-burst" width="54" height="54" viewBox="0 0 54 54" fill="none" focusable="false">
+          <path d="M27 2v4m17 4-3 3m10 14h-4m-3 17-3-3M27 52v-4M10 44l3-3M2 27h4m4-17 3 3" />
+        </svg>
+      </span>}
+      <span>Lección completada y guardada.</span>{earnedReward && <strong>+{LESSON_XP} XP</strong>}
+    </p>
+      {nextPath && <Link className="button button-primary sv-motion-action" to={nextPath}>Siguiente lección <ArrowRight size={17} aria-hidden="true" /></Link>}</>
+      : <button className="button button-primary sv-motion-action" type="button" onClick={finish}><Check size={17} aria-hidden="true" /> Finalizar lección</button>}
   </div>;
 }
 
@@ -152,7 +182,7 @@ export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
   return <div className="lesson-sequence">
     <nav className="white-card lesson-sequence-outline" aria-label="Actividades de la lección">
       <p><strong>{available} de {plan.steps.length}</strong> actividades completadas</p>
-      <progress value={available} max={plan.steps.length} aria-label="Avance en esta lección" />
+      <MotionProgress value={available} max={plan.steps.length} label="Avance en esta lección" />
       <details><summary>Ver actividades</summary>
         <ol>{[...plan.steps.map(item => item.title), 'Resumen'].map((title, i) =>
           <li key={i}><button type="button" disabled={i > available} aria-current={index === i ? 'step' : undefined}
@@ -198,21 +228,20 @@ export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
       {step?.kind === 'assessment' && <Assessment step={step} result={result} submit={submit}
         review={input => recordActivity({ type: 'lesson-review', lessonId, stepId: step.id, input })} />}
       {step?.kind === 'practice' && <PracticeStep step={step} previous={result} submit={submit} />}
-      {!step && <Summary plan={plan} run={run} onReview={setSelected} nextPath={nextPath}
-        finish={() => recordActivity({ type: 'lesson-finish', lessonId })} />}
+      {!step && <Summary plan={plan} run={run} lessonId={lessonId} onReview={setSelected} nextPath={nextPath} />}
       <div className="lesson-sequence-nav">
-        {index > 0 && <button className="button button-outline" type="button" onClick={() => setSelected(index - 1)}>
+        {index > 0 && <button className="button button-outline sv-motion-action" type="button" onClick={() => setSelected(index - 1)}>
           <ArrowLeft size={17} aria-hidden="true" /> Anterior
         </button>}
-        {result?.complete && <button className="button button-primary" type="button" onClick={() => setSelected(index + 1)}>
+        {result?.complete && <button className="button button-primary sv-motion-action" type="button" onClick={() => setSelected(index + 1)}>
           {index + 1 === plan.steps.length ? 'Ver resumen' : 'Continuar'} <ArrowRight size={17} aria-hidden="true" />
         </button>}
         {!result?.complete && (step?.kind === 'intro' || step?.kind === 'reading' || step?.kind === 'study') &&
-          <button className="button button-primary" type="button" onClick={() => submit({ method: 'read' }, true)}>
+          <button className="button button-primary sv-motion-action" type="button" onClick={() => submit({ method: 'read' }, true)}>
             {step.kind === 'intro' ? 'Comenzar lección' : 'Continuar'} <ArrowRight size={17} aria-hidden="true" />
           </button>}
       </div>
     </section>
-    <Link to={unitPath} className="button button-outline"><ArrowLeft size={17} aria-hidden="true" /> Volver a las lecciones</Link>
+    <Link to={unitPath} className="button button-outline sv-motion-action"><ArrowLeft size={17} aria-hidden="true" /> Volver a las lecciones</Link>
   </div>;
 }

@@ -1,0 +1,173 @@
+/* SeñaVerse Motion. Only the routes that opt in use these tokens and effects. */
+.sv-motion {
+  --sv-motion-micro: 160ms;
+  --sv-motion-transition: 260ms;
+  --sv-motion-entry: 400ms;
+  --sv-motion-progress: 540ms;
+  --sv-motion-stagger: 45ms;
+  --sv-motion-ease: cubic-bezier(.2, .65, .3, 1);
+}
+
+.sv-motion-enter {
+  --sv-entry-timing: var(--sv-entry-duration, var(--sv-motion-entry)) var(--sv-motion-ease)
+    calc(var(--sv-entry-step, 0) * var(--sv-motion-stagger)) backwards;
+  animation: sv-motion-rise var(--sv-entry-timing), var(--sv-entry-fade, sv-motion-fade) var(--sv-entry-timing);
+}
+
+.sv-motion-enter:focus-within {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.sv-motion-veil { --sv-entry-fade: none; }
+
+/* The content remains paintable while a translucent layer fades away. */
+.sv-motion-veil::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: var(--sv-veil-surface, var(--color-page));
+  pointer-events: none;
+  animation: sv-motion-unveil var(--sv-entry-timing);
+  opacity: 0;
+}
+
+.sv-motion-veil:focus-within::after { opacity: 0 !important; }
+
+@keyframes sv-motion-rise {
+  from { transform: translateY(var(--sv-entry-distance, 8px)); }
+  to { transform: none; }
+}
+
+@keyframes sv-motion-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sv-motion-soft-fade { from { opacity: .85; } to { opacity: 1; } }
+@keyframes sv-motion-unveil { from { opacity: .4; } to { opacity: 0; } }
+
+.sv-motion .sv-motion-lift {
+  transition: transform var(--sv-motion-micro) var(--sv-motion-ease),
+    border-color var(--sv-motion-micro), box-shadow var(--sv-motion-transition);
+}
+
+.sv-motion-lift:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--color-line-strong);
+  box-shadow: var(--sv-lift-shadow, 0 8px 20px light-dark(#4b2d9312, #100a2255));
+}
+
+@media (hover: hover) {
+  .sv-motion-lift:hover {
+    transform: var(--sv-lift-transform, translateY(-3px));
+    border-color: var(--color-line-strong);
+    box-shadow: var(--sv-lift-shadow, 0 8px 20px light-dark(#4b2d9312, #100a2255));
+  }
+}
+
+.sv-motion .sv-motion-action {
+  transition: transform var(--sv-motion-micro) var(--sv-motion-ease),
+    background-color var(--sv-motion-micro), border-color var(--sv-motion-micro),
+    color var(--sv-motion-micro);
+}
+
+.sv-motion-action > svg {
+  flex-shrink: 0;
+  transition: transform var(--sv-motion-micro) var(--sv-motion-ease);
+}
+
+.sv-motion-action:focus-visible > svg { transform: translateX(3px); }
+
+@media (hover: hover) {
+  .sv-motion-action:where(:not(:disabled)):hover { transform: translateY(-1px); }
+  .sv-motion-action:where(:not(:disabled)):hover > svg { transform: translateX(3px); }
+}
+
+.sv-motion-action:where(:not(:disabled)):active { transform: translateY(1px); }
+
+.sv-motion .sv-motion-on-banner:focus-visible {
+  outline-color: #fff;
+  outline-offset: 5px;
+}
+
+.sv-motion-value { display: inline-block; }
+
+.sv-motion-progress {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+.sv-motion-progress > progress {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.sv-motion-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  transform: scaleX(var(--sv-progress-value));
+  transform-origin: left;
+  transition: transform var(--sv-motion-progress) var(--sv-motion-ease);
+}
+
+@starting-style {
+  .sv-motion-progress-fill:where(:not(.sv-motion-progress-settled)) { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-motion-enter, .sv-motion-veil::after { animation: none; }
+
+  .sv-motion .button { transition: none; }
+  .sv-motion .button:hover:not(:disabled, .sv-motion-action) { transform: none; }
+
+  .sv-motion :is(.sv-motion-action, .sv-motion-action > svg, .sv-motion-lift) {
+    transform: none;
+    transition: none;
+  }
+
+  .sv-motion-progress-fill { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .sv-motion-progress > progress { opacity: 1; }
+  .sv-motion-progress-fill { visibility: hidden; }
+}
+
+/* Keep the native close and focus change synchronous while the backdrop fades. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (transition-behavior: allow-discrete) {
+    .sv-motion :is(.sv-motion-dialog, .sign-media-dialog) {
+      opacity: 0;
+      pointer-events: none;
+      transition: display var(--sv-motion-micro) allow-discrete, overlay var(--sv-motion-micro) allow-discrete;
+    }
+
+    .sv-motion :is(.sv-motion-dialog, .sign-media-dialog)[open] {
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity var(--sv-motion-micro) var(--sv-motion-ease),
+        display var(--sv-motion-micro) allow-discrete, overlay var(--sv-motion-micro) allow-discrete;
+    }
+
+    .sv-motion :is(.sv-motion-dialog, .sign-media-dialog)::backdrop {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--sv-motion-micro), display var(--sv-motion-micro) allow-discrete,
+        overlay var(--sv-motion-micro) allow-discrete;
+    }
+
+    .sv-motion :is(.sv-motion-dialog, .sign-media-dialog)[open]::backdrop { opacity: 1; pointer-events: auto; }
+
+    @starting-style {
+      .sv-motion :is(.sv-motion-dialog, .sign-media-dialog)[open],
+      .sv-motion :is(.sv-motion-dialog, .sign-media-dialog)[open]::backdrop { opacity: 0; }
+    }
+  }
+}

@@ -2,11 +2,13 @@ import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { Illustration } from '../components/Illustration';
+import { MotionValue } from '../components/MotionValue';
 import { StudentActivityList } from '../components/StudentActivityList';
 import { StudentLevel } from '../components/StudentLevel';
 import type { HomeVisualName } from '../data/homeVisuals';
 import { headerIllustrations } from '../data/illustrations';
 import { useStudentOverview } from '../hooks/useStudentOverview';
+import '../senaverse-motion.css';
 
 const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
   { title: 'Ruta de aprendizaje', description: 'Lecciones organizadas por niveles.', action: 'Explorar', to: '/academia', visual: 'learning' },
@@ -27,18 +29,18 @@ export function DashboardPage() {
   const badges = summary.latestAchievements.slice(0, 3);
 
   return (
-    <div className="home-dashboard">
+    <div className="home-dashboard sv-motion">
       <div className="home-heading">
         <h1>¡Bienvenido a <span className="home-heading-brand">SeñaVerse! <HomeVisual name="welcome" /></span></h1>
         <p>Descubre una forma interactiva de aprender Lengua de Señas Peruana.</p>
       </div>
 
-      <section className="home-banner" aria-labelledby="home-banner-title">
+      <section className="home-banner sv-motion-enter sv-motion-veil" aria-labelledby="home-banner-title">
         <div className="home-banner-copy">
           <span className="home-banner-eyebrow">{resumeLesson ? 'Continúa aprendiendo' : 'Tu ruta de aprendizaje'}</span>
           <h2 id="home-banner-title">{lesson?.title ?? 'Explora las lecciones'}</h2>
           <p>{lesson?.detail}</p>
-          <Link to={lesson?.path ?? '/academia'} className="home-continue">
+          <Link to={lesson?.path ?? '/academia'} className="home-continue sv-motion-action sv-motion-on-banner">
             {resumeLesson ? 'Continuar aprendiendo' : initialLesson?.completed ? 'Repasar lección' : 'Empezar a aprender'} <ArrowRight size={23} aria-hidden="true" />
           </Link>
         </div>
@@ -53,25 +55,25 @@ export function DashboardPage() {
       <section className="home-learning" aria-labelledby="home-learning-title">
         <div className="home-section-heading">
           <h2 id="home-learning-title">Mi aprendizaje</h2>
-          <Link className="home-overview-link" to="/progreso">Ver mi progreso <ArrowRight size={17} aria-hidden="true" /></Link>
+          <Link className="home-overview-link sv-motion-action" to="/progreso">Ver mi progreso <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
         <div className="home-stats">
           <div className="home-stat">
             <HomeVisual name="lessons" />
-            <dl className="home-stat-copy"><dt>Lecciones completadas</dt><dd>{summary.curriculum.done}<span>/{summary.curriculum.total}</span></dd></dl>
+            <dl className="home-stat-copy"><dt>Lecciones completadas</dt><dd><MotionValue value={summary.curriculum.done} /><span className="home-stat-unit">/{summary.curriculum.total}</span></dd></dl>
           </div>
           <div className="home-stat">
             <HomeVisual name="experience" />
-            <dl className="home-stat-copy"><dt>XP acumulados</dt><dd>{summary.xp}</dd></dl>
+            <dl className="home-stat-copy"><dt>XP acumulados</dt><dd><MotionValue value={summary.xp} /></dd></dl>
           </div>
           <div className="home-stat">
             <HomeVisual name="progress" />
-            <dl className="home-stat-copy"><dt>Racha actual</dt><dd>{summary.calendar.current}<span> {summary.calendar.current === 1 ? 'día' : 'días'}</span></dd></dl>
+            <dl className="home-stat-copy"><dt>Racha actual</dt><dd>{summary.calendar.current}<span className="home-stat-unit"> {summary.calendar.current === 1 ? 'día' : 'días'}</span></dd></dl>
           </div>
         </div>
         <div className="home-learning-detail">
-          <StudentLevel level={summary.level} xp={summary.xp} />
-          <div><h3><Link className="home-overview-link" to={recommendation.path}>{recommendation.title} <ArrowRight size={17} aria-hidden="true" /></Link></h3><p>{recommendation.detail}</p></div>
+          <StudentLevel level={summary.level} xp={summary.xp} motion />
+          <div><h3><Link className="home-overview-link sv-motion-action" to={recommendation.path}>{recommendation.title} <ArrowRight size={17} aria-hidden="true" /></Link></h3><p>{recommendation.detail}</p></div>
         </div>
       </section>
       <section className="home-learning-detail home-recent" aria-label="Actividad y logros">
@@ -85,10 +87,10 @@ export function DashboardPage() {
         <div className="home-section-heading"><h2 id="home-explore-title">Explora SeñaVerse</h2></div>
         <div className="home-explore-grid">
           {exploreItems.map(item => (
-            <article className="home-explore-card" key={item.to}>
+            <article className="home-explore-card sv-motion-lift" key={item.to}>
               <HomeVisual name={item.visual} />
               <div className="home-explore-copy"><h3>{item.title}</h3><p>{item.description}</p></div>
-              <Link className="home-explore-link" to={item.to} aria-label={`${item.action}: ${item.title}`}>{item.action}</Link>
+              <Link className="home-explore-link sv-motion-action" to={item.to} aria-label={`${item.action}: ${item.title}`}>{item.action}</Link>
             </article>
           ))}
         </div>

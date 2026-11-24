@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, Info, LibraryBig
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { LessonActivity } from '../components/LessonActivity';
 import { LessonSequence } from '../components/LessonSequence';
+import { MotionProgress } from '../components/MotionProgress';
 import { SignMediaViewer } from '../components/SignMediaViewer';
 import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Lesson, type Unit } from '../data/curriculum';
 import { getEducationalSign, getLibrarySignPath } from '../data/library';
@@ -32,7 +33,7 @@ function LessonContent({ unit, lesson, completed, onVisit }: LessonPageProps & {
   useEffect(() => { onVisit(lesson.id); }, [lesson.id, onVisit]);
 
   return (
-    <div className="learning-lesson-page">
+    <div className="learning-lesson-page sv-motion">
       <nav className="lesson-breadcrumb" aria-label="Ruta de aprendizaje">
         <Link to="/academia">Aprender</Link><span aria-hidden="true">/</span>
         <Link to={getUnitPath(unit.id)}>Unidad {unit.id}</Link><span aria-hidden="true">/</span>
@@ -51,7 +52,7 @@ function LessonContent({ unit, lesson, completed, onVisit }: LessonPageProps & {
         <aside className="lesson-aside">
           <section className="white-card unit-outline learning-lesson-outline">
             <h3><BookOpen size={19} aria-hidden="true" /> Contenido de la unidad</h3>
-            {unitProgress?.count ? <><div className="bar"><div style={{ width: `${unitProgress.percent}%` }} /></div>
+            {unitProgress?.count ? <><MotionProgress value={unitProgress.done} max={unitProgress.count} label="Avance de la unidad" />
               <span className="unit-completion">{unitProgress.done} de {unitProgress.count} lecciones funcionales</span></> : <span className="unit-completion">Material preliminar</span>}
             {unit.lessons.map((item, index) => {
                 const done = item.plan ? !!progress.lessonStudy?.[item.id]?.completedAt : completed.includes(item.id);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BookOpen, Bookmark, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Hand, Heart, LayoutGrid, Search, SearchX, Soup, Sparkles, UsersRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { EducationalVisual, SignMediaViewer } from '../components/SignMediaViewer';
@@ -66,6 +66,16 @@ export function LibraryPage() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    const cards = resultsRef.current?.querySelectorAll<HTMLElement>('.library-card');
+    // StudentLayout resets the scroll position on entry to the route.
+    const scroll = window.scrollY;
+    cards?.forEach(card => {
+      const { top, bottom } = card.getBoundingClientRect();
+      if (top + scroll < window.innerHeight && bottom + scroll > 0) card.classList.add('library-card-initial');
+    });
+  }, []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -142,7 +152,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="library-page">
+    <div className="library-page sv-motion">
       <header className="library-hero">
         <div className="library-book" aria-hidden="true">
           <svg viewBox="0 0 120 104" fill="none" stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -199,7 +209,7 @@ export function LibraryPage() {
             const detail = new URLSearchParams(params);
             detail.set('sena', entry.id);
             return (
-              <article className="library-card" key={entry.id}>
+              <article className="library-card sv-motion-lift" key={entry.id}>
                 <LibraryReference entry={entry} />
                 <div className="library-card-copy">
                   <h2>{entry.word}</h2>
@@ -225,7 +235,7 @@ export function LibraryPage() {
         <button type="button" className="library-page-arrow" aria-label="Página siguiente" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}><ChevronRight size={25} aria-hidden="true" /></button>
       </nav>}
 
-      <dialog ref={dialogRef} className="library-dialog" aria-labelledby="library-dialog-title"
+      <dialog ref={dialogRef} className="library-dialog sv-motion-dialog" aria-labelledby="library-dialog-title"
         onCancel={event => { event.preventDefault(); closeEntry(); }} onClick={event => { if (event.target === event.currentTarget) closeEntry(); }}>
         <div className="library-dialog-content">
           <button className="library-dialog-close" type="button" aria-label="Cerrar ficha" autoFocus onClick={closeEntry}><X size={24} /></button>

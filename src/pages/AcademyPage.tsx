@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Layers3, Play } fro
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
 import { Illustration } from '../components/Illustration';
+import { MotionProgress } from '../components/MotionProgress';
 import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units } from '../data/curriculum';
 import { useStudentProgress } from '../hooks/progressContext';
 import type { LearningActivity } from '../hooks/useLearningActivity';
@@ -24,7 +25,7 @@ function UnitLessons({ unit, completed }: AcademyProps & { unit: CurriculumUnit 
   const unitProgress = getCurriculumProgress(progress).unitProgress.find(item => item.unit.id === unit.id);
 
   return (
-    <div className="learning-unit-page">
+    <div className="learning-unit-page sv-motion">
       <nav className="lesson-breadcrumb learning-breadcrumb" aria-label="Ruta de aprendizaje">
         <Link to="/academia"><ArrowLeft size={16} aria-hidden="true" /> Aprender</Link>
         <span aria-hidden="true">/</span><span aria-current="page">Unidad {unit.id}</span>
@@ -35,7 +36,7 @@ function UnitLessons({ unit, completed }: AcademyProps & { unit: CurriculumUnit 
       </header>
       <section className="learning-unit-progress" aria-label="Progreso de la unidad">
         <div><h2>Progreso de la unidad</h2><span>{unitProgress?.count ? `${unitProgress.done} de ${unitProgress.count} lecciones funcionales` : 'Material en preparación'}</span></div>
-        {!!unitProgress?.count && <progress value={unitProgress.done} max={unitProgress.count} aria-label={`Progreso de la unidad ${unit.id}`} />}
+        {!!unitProgress?.count && <MotionProgress value={unitProgress.done} max={unitProgress.count} label={`Progreso de la unidad ${unit.id}`} />}
       </section>
       <div className="learning-section-heading"><h2>Lecciones de la unidad</h2></div>
       <ol className="learning-lesson-list">
@@ -49,7 +50,7 @@ function UnitLessons({ unit, completed }: AcademyProps & { unit: CurriculumUnit 
               <span className="learning-lesson-number" aria-hidden="true">{isDone ? <Check size={21} /> : index + 1}</span>
               <div className="learning-lesson-copy"><h3>{lesson.title}</h3><p>{lesson.description}</p><span><Clock3 size={14} aria-hidden="true" /> {lesson.duration}</span></div>
               <span className={`learning-lesson-status${isDone ? ' is-completed' : ''}`}>{status}</span>
-              <Link className={`button ${lesson.plan && !isDone ? 'button-primary' : 'button-outline'} learning-lesson-open`} to={getLessonPath(unit.id, lesson.id)}>{lesson.plan ? isDone ? 'Repasar' : isStarted ? 'Continuar' : 'Comenzar' : 'Consultar'}<ArrowRight size={17} aria-hidden="true" /></Link>
+              <Link className={`button ${lesson.plan && !isDone ? 'button-primary' : 'button-outline'} learning-lesson-open sv-motion-action`} to={getLessonPath(unit.id, lesson.id)}>{lesson.plan ? isDone ? 'Repasar' : isStarted ? 'Continuar' : 'Comenzar' : 'Consultar'}<ArrowRight size={17} aria-hidden="true" /></Link>
             </li>
           );
         })}
@@ -73,7 +74,7 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
   const last = activity.lastLessonId ? getLessonLocation(activity.lastLessonId) : undefined;
 
   return (
-    <div className="learning-page">
+    <div className="learning-page sv-motion">
       <header className="learning-heading"><h1>Mi ruta de aprendizaje</h1><p>Aprende Lengua de Señas Peruana paso a paso.</p></header>
       <section className="learning-banner" aria-labelledby="learning-banner-title">
         <div className="learning-banner-copy">
@@ -101,16 +102,17 @@ export function AcademyPage({ completed, activity }: AcademyProps) {
           const isComplete = !!count && done === count;
           const canContinue = started && !!next;
           const status = isComplete ? 'Completada' : started ? 'En progreso' : count ? 'Disponible' : 'Material preliminar';
+          const state = isComplete ? 'complete' : started ? 'started' : count ? 'available' : 'preliminary';
           const actionPath = canContinue ? getLessonPath(unit.id, next.id) : getUnitPath(unit.id);
 
           return (
-            <article className="learning-unit-card" key={unit.id} aria-labelledby={`learning-unit-${unit.id}`}>
+            <article className={`learning-unit-card${count ? ' sv-motion-lift' : ''}`} data-unit-state={state} key={unit.id} aria-labelledby={`learning-unit-${unit.id}`}>
               <Link className="learning-unit-picture" to={getUnitPath(unit.id)} aria-label={`Ver unidad ${unit.id}, ${unit.title}`}><UnitIllustration unit={unit} /></Link>
               <h3 id={`learning-unit-${unit.id}`}><Link to={getUnitPath(unit.id)}>Unidad {unit.id} · {unit.title}</Link></h3>
               <p>{unit.subtitle}</p>
               <span className={`learning-unit-status${isComplete ? ' is-completed' : ''}`}>{isComplete && <CheckCircle2 size={15} aria-hidden="true" />}{status}</span>
-              {!!count && <div className="learning-card-progress"><span>{done} de {count} lecciones funcionales</span><progress value={done} max={count} aria-label={`Progreso de ${unit.title}`} /></div>}
-              <Link className={`button ${canContinue ? 'button-primary' : 'button-outline'} learning-unit-action`} to={actionPath}>{canContinue ? 'Continuar unidad' : 'Ver unidad'}{canContinue && <ArrowRight size={20} aria-hidden="true" />}{isComplete && <Check size={19} aria-hidden="true" />}{!started && <Play size={17} aria-hidden="true" />}</Link>
+              {!!count && <div className="learning-card-progress"><span>{done} de {count} lecciones funcionales</span><MotionProgress value={done} max={count} label={`Progreso de ${unit.title}`} /></div>}
+              <Link className={`button ${canContinue ? 'button-primary' : 'button-outline'} learning-unit-action sv-motion-action`} to={actionPath}>{canContinue ? 'Continuar unidad' : 'Ver unidad'}{canContinue && <ArrowRight size={20} aria-hidden="true" />}{isComplete && <Check size={19} aria-hidden="true" />}{!!count && !started && <Play size={17} aria-hidden="true" />}</Link>
             </article>
           );
         })}

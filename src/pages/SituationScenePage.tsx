@@ -1,9 +1,15 @@
 import { useEffect } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, Info, MessageSquareText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, CircleX, ClipboardList, Info, MessageSquareText } from 'lucide-react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
+<<<<<<< Updated upstream
 import { SituationDialogue, SituationLine } from '../components/SituationDialogue';
+=======
+import { SituationDialogue } from '../components/SituationDialogue';
+import { MotionProgress } from '../components/MotionProgress';
+import { rememberSituationFinish } from '../components/situationFinishMotion';
+>>>>>>> Stashed changes
 import { getEducationalSign } from '../data/library';
 import { nextSituationScene, summarizeSituation } from '../data/situationStudy';
 import { getSituation, getSituationFilter, getSituationPath, getSituationResultsPath, getSituationScenePath, getSituationsPath,
@@ -48,12 +54,14 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
   useEffect(() => { recordActivity({ type: 'situation-start', situationId }); }, [recordActivity, situationId]);
 
   function finish() {
+    const from = Date.now();
+    const alreadyRewarded = progress.activities.some(activity => activity.id === `situation:${situationId}` && activity.rewardXp);
     recordActivity({ type: 'situation-finish', situationId });
-    navigate(results);
+    navigate(results, alreadyRewarded ? undefined : { state: { finishMotionToken: rememberSituationFinish(situationId, from) } });
   }
 
   return (
-    <div className="situation-scene-page">
+    <div className="situation-scene-page sv-motion">
       <SituationBreadcrumbs situation={situation} current={`Interacción ${sceneIndex + 1}`} filter={filter} />
       <header className="situation-scene-heading">
         <div>
@@ -61,11 +69,11 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
           <h1>{situation.title}</h1>
           <p>{situation.context}</p>
         </div>
-        <Link className="situation-results-link" to={results}><ClipboardList size={19} aria-hidden="true" /> Ver resumen</Link>
+        <Link className="situation-results-link sv-motion-action" to={results}><ClipboardList size={19} aria-hidden="true" /> Ver resumen</Link>
       </header>
       <div className="situation-scene-progress">
         <span>Interacción {sceneIndex + 1} de {situation.scenes.length}</span><span>{completed} {completed === 1 ? 'completada' : 'completadas'}</span>
-        <progress value={completed} max={situation.scenes.length} aria-label="Interacciones completadas de la situación" />
+        <MotionProgress value={completed} max={situation.scenes.length} label="Interacciones completadas de la situación" animateOnMount={false} />
       </div>
 
       {scene.dialogue ? <SituationDialogue situation={situation} scene={scene} answer={answer} filter={filter} onEvent={recordActivity} /> : <>
@@ -93,7 +101,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
                     onChange={() => recordActivity({ type: 'situation-select', situationId, sceneId, choiceId: id })} />
                   <span className="situation-option-letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span>
                   <strong>{getEducationalSign(id)?.word ?? id}</strong>
-                  {selected && answer.checked && isCorrect && <CheckCircle2 size={21} aria-hidden="true" />}
+                  {selected && answer.checked && (isCorrect ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleX size={21} aria-hidden="true" />)}
                 </label>
               );
             })}
@@ -104,7 +112,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
               {!isCorrect && !answer.practice && ' Elige otra respuesta para continuar.'}</p>
           </div>}
           {!answer?.practice && <div className="situation-question-actions">
-            <button className="button button-primary" type="submit" disabled={!answer || answer.checked}>Comprobar alternativa <ArrowRight size={18} aria-hidden="true" /></button>
+            <button className="button button-primary sv-motion-action" type="submit" disabled={!answer || answer.checked}>Comprobar alternativa <ArrowRight size={18} aria-hidden="true" /></button>
           </div>}
         </form>
       </section>
@@ -120,10 +128,10 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
         <SituationLine speaker={situation.speaker}>{scene.reply}</SituationLine>
       </div>}
       <div className="situation-navigation">
-        <Link className="button button-outline" to={getSituationsPath(filter)}><ArrowLeft size={18} aria-hidden="true" /> Volver a Situaciones</Link>
-        {answer?.practice && (followingScene ? <Link className="button button-primary" to={getSituationScenePath(situationId, followingScene.id, filter)}>
+        <Link className="button button-outline sv-motion-action" to={getSituationsPath(filter)}><ArrowLeft size={18} aria-hidden="true" /> Volver a Situaciones</Link>
+        {answer?.practice && (followingScene ? <Link className="button button-primary sv-motion-action" to={getSituationScenePath(situationId, followingScene.id, filter)}>
           Continuar a la siguiente interacción <ArrowRight size={18} aria-hidden="true" />
-        </Link> : run?.completedAt ? <Link className="button button-primary" to={results}>Ver resumen final</Link> : <button className="button button-primary"
+        </Link> : run?.completedAt ? <Link className="button button-primary sv-motion-action" to={results}>Ver resumen final</Link> : <button className="button button-primary sv-motion-action"
           type="button" onClick={finish}>Finalizar situación <ArrowRight size={18} aria-hidden="true" /></button>)}
       </div>
     </div>

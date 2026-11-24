@@ -48,3 +48,20 @@
 .sign-media-dialog .sign-media-image img, .sign-media-dialog .sign-media-frames img { max-height: min(62dvh, 680px); }
 .sign-media-error { color: var(--color-error); }
 .external-reference-status { display: block; color: var(--color-text-secondary); font-size: .84rem; }
+
+.sv-motion .sign-media-player .sign-media-actions > [role='status'] {
+  flex: 1 1 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sv-motion :is(.sign-media-open, .sign-media-load, .sign-media-actions button, .sign-media-dialog header button) {
+    transition: background-color var(--sv-motion-micro), border-color var(--sv-motion-micro);
+  }
+  .sv-motion :is(.sign-media-actions, .sign-media-error, .sign-media-dialog header) {
+    animation: sv-motion-soft-fade var(--sv-motion-micro) var(--sv-motion-ease);
+  }
+}

@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { ArrowRight, Info, LayoutGrid, MessageSquareText, UserRound, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
+import { MotionProgress } from '../components/MotionProgress';
 import { SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { getSituationFilter, getSituationPath, situations, type SituationFilter } from '../data/situations';
 import { summarizeSituation } from '../data/situationStudy';
@@ -17,15 +18,20 @@ export function SituationsPage() {
   const { progress } = useStudentProgress();
   const [searchParams, setSearchParams] = useSearchParams();
   const helpRef = useRef<HTMLDialogElement>(null);
+  const gridRef = useRef<HTMLElement>(null);
   const filter = getSituationFilter(searchParams.get('nivel'));
   const visibleSituations = situations.filter(situation => filter === 'todos' || situation.difficulty === filter);
+
+  useLayoutEffect(() => {
+    gridRef.current?.querySelectorAll('.situation-card').forEach(card => card.classList.add('situation-card-entry'));
+  }, []);
 
   function selectFilter(next: SituationFilter) {
     setSearchParams(next === 'todos' ? {} : { nivel: next });
   }
 
   return (
-    <div className="situations-page">
+    <div className="situations-page sv-motion">
       <header className="situations-heading">
         <span className="situations-heading-icon" aria-hidden="true"><MessageSquareText strokeWidth={1.8} /></span>
         <div className="situations-heading-copy">
@@ -60,12 +66,12 @@ export function SituationsPage() {
       <p className="situations-demo-note"><Info size={16} aria-hidden="true" /> El reconocimiento es experimental. Todas las situaciones se pueden completar sin cámara.</p>
       <span className="sr-only" role="status">{visibleSituations.length} situaciones disponibles en este filtro.</span>
 
-      <section className="situations-grid" aria-label="Situaciones cotidianas">
+      <section className="situations-grid" ref={gridRef} aria-label="Situaciones cotidianas">
         {visibleSituations.map(situation => {
           const run = progress.situationStudy?.[situation.id];
           const { completed } = summarizeSituation(situation, run);
           return (
-            <article className="situation-card" key={situation.id} aria-labelledby={`situation-${situation.id}`}>
+            <article className="situation-card sv-motion-lift" key={situation.id} aria-labelledby={`situation-${situation.id}`}>
               <SituationIllustration situation={situation} />
               <div className="situation-card-copy">
                 <h2 id={`situation-${situation.id}`}>{situation.title}</h2>
@@ -74,9 +80,9 @@ export function SituationsPage() {
                 <p className="situation-card-context">{situation.context}</p>
                 <div className="situation-card-progress">
                   <span>{completed} de {situation.scenes.length} interacciones{run?.completedAt && ' · Finalizada'}</span>
-                  <progress value={completed} max={situation.scenes.length} aria-label={`Interacciones completadas de ${situation.title}`} />
+                  <MotionProgress value={completed} max={situation.scenes.length} label={`Interacciones completadas de ${situation.title}`} animateOnMount={false} />
                 </div>
-                <Link className="button button-primary situation-start" to={getSituationPath(situation.id, filter)}>{run?.completedAt ? 'Ver resumen' : run ? 'Continuar' : 'Comenzar'}<ArrowRight size={19} aria-hidden="true" /></Link>
+                <Link className="button button-primary situation-start sv-motion-action" to={getSituationPath(situation.id, filter)}>{run?.completedAt ? 'Ver resumen' : run ? 'Continuar' : 'Comenzar'}<ArrowRight size={19} aria-hidden="true" /></Link>
               </div>
             </article>
           );

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Check, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { LessonActivity as Activity } from '../data/curriculum';
 import { gradeAnswers } from '../data/lessonPlan';
@@ -10,9 +10,9 @@ import { QuizSignMedia } from './QuizSignMedia';
 
 const activityTitles = { choice: 'Comprueba lo aprendido', identify: 'Identifica la expresión', association: 'Relaciona los conceptos', order: 'Ordena los pasos' };
 
-export function LessonAnswerFields({ activity, responses, onResponse, checked, disabled }: {
+export function LessonAnswerFields({ activity, responses, onResponse, checked, disabled, motion = false }: {
   activity: Activity; responses: Record<string, string>; onResponse: (id: string, value: string) => void;
-  checked: boolean; disabled?: boolean;
+  checked: boolean; disabled?: boolean; motion?: boolean;
 }) {
   const name = useId();
   const sign = activity.diagramId ? getEducationalSign(activity.diagramId) : undefined;
@@ -27,7 +27,7 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
     const label = <label className={`answer${selected ? ' selected' : ''}${feedback}`} key={option.id}>
       <input type="radio" name={name} value={option.id} checked={selected} onChange={() => onResponse('choice', option.id)} />
       {!option.media && <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>}{option.label}
-      {feedback && <small>{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
+      {feedback && <small className={motion ? 'lesson-answer-result' : undefined}>{motion && (feedback === ' right' ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
       {!option.media && checked && option.feedback && <small>{option.feedback}</small>}
     </label>;
     return option.media ? <div className="lesson-visual-option" key={option.id}>
@@ -43,10 +43,15 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
     {activity.media && <QuizSignMedia key={activity.media.signId} media={activity.media} />}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
+<<<<<<< Updated upstream
       const fieldId = `${name}-${pair.id}`;
       return <div className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
         <div><label htmlFor={fieldId}>{pair.label}</label>
           {checked && <small id={`${fieldId}-feedback`}>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
+=======
+      return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
+        <span>{pair.label}{checked && <small className={motion ? 'lesson-answer-result' : undefined}>{motion && (correct ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
+>>>>>>> Stashed changes
           {pair.media && <QuizSignMedia media={pair.media} />}
         </div>
         <select id={fieldId} aria-describedby={checked ? `${fieldId}-feedback` : undefined}
@@ -83,10 +88,10 @@ export function LessonActivity({ activity, onResult }: { activity: Activity; onR
     <section className="white-card lesson-article quiz">
       <span className="section-eyebrow">03 / PONTE A PRUEBA</span>
       <h2>{activityTitles[activity.type]}</h2>
-      <LessonAnswerFields activity={activity} responses={responses} onResponse={changeResponse} checked={checked} />
+      <LessonAnswerFields activity={activity} responses={responses} onResponse={changeResponse} checked={checked} motion />
       <div className="quiz-actions">
-        <button className="button button-primary" type="button" disabled={!result} onClick={() => { setChecked(true); onResult?.(correct); }}>Comprobar respuesta <ArrowRight size={17} aria-hidden="true" /></button>
-        {checked && <p role="status" className={correct ? 'success-message' : 'error-message'}>{correct ? activity.success : 'Inténtalo de nuevo. Revisa la explicación y el contexto de cada expresión.'}</p>}
+        <button className="button button-primary sv-motion-action" type="button" disabled={!result} onClick={() => { setChecked(true); onResult?.(correct); }}>Comprobar respuesta <ArrowRight size={17} aria-hidden="true" /></button>
+        {checked && <p role="status" className={`lesson-motion-feedback ${correct ? 'success-message' : 'error-message'}`}>{correct ? <Check size={19} aria-hidden="true" /> : <Info size={19} aria-hidden="true" />}<span>{correct ? activity.success : 'Inténtalo de nuevo. Revisa la explicación y el contexto de cada expresión.'}</span></p>}
       </div>
     </section>
   );

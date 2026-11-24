@@ -1,4 +1,6 @@
 .hero-visual {
+  --sv-veil-surface: var(--bg);
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -8,12 +10,82 @@
 }
 
 .lesson-teaser {
+  --sv-lift-transform: perspective(900px) translateY(-3px) rotateX(1.2deg);
+  --sv-lift-shadow: var(--shadow), 0 12px 26px light-dark(#5733a512, #100a2255);
+  position: relative;
   width: min(100%, 545px);
   padding: clamp(12px, 2vw, 22px);
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: var(--color-card);
+  background: radial-gradient(ellipse at top right, color-mix(in srgb, var(--color-primary) 6%, transparent), transparent 65%), var(--color-card);
   box-shadow: var(--shadow);
+}
+
+.hero h1 { --sv-entry-step: 1; }
+.hero-description, .hero-visual { --sv-entry-step: 2; }
+.hero-actions { --sv-entry-step: 3; }
+.hero-caption { --sv-entry-step: 4; --sv-entry-duration: 340ms; }
+.hero-visual { --sv-entry-duration: 450ms; --sv-entry-distance: 10px; }
+
+.lesson-teaser-beam {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.lesson-teaser-beam::before {
+  content: '';
+  position: absolute;
+  inset: -65%;
+  background: conic-gradient(transparent 6%, var(--color-primary) 13%, var(--color-info) 17%, var(--color-focus) 20%, transparent 23%);
+  opacity: 0;
+}
+
+@supports (mask-composite: exclude) {
+  .lesson-teaser-beam::before { animation: sv-presentation-beam 850ms linear 220ms; }
+}
+
+@keyframes sv-presentation-beam {
+  0% { opacity: 0; transform: rotate(0); }
+  22%, 58% { opacity: .8; }
+  100% { opacity: 0; transform: rotate(1turn); }
+}
+
+.landing .button.sv-motion-action {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing .button.sv-motion-action::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(105deg, var(--sv-button-tint), transparent 92%);
+  opacity: 0;
+  transform: scaleX(.65);
+  transform-origin: left;
+  transition: opacity var(--sv-motion-micro), transform var(--sv-motion-micro) var(--sv-motion-ease);
+}
+
+.landing .button-primary { --sv-button-tint: #fff2; }
+.landing :is(.button-outline, .button-white) { --sv-button-tint: color-mix(in srgb, var(--color-primary) 14%, transparent); }
+.landing .sv-motion-action:focus-visible::before { opacity: 1; transform: none; }
+
+@media (hover: hover) {
+  .landing .sv-motion-action:hover::before { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-teaser-beam::before { animation: none; }
+  .landing .button.sv-motion-action::before { transform: none; transition: none; }
 }
 
 .lesson-teaser > img {
