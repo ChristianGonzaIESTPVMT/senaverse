@@ -47,9 +47,13 @@ export function SampleFrames({ sample }: { sample: DatasetSample }) {
 export function SampleQuality({ sample }: { sample: SampleSummary }) {
   const quality = sample.qualityMetrics;
   const warnings = sampleReviewWarnings(sample);
+  const emptyFrame = sample.captureMetadata.campaign?.hand === 'none';
+  const hasHandRequirement = emptyFrame || sample.captureMetadata.labelSnapshot.expectedHands > 0;
   const values = [['Observaciones', quality.frameCount], ['Ventana de grabación', `${(sample.durationMs / 1000).toFixed(2)} s`],
     ['Datos observados', `${(quality.observedDurationMs / 1000).toFixed(2)} s`], ['Manos detectadas', `${quality.minimumHands}–${quality.maximumHands}`],
-    [sample.captureMetadata.labelSnapshot.expectedHands === 0 ? 'Requisito de manos' : 'Con las manos esperadas', sample.captureMetadata.labelSnapshot.expectedHands === 0 ? 'Sin requisito' : `${(quality.expectedHandsRatio * 100).toFixed(1)}%`], ['Frecuencia real', `${quality.averageFps.toFixed(1)} obs/s`], ['Pérdidas de seguimiento', quality.trackingLosses], ['Incidencias', sample.incidents.length]];
+    [emptyFrame ? 'Observaciones sin manos' : hasHandRequirement ? 'Con las manos esperadas' : 'Requisito de manos',
+      hasHandRequirement ? `${(quality.expectedHandsRatio * 100).toFixed(1)}%` : 'Sin requisito'],
+    ['Frecuencia real', `${quality.averageFps.toFixed(1)} obs/s`], ['Pérdidas de seguimiento', quality.trackingLosses], ['Incidencias', sample.incidents.length]];
   return <><dl className="dataset-quality-grid">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     {warnings.length > 0 && <ul className="dataset-quality-warnings">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
     <p className="dataset-muted">La calidad describe la captura de puntos. No demuestra que la seña ejecutada sea lingüísticamente correcta.</p></>;

@@ -50,6 +50,7 @@ function PracticeStep({ step, previous, submit }: {
   const [path, setPath] = useState<'choose' | 'camera' | 'alternative'>(last?.input.method === 'alternative' ? 'alternative' : 'choose');
   const supportsCamera = recognitionSignsById.has(step.targetId);
   const sign = getEducationalSign(step.targetId);
+  const visualAlternative = step.alternative.some(({ activity }) => activity.options.some(option => option.media));
   if (previous?.complete) {
     return <div className="lesson-sequence-stack">
       <p>{last?.input.method === 'camera' ? 'Práctica registrada con coincidencia experimental de cámara.' : 'Ejercicio alternativo sin cámara completado.'}</p>
@@ -58,7 +59,7 @@ function PracticeStep({ step, previous, submit }: {
   }
 
   return <div className="lesson-sequence-stack">
-    {path !== 'camera' && sign && <SignMediaViewer sign={sign} instruction={step.instruction} compact />}
+    {path !== 'camera' && (path !== 'alternative' || !visualAlternative) && sign && <SignMediaViewer sign={sign} instruction={step.instruction} compact />}
     {supportsCamera && <p className="lesson-warning">Reconocimiento experimental. La revisión lingüística está pendiente. Si te cuesta obtener una coincidencia, puedes elegir el ejercicio sin cámara.</p>}
     {step.notice && <p>{step.notice}</p>}
     <div className="lesson-sequence-nav">

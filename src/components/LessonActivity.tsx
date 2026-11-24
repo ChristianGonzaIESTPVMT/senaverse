@@ -1,10 +1,12 @@
 import { useId, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { LessonActivity as Activity } from '../data/curriculum';
 import { gradeAnswers } from '../data/lessonPlan';
-import { getEducationalSign } from '../data/library';
+import { getEducationalSign, getLibrarySignPath } from '../data/library';
 import { getQuizVisual } from '../data/educationalMedia';
 import { EducationalVisual } from './SignMediaViewer';
+import { QuizSignMedia } from './QuizSignMedia';
 
 const activityTitles = { choice: 'Comprueba lo aprendido', identify: 'Identifica la expresión', association: 'Relaciona los conceptos', order: 'Ordena los pasos' };
 
@@ -16,32 +18,49 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
   const sign = activity.diagramId ? getEducationalSign(activity.diagramId) : undefined;
   const visual = sign && getQuizVisual(sign.media);
   const rows = activity.type === 'association' ? activity.pairs : activity.type === 'order'
-    ? activity.order.map((answerId, index) => ({ id: String(index), label: `Paso ${index + 1}`, answerId })) : undefined;
+    ? activity.order.map((answerId, index) => ({ id: String(index), label: `Paso ${index + 1}`, answerId, media: undefined })) : undefined;
+  const hasVisualOptions = activity.options.some(option => option.media);
   const labelFor = (id: string) => activity.options.find(option => option.id === id)?.label;
+  const choices = (activity.type === 'choice' || activity.type === 'identify') && activity.options.map((option, index) => {
+    const selected = responses.choice === option.id;
+    const feedback = checked && selected ? option.id === activity.correctId ? ' right' : ' wrong' : '';
+    const label = <label className={`answer${selected ? ' selected' : ''}${feedback}`} key={option.id}>
+      <input type="radio" name={name} value={option.id} checked={selected} onChange={() => onResponse('choice', option.id)} />
+      {!option.media && <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>}{option.label}
+      {feedback && <small>{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
+      {!option.media && checked && option.feedback && <small>{option.feedback}</small>}
+    </label>;
+    return option.media ? <div className="lesson-visual-option" key={option.id}>
+      <QuizSignMedia media={option.media} />
+      {label}
+      {checked && option.feedback && <small>{option.feedback}</small>}
+    </div> : label;
+  });
   return <fieldset className="lesson-answer-fields" disabled={disabled}>
     <legend>{activity.question}</legend>
     {activity.type === 'order' && <small>Usa cada acción una sola vez.</small>}
     {visual && <div className="lesson-question-diagram"><EducationalVisual key={visual.id} visual={visual} /></div>}
+    {activity.media && <QuizSignMedia key={activity.media.signId} media={activity.media} />}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
       return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
-        <span>{pair.label}{checked && <small>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}</span>
+        <span>{pair.label}{checked && <small>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
+          {pair.media && <QuizSignMedia media={pair.media} />}
+        </span>
         <select value={responses[pair.id] ?? ''} onChange={event => onResponse(pair.id, event.target.value)}>
           <option value="">Elige una respuesta</option>
           {activity.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
       </label>;
     })}
-    {(activity.type === 'choice' || activity.type === 'identify') && activity.options.map((option, index) => {
-      const selected = responses.choice === option.id;
-      const feedback = checked && selected ? option.id === activity.correctId ? ' right' : ' wrong' : '';
-      return <label className={`answer${selected ? ' selected' : ''}${feedback}`} key={option.id}>
-        <input type="radio" name={name} value={option.id} checked={selected} onChange={() => onResponse('choice', option.id)} />
-        <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>{option.label}
-        {feedback && <small>{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
-      </label>;
-    })}
+    {hasVisualOptions ? <div className="lesson-visual-options">{choices}</div> : choices}
     {checked && activity.explanation && <p className="lesson-answer-explanation">{activity.explanation}</p>}
+    {checked && activity.reviewSignIds && <div className="lesson-quiz-review" aria-label="Repasar material educativo">
+      {activity.reviewSignIds.flatMap(id => {
+        const entry = getEducationalSign(id);
+        return entry ? [<Link key={id} to={getLibrarySignPath(id)}>Repasar {entry.word} en Biblioteca</Link>] : [];
+      })}
+    </div>}
   </fieldset>;
 }
 

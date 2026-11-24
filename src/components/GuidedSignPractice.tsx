@@ -25,12 +25,12 @@ function AlternativePractice({ exercise, onComplete }: { exercise: ChoiceExercis
   </form>;
 }
 
-export function GuidedSignPractice({ sign, exercise, returnState, titleId, practice, onComplete }: {
+export function GuidedSignPractice({ sign, exercise, returnState, titleId, practice, onComplete, cameraDisabled = false }: {
   sign: LibraryEntry; exercise: ChoiceExercise; returnState: object; titleId: string;
-  practice?: SignPractice; onComplete: (input: SignPractice) => void;
+  practice?: SignPractice; onComplete: (input: SignPractice) => void; cameraDisabled?: boolean;
 }) {
   const [mode, setMode] = useState<'camera' | 'alternative' | null>(null);
-  const supportsCamera = !!(sign.recognitionClassId && sign.instructions && sign.reference);
+  const supportsCamera = !cameraDisabled && !!(sign.recognitionClassId && sign.instructions && sign.reference);
 
   return <section className="situation-practice-step" aria-labelledby={titleId}>
     <div className="situation-practice-heading">
@@ -38,7 +38,7 @@ export function GuidedSignPractice({ sign, exercise, returnState, titleId, pract
       {!sign.instructions && <p>{sign.meaning}</p>}
     </div>
     <div className="situation-practice-reference">
-      {mode !== 'camera' && <SignMediaViewer key={sign.id} sign={sign} compact />}
+      {mode !== 'camera' && (practice || !exercise.options.some(option => option.media)) && <SignMediaViewer key={sign.id} sign={sign} compact />}
       <Link to={getLibrarySignPath(sign.id)} state={returnState}>Ver ficha de {sign.word} en Biblioteca</Link>
     </div>
     {practice ? <div className="situation-answer-feedback is-correct" role="status">
@@ -56,7 +56,7 @@ export function GuidedSignPractice({ sign, exercise, returnState, titleId, pract
         <button className="button button-outline" type="button" aria-pressed={mode === 'alternative'} onClick={() => setMode('alternative')}>Hacer ejercicio sin cámara</button>
       </div>
       {mode === 'alternative' && <AlternativePractice exercise={exercise} onComplete={onComplete} />}
-      {mode === 'camera' && sign.recognitionClassId && sign.instructions && sign.reference && <div className="situation-directed-practice">
+      {mode === 'camera' && supportsCamera && sign.recognitionClassId && sign.instructions && sign.reference && <div className="situation-directed-practice">
         <Suspense fallback={<p role="status">Abriendo la práctica dirigida…</p>}>
           <DirectedLessonPractice targetId={sign.recognitionClassId} instruction={sign.instructions}
             continueLabel="Guardar práctica con cámara" onContinue={signId => onComplete({ method: 'camera', signId })} />

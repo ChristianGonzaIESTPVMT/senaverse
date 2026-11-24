@@ -32,7 +32,30 @@ export async function loadTraces(datasetPath) {
   return traces;
 }
 
-export async function replayTrace(evaluate, until, sample, expected) {
+// Repeat one real landmark frame so test assertions do not depend on video scheduling.
+export async function loadStaticTraces(datasetPath, labels) {
+  const model = parseLabModel(JSON.parse(await readFile('public/models/lsp-v1.json', 'utf8')));
+  const { samples } = JSON.parse(await readFile(datasetPath, 'utf8'));
+  return Object.fromEntries(labels.map(label => {
+    const candidates = samples.filter(sample => sample.reviewStatus === 'accepted' && sample.labelId === label
+      && sample.captureMetadata.configuration.processingWidth / sample.captureMetadata.configuration.processingHeight === 4 / 3);
+    const candidate = candidates.flatMap(sample => {
+      const hands = sample.frames.at(-1)?.hands;
+      if (hands?.length !== 1) return [];
+      const frames = Array.from({ length: 25 }, (_, index) => ({ timestampMs: index * 60, hands }));
+      const prepared = trailingWindow(frames, 4 / 3);
+      if (!prepared.features) return [];
+      const prediction = model.predictor.classify(prepared);
+      const usable = label === 'NEG-001'
+        ? prediction.reason === 'low-confidence' || prediction.reason === 'low-margin' : prediction.labelId === label;
+      return usable ? [{ hands, strength: label === 'NEG-001' ? -prediction.margin : prediction.margin }] : [];
+    }).sort((a, b) => b.strength - a.strength)[0];
+    assert.ok(candidate, `Se requiere una postura reproducible de ${label}.`);
+    return [label, { frames: [{ timestampMs: 0, hands: candidate.hands }] }];
+  }));
+}
+
+export async function replayTrace(evaluate, until, sample, expected, afterConfirmation) {
   const frames = sample.frames.map(frame => ({ time: frame.timestampMs, result: {
     landmarks: frame.hands.map(hand => hand.landmarks), handedness: frame.hands.map(hand => hand.handedness),
   } }));
@@ -44,6 +67,7 @@ export async function replayTrace(evaluate, until, sample, expected) {
   })()`);
   try {
     await until(expected, () => evaluate(`[...window.studentTrace.statuses].some(status => status.includes(${JSON.stringify(expected)}))`));
+    await afterConfirmation?.();
   } catch (error) {
     const diagnostics = await evaluate(`({ statuses: [...window.studentTrace.statuses], cursor: window.studentTrace.cursor,
       size: [...document.querySelectorAll('video')].map(video => [video.videoWidth, video.videoHeight]),
@@ -78,7 +102,9 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
   assert.match(await evaluate('document.querySelector(".lesson-sequence-step a").href'), /minedu\.gob\.pe.*#page=14$/);
   assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list dt").length'), 5);
   await next();
-  await step('Elige una cantidad');
+  await step('De la seña a la cantidad');
+  await until('video de cantidades listo', () => evaluate('document.querySelector(".quiz-sign-video")?.readyState >= 1'));
+  assert.equal(await evaluate('!!document.querySelector(".lesson-quiz-review,.lesson-answer-explanation")'), false);
   await radio(0, 'LSP-001');
   await check();
   await until('respuesta incorrecta', () => evaluate('document.querySelector(".lesson-sequence-step [role=status]")?.textContent.includes("0 de 1")'));
@@ -186,9 +212,14 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
   await alternative('LSP-005');
   await step('Evaluación final');
   assert.equal(await evaluate(`(${storage}).activities.length`), 0);
+  assert.equal(await evaluate('document.querySelectorAll(".lesson-answer-fields :is(.quiz-sign-image,.quiz-sign-video,.quiz-sign-diagram)").length'), 5);
+  assert.equal(await evaluate('!!document.querySelector(".lesson-quiz-review,.lesson-answer-explanation,.sign-media-credit")'), false);
+  assert.equal(await evaluate(`[...document.querySelectorAll('.lesson-answer-fields [alt],.lesson-answer-fields [aria-label]')]
+    .every(element => !/\\b(Uno|Dos|Tres|Cuatro|Cinco)\\b/i.test(element.getAttribute('alt') ?? element.getAttribute('aria-label')))`), true);
   for (const [group, id] of ['LSP-002', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005'].entries()) await radio(group, id);
   await check();
   await until('calificación real', () => evaluate('document.querySelector(".lesson-sequence-step [role=status]")?.textContent.includes("4 de 5")'));
+  assert.ok(await evaluate('document.querySelectorAll(".lesson-quiz-review a").length >= 5'));
   await click('Ver resumen');
   await step('Resumen de la lección');
   await click('Finalizar lección');

@@ -5,6 +5,7 @@ import { COUNTDOWN_OPTIONS, type CountdownSeconds } from '../../features/sign-re
 import { useDatasetCapture } from '../../features/sign-recognition/dataset/useDatasetCapture';
 import { expectedHandsMatch, NADA_EXECUTION, signConfigurationErrors } from '../../features/sign-recognition/dataset/signCatalog';
 import type { DatasetParticipant, DatasetSample, DatasetSign } from '../../features/sign-recognition/dataset/datasetTypes';
+import type { CampaignCapture } from '../../features/sign-recognition/dataset/datasetCampaign';
 import { SampleReview } from './SampleReview';
 
 const captureStatus = {
@@ -15,9 +16,10 @@ const captureStatus = {
   review: 'Captura pendiente de guardar',
 };
 
-export function RecordingPanel({ participant, sign, sessionConsent, repetition, disabled, countdownSeconds, campaignCount = 0, onCountdownChange, onLocked, onSave }: {
+export function RecordingPanel({ participant, sign, sessionConsent, repetition, disabled, countdownSeconds, campaign, campaignCount = 0, onCountdownChange, onLocked, onSave }: {
   participant: DatasetParticipant | undefined; sign: DatasetSign; sessionConsent: boolean; repetition: number; disabled: boolean;
   countdownSeconds: CountdownSeconds; campaignCount?: number; onCountdownChange: (seconds: CountdownSeconds) => void;
+  campaign?: CampaignCapture;
   onLocked: (locked: boolean) => void; onSave: (sample: DatasetSample) => Promise<boolean>;
 }) {
   const capture = useDatasetCapture();
@@ -33,18 +35,19 @@ export function RecordingPanel({ participant, sign, sessionConsent, repetition, 
   const recording = ['recording', 'finishing'].includes(view.phase);
   const preparing = view.phase === 'countdown';
   const canStart = !disabled && permitted && capture.sessionReady
-    && (countdownSeconds > 0 || ((sign.expectedHands === 0 || camera.detector.status === 'detected') && expectedHandsMatch(sign, camera.detector.handCount)));
+    && (countdownSeconds > 0 || ((sign.expectedHands === 0 || camera.detector.status === 'detected')
+      && (campaign?.hand === 'none' ? camera.detector.handCount === 0 : expectedHandsMatch(sign, camera.detector.handCount))));
   const timerDisplay = preparing ? `${Math.ceil(view.countdownRemainingMs / 1000)} s`
     : `${(view.elapsedMs / 1000).toFixed(1)} / ${(sign.durationMs / 1000).toFixed(1)} s`;
   useEffect(() => { onLocked(locked); }, [locked, onLocked]);
-  const selection = participant ? { participant, sign, repetition, sessionConsent } : null;
+  const selection = participant ? { participant, sign, repetition, sessionConsent, campaign } : null;
   function begin() { if (selection) capture.start(selection, countdownSeconds); }
   return <section className="dataset-panel dataset-recording" aria-labelledby="dataset-record-title">
     <div className="dataset-section-title"><div><span className="dataset-eyebrow">03 / RECOPILACIÓN</span><h2 id="dataset-record-title">Una repetición, una secuencia</h2></div><Video size={26} aria-hidden="true" /></div>
     <div className="dataset-session-labels"><span>{participant?.id ?? 'Sin participante'}</span><span>{sign.name || 'Etiqueta sin configurar'}</span><span>Repetición {repetition}</span></div>
     <div className="dataset-instructions"><strong>Instrucciones de ejecución · {sign.id}</strong><p>{sign.id === 'LSP-007' ? NADA_EXECUTION : sign.instructions || 'Configura las instrucciones de esta etiqueta antes de recopilar.'}</p>{sign.referenceUrl && <a href={sign.referenceUrl} target="_blank" rel="noopener noreferrer">{sign.sourceReference ? `Consultar MINEDU (2015) · página ${sign.sourceReference.page}` : 'Abrir referencia documental o audiovisual'} ↗</a>}
-      {sign.id === 'LSP-007' && <p>{campaignCount} de unas 30 capturas del hito guardadas. Registra un poco de reposo antes y después del desplazamiento.</p>}
-      {sign.category === 'negative' && <p>{campaignCount} de unos 60 ejemplos del hito guardados. Alterna tomas sin manos, con una mano y con dos. Incluye reposo, gestos fuera del catálogo, transiciones, índice inmóvil y movimientos incompletos.</p>}
+      {!campaign && sign.id === 'LSP-007' && <p>{campaignCount} de unas 30 capturas del hito guardadas. Registra un poco de reposo antes y después del desplazamiento.</p>}
+      {!campaign && sign.category === 'negative' && <p>{campaignCount} de unos 60 ejemplos del hito guardados. Alterna tomas sin manos, con una mano y con dos. Incluye reposo, gestos fuera del catálogo, transiciones, índice inmóvil y movimientos incompletos.</p>}
       {sign.category === 'lsp' && <p>Referencia pendiente de revisión lingüística. La lateralidad descrita no impone una adaptación para personas zurdas o diestras; cualquier adaptación requiere revisión previa.</p>}
     </div>
     <p className="dataset-muted">{sign.type === 'static' ? 'Se guardará una secuencia de la postura durante todo el intervalo.' : 'Se guardará la secuencia temporal completa del movimiento.'} Cámara en espejo solo para la vista; coordenadas y lateralidad originales del detector, sin invertir.</p>
@@ -52,7 +55,7 @@ export function RecordingPanel({ participant, sign, sessionConsent, repetition, 
     <div className={`dataset-recording-status${preparing ? ' is-preparing' : recording ? ' is-recording' : ''}`} aria-live="polite" aria-atomic={preparing}>
       <span><Timer size={19} aria-hidden="true" />{captureStatus[view.phase]}</span><strong>{timerDisplay}</strong>
     </div>
-    <div className="dataset-live-count"><span><Hand size={17} aria-hidden="true" /> {camera.detector.handCount} manos detectadas · {sign.expectedHands === 0 ? 'sin requisito de manos' : `${sign.expectedHands} esperadas`}</span><span>{view.frameCount} observaciones</span></div>
+    <div className="dataset-live-count"><span><Hand size={17} aria-hidden="true" /> {camera.detector.handCount} manos detectadas · {sign.expectedHands === 0 && !campaign ? 'sin requisito de manos' : `${sign.expectedHands} esperadas`}</span><span>{view.frameCount} observaciones</span></div>
     {view.warning && <p className="dataset-notice" role="status">{view.warning}</p>}
     {capture.error && <p className="dataset-error" role="alert">{capture.error}</p>}
     <div className="dataset-recording-controls">

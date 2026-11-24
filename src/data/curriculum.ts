@@ -3,12 +3,13 @@ import type { StudyRun } from './lessonStudy.ts';
 import { numbersLesson } from './numbersLesson.ts';
 import { basicLessons } from './basicLessons.ts';
 import { localIllustration, type IllustrationAsset } from './illustrations.ts';
+import type { QuizMedia } from './educationalMedia.ts';
 
-type ActivityOption = { id: string; label: string };
-type ActivityBase = { question: string; success: string; explanation?: string; diagramId?: string };
+type ActivityOption = { id: string; label: string; media?: QuizMedia; feedback?: string };
+type ActivityBase = { question: string; success: string; explanation?: string; diagramId?: string; media?: QuizMedia; reviewSignIds?: string[] };
 export type LessonActivity = ActivityBase & (
   | { type: 'choice' | 'identify'; options: ActivityOption[]; correctId: string }
-  | { type: 'association'; options: ActivityOption[]; pairs: { id: string; label: string; answerId: string }[] }
+  | { type: 'association'; options: ActivityOption[]; pairs: { id: string; label: string; answerId: string; media?: QuizMedia }[] }
   | { type: 'order'; options: ActivityOption[]; order: string[] }
 );
 

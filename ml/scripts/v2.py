@@ -14,13 +14,14 @@ from threadpoolctl import threadpool_limits
 from audit import LABELS, LSP, NEGATIVE, audit, read_document
 from pipeline import DEFAULT_DATASET, ML, atomic, digest, load_partitions, node, read_json, web_input, write_json
 from training import closed_scores, json_bytes, make_bundle, rank, temperature_for, training_candidates
+from v2_campaign import PARTITIONS as GROUPS, campaign_issues, coverage, participant_partitions
+from v2_sources import read_sources
 
 
 WORK = ML / "artifacts" / "hito-4-3-v2"
 PRIVATE = ML / "reports" / "local" / "hito-4-3-v2"
 V1 = ML / "artifacts" / "hito-3"
 NADA = "LSP-007"
-GROUPS = ("train", "validation", "test")
 
 
 def geometry(command, samples):
@@ -30,7 +31,7 @@ def geometry(command, samples):
 
 
 def audit_nada(dataset):
-    document, source = read_document(dataset)
+    document, source = read_sources(dataset)
     _, report = audit(document)
     technical = {row["sampleId"]: row for row in report["samples"]}
     samples = [sample for sample in document["samples"] if sample["labelId"] == NADA]
@@ -80,22 +81,21 @@ def diagnose(baseline):
     return result
 
 
-def prepare(args):
-    if not args.dataset:
-        raise ValueError("Indica la exportación nueva con --dataset.")
-    document, source = read_document(args.dataset)
+def partition_data(args):
+    document, source = read_sources(args.dataset)
     baseline, v1_manifest = historical(args.baseline)
     old_ids = {sample["sampleId"] for sample in baseline["samples"]}
     old_people = {person["id"] for person in baseline["participants"]}
     v1_test = load_partitions(V1 / "test.npz", v1_manifest, ("test",))["test"]["rows"]
     blocked = {row["sampleId"] for row in v1_test}
-    people = {person["id"] for person in document["participants"]}
-    validation, test = set(args.validation_participant), set(args.test_participant)
-    if (not validation or not test or validation & test or test & old_people
-            or not (validation | test).issubset(people)):
-        raise ValueError("Indica participantes distintos para validación y prueba. Los de prueba deben ser nuevos.")
     if document["datasetId"] != baseline["datasetId"] or document["mediaPipeModel"] != baseline["mediaPipeModel"]:
         raise ValueError("Exporta el Dataset Studio existente con las capturas nuevas y el mismo detector.")
+    people = document["participants"]
+    train_people = getattr(args, "train_participant", [])
+    strict = any(person.get("partition") for person in people) or bool(train_people) or getattr(args, "command", "") == "readiness"
+    roles = participant_partitions(people, old_people, {
+        "train": train_people, "validation": args.validation_participant, "test": args.test_participant,
+    })
 
     _, technical = audit(document)
     split = {name: [] for name in GROUPS}
@@ -106,28 +106,43 @@ def prepare(args):
             excluded.append({"sampleId": identifier, "labelId": label, "reasons": issues})
             continue
         person = sample["participantId"]
-        partition = "test" if person in test else "validation" if person in validation else "train"
+        partition = roles.get(person, "" if strict else "train")
+        if not partition:
+            issues.append("participante-sin-particion")
         if sample.get("excludedFromV2") is True:
             issues.append("exclusion-de-v2")
         if identifier in blocked:
             issues.append("prueba-original-v1")
-        if (label in (NADA, NEGATIVE) or partition == "test") and (
+        if (label in (NADA, NEGATIVE) or partition == "test" or (strict and person not in old_people)) and (
                 identifier in old_ids or sample.get("captureMetadata", {}).get("collectionProtocol") != "hito-4.3"
                 or sample.get("operatorReviewed") is not True):
             issues.append("requiere-captura-nueva-y-revision-explicita")
+        if sample["captureMetadata"].get("campaign") is not None or (strict and person not in old_people):
+            issues.extend(campaign_issues(sample, row))
         if issues:
             excluded.append({"sampleId": identifier, "labelId": label, "reasons": issues})
             continue
         split[partition].append(sample)
-    counts = {name: dict(Counter(sample["labelId"] for sample in part)) for name, part in split.items()}
-    negatives = {name: dict(Counter(max(frame["handCount"] for frame in sample["frames"])
-                                       for sample in part if sample["labelId"] == NEGATIVE))
-                 for name, part in split.items()}
-    gaps = {name: sorted(set(LABELS) - count.keys()) for name, count in counts.items() if set(LABELS) - count.keys()}
-    write_json(PRIVATE / "dataset-audit.json", {"sourceSha256": source, "counts": counts, "negativeByMaxHands": negatives, "missing": gaps,
-                                             "excluded": excluded, "technical": technical})
-    if gaps:
-        raise ValueError(f"Faltan capturas elegibles en la división V2: {gaps}. Consulta dataset-audit.json.")
+    summary = coverage(split, roles, strict)
+    return document, split, {"sourceSha256": source, **summary, "excluded": excluded, "technical": technical}
+
+
+def readiness(args):
+    document, _, report = partition_data(args)
+    return {key: value for key, value in report.items() if key not in ("excluded", "technical")} | {
+        "samples": len(document["samples"]), "excludedCount": len(report["excluded"]),
+        "exclusionReasons": dict(Counter(reason for row in report["excluded"] for reason in row["reasons"])),
+        "qualityFlags": report["technical"]["summary"]["flags"],
+    }
+
+
+def prepare(args):
+    document, split, report = partition_data(args)
+    source = report["sourceSha256"]
+    counts, negatives = report["counts"], report["negativeByMaxHands"]
+    write_json(PRIVATE / "dataset-audit.json", report)
+    if report["missing"] or report["missingNegativeHandCounts"] or report["missingParticipants"]:
+        raise ValueError("Faltan clases, tipos de negativos o participantes elegibles. Consulta dataset-audit.json.")
     if not (negatives["test"].get(1) or negatives["test"].get(2)):
         raise ValueError("La prueba independiente requiere negativos con manos para medir falsas aceptaciones.")
 
@@ -251,7 +266,7 @@ def compare(args):
     if (trained["preparedSha256"] != prepared_hash or trained["modelSha256"] != digest(model_path)
             or split["preparedSha256"] != prepared_hash):
         raise ValueError("La división, el preprocesamiento y el modelo no corresponden a la misma corrida.")
-    document, source = read_document(args.dataset)
+    document, source = read_sources(args.dataset)
     if source != prepared["sourceSha256"]:
         raise ValueError("La exportación cambió desde prepare.")
     by_id = {sample["sampleId"]: sample for sample in document["samples"]}
@@ -267,16 +282,18 @@ def compare(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("audit-nada", "diagnose", "prepare", "train", "compare"))
-    parser.add_argument("--dataset", type=Path)
+    parser.add_argument("command", choices=("audit-nada", "diagnose", "readiness", "prepare", "train", "compare"))
+    parser.add_argument("--dataset", type=Path, action="append", help="JSON o bloque. Repite la opción por archivo.")
     parser.add_argument("--baseline", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--seed", type=int, default=1729)
+    parser.add_argument("--train-participant", action="append", default=[])
     parser.add_argument("--validation-participant", action="append", default=[])
     parser.add_argument("--test-participant", action="append", default=[])
     parser.add_argument("--partition", choices=("validation", "test"), default="validation")
     args = parser.parse_args()
-    commands = {"audit-nada": lambda: audit_nada(args.dataset or args.baseline),
+    commands = {"audit-nada": lambda: audit_nada(args.dataset or [args.baseline]),
                 "diagnose": lambda: diagnose(args.baseline), "prepare": lambda: prepare(args),
+                "readiness": lambda: readiness(args),
                 "train": train, "compare": lambda: compare(args)}
     try:
         print(json.dumps(commands[args.command](), ensure_ascii=False, indent=2))

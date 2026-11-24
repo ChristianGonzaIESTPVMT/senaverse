@@ -6,16 +6,17 @@ import { getEducationalSignForClass } from '../data/library';
 import { loadEducationModel } from '../features/sign-recognition/educationModel';
 import { useRecognition } from '../features/sign-recognition/useRecognition';
 import { RECOGNITION_STATES } from '../features/sign-recognition/liveRecognition';
-import type { RecognitionConfirmation } from '../features/sign-recognition/recognitionResult';
+import type { RecognitionConfirmation, RecognitionObservation } from '../features/sign-recognition/recognitionResult';
 import { SignMediaViewer } from './SignMediaViewer';
 
 const PracticePreview = memo(PracticeCamera);
 
-export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave }: {
+export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onSave, assessment }: {
   initialSign?: string;
   onConfirmed?: (event: RecognitionConfirmation) => void;
   onSave?: (signId: string) => void;
   guided?: { targetId: string; instruction: string; onAccept: (signId: string) => void; acceptLabel?: string };
+  assessment?: { targetId: string; onObserve: (observation: RecognitionObservation) => void };
 }) {
   const initial = resolvePracticeSign(guided?.targetId ?? initialSign);
   const [confirmedMatch, setConfirmedMatch] = useState<string | null>(null);
@@ -35,6 +36,11 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   const selectRef = useRef<HTMLSelectElement>(null);
   const id = useId();
   const { mode, result, modelState, cameraActive } = recognition;
+  const assessmentTarget = assessment && recognitionSignsById.get(assessment.targetId);
+  const observation: RecognitionObservation | undefined = result.confirmation
+    ? { status: 'recognized', signId: result.confirmation.signId }
+    : result.status === 'unknown' ? { status: 'unknown' }
+      : result.status === 'tracking' || result.status === 'searching' ? { status: 'tracking' } : undefined;
   const targetId = mode.type === 'directed' ? mode.targetId : '';
   const confirmed = result.confirmation && recognitionSignsById.get(result.confirmation.signId);
   const entry = getEducationalSignForClass(targetId || confirmed?.id || '');
@@ -60,7 +66,7 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
   }
 
   return <section aria-label="Práctica con reconocimiento">
-    {!guided && <div className="practice-panel practice-selection">
+    {!guided && !assessment && <div className="practice-panel practice-selection">
       <div className="practice-select-field">
         <label htmlFor={id}>Modo de práctica</label>
         <select id={id} ref={selectRef} value={targetId} onChange={event => selectTarget(event.target.value)}>
@@ -100,13 +106,15 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
               {result.confirmation?.outcome === 'different' && <p>El modelo confirmó una seña distinta de la elegida.</p>}
             </>}
           </div>
-          <button type="button" className="button button-outline" onClick={() => {
+          {assessment ? <button type="button" className="button button-primary" disabled={!cameraActive || modelState.status !== 'ready' || !observation}
+            onClick={() => { if (observation) assessment.onObserve(observation); }}>Comprobar intento con cámara</button>
+            : <button type="button" className="button button-outline" onClick={() => {
             setConfirmedMatch(null);
             clearSavedPractice();
             recognition.reset();
           }} disabled={!cameraActive || modelState.status !== 'ready'}>
             <RotateCcw size={17} aria-hidden="true" /> Reintentar práctica
-          </button>
+          </button>}
           {onSave && (practiceSaved ? <p role="status">Práctica experimental guardada en Mi progreso.</p>
             : cameraActive && saveableSignId && <><p>Coincidencia experimental disponible · {recognitionSignsById.get(saveableSignId)?.name}</p>
               <button className="button button-primary" type="button" onClick={() => {
@@ -120,14 +128,18 @@ export function RecognitionPractice({ initialSign = '', onConfirmed, guided, onS
             <button type="button" className="button button-primary" onClick={() => guided.onAccept(confirmedMatch)}>{guided.acceptLabel ?? 'Guardar práctica y continuar'}</button>
           </>}
         </section>
-        <section className="practice-panel practice-recognition-result">
+        {assessment ? <section className="practice-panel practice-recognition-result">
+          <h2>Realiza «{assessmentTarget?.name}»</h2>
+          <p>Coloca la mano completa dentro del encuadre, con luz de frente. Mantén la postura hasta que termine el análisis.</p>
+          <p>El modelo experimental puede reconocer cualquiera de sus diez señas.</p>
+        </section> : <section className="practice-panel practice-recognition-result">
           <h2>{entry ? `Referencia educativa de «${entry.word}»` : 'Cómo practicar'}</h2>
           {entry ? <SignMediaViewer key={entry.id} sign={entry} instruction={guided?.instruction ?? entry.instructions} compact />
             : <p>Mantén las posturas estáticas hasta la confirmación. Para las señas dinámicas, realiza el movimiento completo.</p>}
-        </section>
+        </section>}
       </div>
     </div>
-    {!guided && <details className="practice-panel practice-catalog">
+    {!guided && !assessment && <details className="practice-panel practice-catalog">
       <summary>Consultar las diez señas compatibles</summary>
       <ul>{recognitionSigns.map(sign => <li key={sign.id}>
         <button type="button" className="button button-outline" aria-pressed={targetId === sign.id} onClick={() => {

@@ -7,10 +7,11 @@ const initialFilters = { sign: '', participant: '', reviewed: '', acceptance: ''
 const acceptance = { pending: 'Pendiente de decisión', accepted: 'Aceptada', rejected: 'Rechazada' };
 const dateFormat = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'medium' });
 
-export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onBulkAction }: {
+export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onBulkAction, onExportSelection }: {
   snapshot: DatasetSnapshot; locked: boolean; notice: string;
   onReview: (id: string) => void; onDelete: (id: string) => void;
   onBulkAction: (selected: SampleSummary[], action: SampleReviewAction, clear: () => void) => void;
+  onExportSelection?: (sampleIds: string[]) => void;
 }) {
   const [filters, setFilters] = useState(initialFilters);
   const [selectedIds, setSelectedIds] = useState(() => new Set<string>());
@@ -75,6 +76,8 @@ export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onB
     {selected.length > 0 && <div className="dataset-bulk-actions">
       <strong role="status">{selected.length} {selected.length === 1 ? 'muestra seleccionada' : 'muestras seleccionadas'}</strong>
       <button className="button button-primary" type="button" disabled={locked} onClick={() => onBulkAction(selected, 'mark', clear)}>Marcar como revisadas por operador</button>
+      {onExportSelection && <button className="button button-outline" type="button" disabled={locked}
+        onClick={() => onExportSelection(selected.map(sample => sample.sampleId))}>Exportar selección por bloques</button>}
       <details><summary>Más acciones</summary><div className="dataset-bulk-options">
         <button type="button" disabled={locked} onClick={() => onBulkAction(selected, 'unmark', clear)}>Desmarcar como revisadas</button>
         <button type="button" disabled={locked || !selected.some(sample => sample.qualityMetrics.sufficient)} onClick={() => onBulkAction(selected, 'accept', clear)}>Aceptar seleccionadas</button>
@@ -105,7 +108,7 @@ export function SavedSamples({ snapshot, locked, notice, onReview, onDelete, onB
               aria-label={`Seleccionar ${label}, ${sample.participantId}, repetición ${sample.repetition}`}
               onChange={event => select([sample], event.target.checked)} /></td>
             <td><strong>{label}</strong><span>Repetición {sample.repetition} · {dateFormat.format(new Date(sample.recordedAt))}</span></td>
-            <td>{sample.participantId}</td>
+            <td>{sample.participantId}{sample.captureMetadata.campaign && <span>Sesión {sample.captureMetadata.campaign.session}</span>}</td>
             <td>{sample.qualityMetrics.frameCount} observaciones<span>{sample.qualityMetrics.averageFps.toFixed(1)} obs/s · {(sample.qualityMetrics.expectedHandsRatio * 100).toFixed(0)}% manos esperadas</span></td>
             <td>
               <span className="dataset-badge">{isOperatorReviewed(sample) ? 'Revisada por operador' : 'Sin revisar'}</span>

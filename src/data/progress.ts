@@ -173,6 +173,8 @@ export function recordProgressEvent(state: StudentProgress, event: ProgressEvent
     case 'situation-select':
     case 'situation-check':
     case 'situation-practice':
+    case 'situation-attempt-start':
+    case 'situation-attempt-result':
     case 'situation-finish':
     case 'situation-repeat': return recordSituationEvent(state, event, occurredAt);
     case 'lesson':

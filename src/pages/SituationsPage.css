@@ -131,6 +131,21 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 .situation-option.is-selected { border-color: light-dark(#a47bdf, var(--color-line-strong)); background: light-dark(#f8f4ff, var(--color-card)); }
 .situation-option.is-correct { border-color: light-dark(#83c6ac, var(--color-success-line)); background: light-dark(#f1faf5, var(--color-success-bg)); }
 .situation-option.is-incorrect { border-color: light-dark(#d6a1a3, var(--color-error-line)); background: light-dark(#fff7f6, var(--color-error-bg)); }
+.situation-dialogue { display: grid; gap: 1rem; min-width: 0; }
+.situation-dialogue-exchange { padding: clamp(1rem, 4vw, 1.75rem); border-radius: 1.25rem; background: var(--color-card); border: 1px solid var(--color-line); }
+.situation-dialogue-exchange > h2 { margin: 0 0 .45rem; }
+.situation-dialogue-exchange > p { color: var(--muted); }
+.situation-dialogue-speaker { display: flex; align-items: flex-start; gap: .75rem; margin-block: 1rem; padding: .9rem 1rem; border-radius: .9rem .9rem .9rem .2rem; background: var(--color-surface); }
+.situation-dialogue-speaker > svg { flex: none; }
+.situation-dialogue-speaker p { margin: .2rem 0 0; }
+.situation-attempt-feedback { display: grid; gap: .65rem; }
+.situation-attempt-feedback .situation-answer-feedback { margin: 0; }
+.situation-dialogue-reply { grid-column: 1 / -1; margin: 0; }
+.situation-dialogue .situation-question-actions { flex-wrap: wrap; }
+@media (min-width: 850px) {
+  .situation-dialogue .situation-options { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+  .situation-attempt-feedback { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .situation-answer-feedback { display: flex; gap: 10px; margin-top: 17px; padding: 14px; border-radius: 13px; background: light-dark(#fff3e4, var(--color-warning-bg)); color: light-dark(#896438, var(--color-warning)); }
 .situation-answer-feedback.is-correct { background: light-dark(#eaf7f0, var(--color-success-bg)); color: light-dark(#237657, var(--color-success)); }
 .situation-answer-feedback > svg { flex-shrink: 0; margin-top: 2px; }

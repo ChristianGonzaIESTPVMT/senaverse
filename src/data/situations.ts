@@ -8,6 +8,7 @@ export type SituationScene = {
   title: string;
   context: string;
   illustrationAfterAnswer?: true;
+  dialogue?: 'camera' | 'visual';
   question: string;
   optionIds: readonly [string, string, ...string[]];
   expectedSignId: string;
@@ -181,6 +182,7 @@ const shopSituation: Situation = {
     {
       id: 'cantidad',
       title: 'Una para ti y otra para tu amigo',
+      dialogue: 'camera',
       context: 'Decides comprar una botella para ti y una para tu amigo. Te preguntan cuántas necesitas.',
       question: '¿Qué cantidad debes indicar?',
       optionIds: ['LSP-001', 'LSP-002', 'LSP-003'],
@@ -209,15 +211,15 @@ export const situations: Situation[] = [
     context: 'En el comedor eliges una porción y miras qué queda en las bandejas.',
     objectives: ['Indicar una porción.', 'Distinguir ausencia de abundancia.'], rewardXp: SITUATION_XP,
     scenes: [
-      { id: 'porcion', title: 'Una porción para el almuerzo',
+      { id: 'porcion', title: 'Una porción para el almuerzo', dialogue: 'camera',
         context: 'Almuerzas por tu cuenta y pides exactamente una porción de sopa.',
         question: '¿Qué número indica cuántas porciones pides?', optionIds: ['LSP-002', 'LSP-003', 'LSP-001'],
         expectedSignId: 'LSP-001', explanation: 'Has pedido una sola porción, por eso corresponde «Uno».' },
-      { id: 'bandeja-vacia', title: 'Se acabó el pan',
+      { id: 'bandeja-vacia', title: 'Se acabó el pan', dialogue: 'visual',
         context: 'La bandeja de pan está vacía y no hay más pan en la cocina.',
         question: '¿Qué palabra expresa que no queda pan?', optionIds: ['LSP-007', 'LSP-008', 'LSP-001'],
         expectedSignId: 'LSP-007', explanation: 'Como la bandeja está vacía, «Nada» expresa que no queda pan.' },
-      { id: 'bandeja-llena', title: 'Arroz para todos',
+      { id: 'bandeja-llena', title: 'Arroz para todos', dialogue: 'visual',
         context: 'Ves una bandeja de arroz casi llena. Hay suficiente para todas las personas de la mesa.',
         question: '¿Qué palabra describe la cantidad abundante de arroz?', optionIds: ['LSP-007', 'LSP-001', 'LSP-008'],
         expectedSignId: 'LSP-008', explanation: 'Hay arroz en abundancia, así que corresponde «Mucho».' },
@@ -248,11 +250,11 @@ export const situations: Situation[] = [
     context: 'En tu grupo de estudio están repartiendo las tareas de una exposición.',
     objectives: ['Distinguir si una persona realiza una tarea sola o en compañía.'], rewardXp: SITUATION_XP,
     scenes: [
-      { id: 'individual', title: 'Una tarea individual',
+      { id: 'individual', title: 'Una tarea individual', dialogue: 'visual',
         context: 'Te toca preparar el cartel por tu cuenta. Nadie más trabaja contigo en esa tarea.',
         question: '¿Qué palabra describe que haces la tarea sin compañía?', optionIds: ['LSP-010', 'LSP-009'],
         expectedSignId: 'LSP-009', explanation: 'Preparas el cartel sin compañía. La opción adecuada es «Solo».' },
-      { id: 'equipo', title: 'Un ensayo en pareja',
+      { id: 'equipo', title: 'Un ensayo en pareja', dialogue: 'visual',
         context: 'Ana estará a tu lado durante el ensayo. Ensayarán juntos.',
         question: '¿Qué palabra indica que ensayas en compañía de Ana?', optionIds: ['LSP-010', 'LSP-009'],
         expectedSignId: 'LSP-010', explanation: 'Ana te acompaña durante el ensayo, así que corresponde «Con».' },
@@ -266,10 +268,11 @@ export const situations: Situation[] = [
     objectives: ['Distinguir las cantidades tres y cuatro en una lista de compra.'], rewardXp: SITUATION_XP,
     scenes: [
       { id: 'cuadernos', title: 'Cuadernos por curso',
+        dialogue: 'camera',
         context: 'Necesitas un cuaderno para Matemática, uno para Comunicación y uno para Ciencia.',
         question: '¿Cuántos cuadernos debes comprar?', optionIds: ['LSP-002', 'LSP-003', 'LSP-004'],
         expectedSignId: 'LSP-003', explanation: 'Necesitas un cuaderno para cada uno de los tres cursos.' },
-      { id: 'lapices', title: 'Materiales para el grupo',
+      { id: 'lapices', title: 'Materiales para el grupo', dialogue: 'camera',
         context: 'La profesora te pide un lápiz para cada una de las cuatro personas de tu grupo.',
         question: '¿Qué cantidad de lápices debes llevar?', optionIds: ['LSP-004', 'LSP-005', 'LSP-003'],
         expectedSignId: 'LSP-004', explanation: 'Hay cuatro personas en el grupo y cada una necesita un lápiz.' },
@@ -283,7 +286,7 @@ export const situations: Situation[] = [
     context: 'Preparas materiales para las personas de un taller.',
     objectives: ['Elegir el número que representa el total.', 'Indicar una unidad pendiente.'], rewardXp: SITUATION_XP,
     scenes: [
-      { id: 'total', title: 'Hojas para el taller',
+      { id: 'total', title: 'Hojas para el taller', dialogue: 'camera',
         context: 'Al taller llegaron cinco personas. Quieres entregar una hoja a cada persona.',
         question: '¿Cuántas hojas necesitas en total?', optionIds: ['LSP-001', 'LSP-004', 'LSP-005'],
         expectedSignId: 'LSP-005', explanation: 'Con cinco personas y una hoja para cada una, necesitas cinco hojas.' },

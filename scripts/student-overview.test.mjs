@@ -34,8 +34,14 @@ function resolveScene(state, situation, scene, at = date) {
   const choiceId = scene.expectedSignId;
   const sign = getEducationalSign(choiceId);
   state = event(state, 'situation-select', { ...common, choiceId }, at);
+  const response = getSituationExercise(scene, sign).correctId;
+  if (scene.dialogue) {
+    const attemptId = scene.id;
+    state = event(state, 'situation-attempt-start', { ...common, attempt: { id: attemptId, method: 'visual' } }, at);
+    return event(state, 'situation-attempt-result', { ...common, attemptId, input: { method: 'visual', response } }, at);
+  }
   state = event(state, 'situation-check', common, at);
-  return event(state, 'situation-practice', { ...common, input: { method: 'alternative', response: getSituationExercise(scene, sign).correctId } }, at);
+  return event(state, 'situation-practice', { ...common, input: { method: 'alternative', response } }, at);
 }
 
 function finishSituation(state, situation, at = date) {

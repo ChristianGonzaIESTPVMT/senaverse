@@ -2,7 +2,7 @@ import { ArrowLeft, ClipboardList, RotateCcw } from 'lucide-react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs } from '../components/SituationContent';
 import { getEducationalSign } from '../data/library';
-import { summarizeSituation } from '../data/situationStudy';
+import { getSituationVisualExercise, summarizeSituation } from '../data/situationStudy';
 import { getSituation, getSituationFilter, getSituationPath, getSituationScenePath, getSituationsPath } from '../data/situations';
 import { useStudentProgress } from '../hooks/progressContext';
 
@@ -43,10 +43,16 @@ export function SituationResultsPage() {
           {situation.scenes.map(scene => {
             const answer = run?.scenes[scene.id];
             const selected = answer && getEducationalSign(answer.choiceId);
+            const latest = answer?.checked ? answer.evaluations?.at(-1) : undefined;
+            const visual = selected && answer?.practice?.method === 'alternative'
+              && answer.practice.response === getSituationVisualExercise(scene, selected)?.correctId;
             return <li key={scene.id}>
               <strong>{scene.title}</strong>
               <span>{selected ? `${selected.word} · ${!answer.checked ? 'Por comprobar' : answer.choiceId === scene.expectedSignId ? 'Adecuada al contexto' : 'Por revisar'}` : 'Respuesta pendiente'}</span>
-              {answer?.practice && <span>{answer.practice.method === 'camera' ? 'Cámara experimental' : 'Ejercicio sin cámara'}</span>}
+              {answer?.practice && <span>{answer.practice.method === 'camera' ? 'Coincidencia gestual experimental'
+                : visual ? 'Comprensión visual · sin cámara' : 'Repaso sin cámara'}</span>}
+              {answer?.evaluations?.length ? <small>{answer.evaluations.length} {answer.evaluations.length === 1 ? 'intento' : 'intentos'}
+                {latest && !latest.passed ? ` · Último intento ${latest.method === 'camera' ? 'con cámara' : 'visual'} por revisar` : ''}</small> : null}
             </li>;
           })}
         </ol>

@@ -2,6 +2,7 @@ import { getHandLandmarkerOptions, HAND_DETECTION_PROFILES } from '../config.ts'
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MAX_IMPORT_BYTES, MAX_RECORDING_MS, MIN_RECORDING_MS, MODEL_METADATA, type DatasetDocument, type DatasetSample, type DatasetSign, type ModelMetadata } from './datasetTypes.ts';
 import { calculateQuality, sameQuality, sampleCanBeSaved } from './datasetValidation.ts';
 import { createDatasetCatalog, isLegacySignId, isSafeReference, NEGATIVE_CATEGORY_ID, signConfigurationErrors } from './signCatalog.ts';
+import { campaignCaptureMatches, partitions, type CampaignCapture } from './datasetCampaign.ts';
 
 type ObjectValue = Record<string, unknown>;
 const signIds = new Set([...createDatasetCatalog().map(sign => sign.id), ...Array.from({ length: 10 }, (_, index) => `sign-${String(index + 1).padStart(2, '0')}`)]);
@@ -84,12 +85,19 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
     const incident = object(value, ['timestampMs', 'type'], 'incidencia');
     check(number(incident.timestampMs, 0, sample.durationMs) && choice(incident.type, ['hand-count-mismatch', 'result-gap', 'invalid-result', 'duplicate-timestamp', 'out-of-order-timestamp']), 'incidencia de captura.');
   }
-  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed', 'qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored', 'collectionProtocol'], 'metadatos');
+  const metadata = object(sample.captureMetadata, ['configuration', 'model', 'labelSnapshot', 'consentedAt', 'consentVersion', 'requestedDurationMs', 'completed', 'qualityPolicyVersion', 'recordingStartedAtMs', 'coordinates', 'visualMirrored', 'collectionProtocol', 'campaign'], 'metadatos');
   check(metadata.collectionProtocol === undefined || (metadata.collectionProtocol === 'hito-4.3' && metadata.qualityPolicyVersion === 2), 'protocolo de recopilación.');
   validateModel(metadata.model); validateSign(metadata.labelSnapshot);
   check(metadata.labelSnapshot.id === sample.labelId && metadata.labelSnapshot.validationStatus !== 'unconfigured', 'etiqueta original.');
   check(metadata.completed === true && date(metadata.consentedAt) && metadata.consentVersion === CONSENT_VERSION
     && metadata.requestedDurationMs === sample.durationMs && metadata.labelSnapshot.durationMs === sample.durationMs, 'captura incompleta o sin consentimiento.');
+  if (metadata.campaign !== undefined) {
+    const capture = object(metadata.campaign, ['slotId', 'session', 'hand', 'negativeSubtype', 'notes'], 'guía de captura V2');
+    check(metadata.collectionProtocol === 'hito-4.3' && Date.parse(metadata.consentedAt) <= Date.parse(sample.recordedAt as string)
+      && (capture.notes === undefined || string(capture.notes, 500))
+      && campaignCaptureMatches(capture as CampaignCapture, metadata.labelSnapshot.id, metadata.labelSnapshot.expectedHands, sample.durationMs),
+    'sesión, mano, duración, subtipo o consentimiento de la guía V2.');
+  }
   if (metadata.qualityPolicyVersion !== undefined) {
     check(metadata.qualityPolicyVersion === 2 && number(metadata.recordingStartedAtMs) && metadata.coordinates === 'mediapipe-original' && metadata.visualMirrored === true, 'política de calidad o coordenadas originales.');
     let previousInference = -Infinity;
@@ -110,7 +118,7 @@ export function validateDatasetSample(value: unknown): asserts value is DatasetS
   for (const key of ['minHandDetectionConfidence', 'minHandPresenceConfidence', 'minTrackingConfidence'] as const) check(configuration[key] === thresholds[key], 'umbrales no coherentes con el perfil.');
   const quality = object(sample.qualityMetrics, ['frameCount', 'validLandmarkFrames', 'expectedHandFrames', 'expectedHandsRatio', 'observedDurationMs', 'averageFps', 'minimumHands', 'maximumHands', 'trackingLosses', 'warnings', 'sufficient'], 'calidad');
   const calculated = calculateQuality(sample.frames as DatasetSample['frames'], sample.durationMs, metadata.labelSnapshot.expectedHands,
-    metadata.qualityPolicyVersion === 2 ? { incidents: sample.incidents as DatasetSample['incidents'], completed: metadata.completed, requestedDurationMs: metadata.requestedDurationMs } : undefined);
+    metadata.qualityPolicyVersion === 2 ? { incidents: sample.incidents as DatasetSample['incidents'], completed: metadata.completed, requestedDurationMs: metadata.requestedDurationMs, campaign: metadata.campaign as CampaignCapture | undefined } : undefined);
   check(sameQuality(calculated, quality as unknown as DatasetSample['qualityMetrics']), 'métricas de calidad que no coinciden con la secuencia.');
   check(sampleCanBeSaved(sample as unknown as DatasetSample), 'la muestra no contiene suficientes datos reales para guardarse.');
   check(sample.reviewStatus !== 'accepted' || calculated.sufficient, 'una muestra de calidad insuficiente no puede figurar como aceptada.');
@@ -131,19 +139,24 @@ export function validateDatasetDocument(value: unknown): asserts value is Datase
   const legacyCatalog = doc.signs.length === 10 && doc.signs.every(sign => isLegacySignId((sign as DatasetSign).id));
   check(legacyCatalog || createDatasetCatalog().every(sign => catalogIds.has(sign.id)), 'faltan entradas estables LSP o la categoría técnica independiente.');
   array(doc.participants, 10000, 'participantes');
-  const participantIds = new Set<string>();
+  const participants = new Map<string, ObjectValue>();
   for (const value of doc.participants) {
-    const participant = object(value, ['id', 'createdAt', 'consentedAt', 'consentVersion'], 'participante');
+    const participant = object(value, ['id', 'createdAt', 'consentedAt', 'consentVersion', 'partition'], 'participante');
     check(string(participant.id, 7) && /^P\d{3,6}$/.test(participant.id) && Number(participant.id.slice(1)) > 0 && date(participant.createdAt), 'identificador anónimo o fecha.');
     check((participant.consentedAt === null && participant.consentVersion === null) || (date(participant.consentedAt) && participant.consentVersion === CONSENT_VERSION), 'consentimiento.');
-    check(!participantIds.has(participant.id), 'participantes duplicados.'); participantIds.add(participant.id);
+    check(participant.partition === undefined || (typeof participant.partition === 'string' && Object.hasOwn(partitions, participant.partition)), 'partición de participante.');
+    check(!participants.has(participant.id), 'participantes duplicados.'); participants.set(participant.id, participant);
   }
-  check(integer(doc.nextParticipantNumber, 1, 1000000) && doc.nextParticipantNumber > Math.max(0, ...[...participantIds].map(id => Number(id.slice(1)))), 'contador de participantes no válido.');
+  check(integer(doc.nextParticipantNumber, 1, 1000000) && doc.nextParticipantNumber > Math.max(0, ...[...participants.keys()].map(id => Number(id.slice(1)))), 'contador de participantes no válido.');
   array(doc.samples, 20000, 'muestras');
   const sampleIds = new Set<string>(), repetitions = new Set<string>();
   for (const sample of doc.samples) {
     validateDatasetSample(sample);
-    check(participantIds.has(sample.participantId) && doc.signs.some(sign => (sign as DatasetSign).id === sample.labelId), 'referencias de una muestra.');
+    const person = participants.get(sample.participantId);
+    check(person && catalogIds.has(sample.labelId), 'referencias de una muestra.');
+    if (sample.captureMetadata.campaign) check(person.partition && typeof person.createdAt === 'string' && typeof person.consentedAt === 'string'
+      && Date.parse(person.createdAt) <= Date.parse(sample.captureMetadata.consentedAt)
+      && Date.parse(sample.captureMetadata.consentedAt) <= Date.parse(person.consentedAt), 'participante o consentimiento de la guía V2.');
     check(!sampleIds.has(sample.sampleId), 'muestras duplicadas.'); sampleIds.add(sample.sampleId);
     const repetition = `${sample.participantId}/${sample.labelId}/${sample.repetition}`;
     check(!repetitions.has(repetition), 'repeticiones duplicadas.'); repetitions.add(repetition);
@@ -154,7 +167,7 @@ export function validateDatasetDocument(value: unknown): asserts value is Datase
 }
 
 export function parseDatasetJSON(text: string): DatasetDocument {
-  if (new TextEncoder().encode(text).byteLength > MAX_IMPORT_BYTES) throw new Error('El archivo supera el límite de importación de 100 MB.');
+  if (new TextEncoder().encode(text).byteLength > MAX_IMPORT_BYTES) throw new Error('El archivo supera el límite de importación de 100 MiB.');
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new Error('El archivo no contiene JSON válido.'); }
   validateDatasetDocument(value);
@@ -164,7 +177,7 @@ export function parseDatasetJSON(text: string): DatasetDocument {
 export function serializeDataset(document: DatasetDocument): string {
   validateDatasetDocument(document);
   const json = JSON.stringify(document);
-  if (new TextEncoder().encode(json).byteLength > MAX_IMPORT_BYTES) throw new Error('El JSON supera el límite de respaldo de 100 MB. No se generará un archivo que el Studio no pueda restaurar.');
+  if (new TextEncoder().encode(json).byteLength > MAX_IMPORT_BYTES) throw new Error('El JSON supera el límite de respaldo de 100 MiB. Usa la exportación por bloques.');
   return json;
 }
 

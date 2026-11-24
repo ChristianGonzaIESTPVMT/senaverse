@@ -1,6 +1,7 @@
 import type { Category } from '@mediapipe/tasks-vision';
 import type { HandCaptureConfiguration } from '../types';
 import { MAX_RESULT_AGE_MS } from '../config.ts';
+import type { CampaignCapture, DatasetPartition } from './datasetCampaign.ts';
 
 export type SignSourceReference = { title: string; publisher: string; year: number; page: number; repositoryUrl: string };
 export type DatasetSign = {
@@ -9,7 +10,7 @@ export type DatasetSign = {
   /** Absent on legacy labels: their identity and linguistic status must be preserved. */
   category?: 'lsp' | 'negative'; sourceReference?: SignSourceReference;
 };
-export type DatasetParticipant = { id: string; createdAt: string; consentedAt: string | null; consentVersion: number | null };
+export type DatasetParticipant = { id: string; createdAt: string; consentedAt: string | null; consentVersion: number | null; partition?: DatasetPartition };
 export type DatasetPoint = { x: number; y: number; z: number };
 export type DatasetHand = { handedness: Category[]; landmarks: DatasetPoint[]; worldLandmarks?: DatasetPoint[] };
 export type DatasetFrame = { timestampMs: number; handCount: number; hands: DatasetHand[];
@@ -37,6 +38,7 @@ export type DatasetCaptureMetadata = {
   coordinates?: 'mediapipe-original';
   visualMirrored?: true;
   collectionProtocol?: 'hito-4.3';
+  campaign?: CampaignCapture;
 };
 export type DatasetSample = {
   sampleId: string; labelId: string; participantId: string; repetition: number; recordedAt: string;

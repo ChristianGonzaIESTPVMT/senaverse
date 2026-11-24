@@ -60,8 +60,12 @@ export function useDatasetCapture() {
     try {
       const latest = fresh.current;
       if (!sessionReady) throw new Error('Activa la cámara y espera a que el detector esté listo.');
+      const emptyCapture = selection.campaign?.hand === 'none';
       if (countdownSeconds === 0 && (!latest || performance.now() - latest.capturedAtMs > CAPTURE_DEFAULTS.maxFreshAgeMs
-        || !expectedHandsMatch(selection.sign, latest.result.landmarks.length))) throw new Error('Coloca las manos esperadas dentro del encuadre y espera una detección reciente.');
+        || (emptyCapture ? latest.result.landmarks.length !== 0 : !expectedHandsMatch(selection.sign, latest.result.landmarks.length)))) {
+        throw new Error(emptyCapture ? 'Deja el encuadre sin manos y espera un resultado reciente del detector.'
+          : 'Coloca las manos esperadas dentro del encuadre y espera una detección reciente.');
+      }
       capture.start(selection, countdownSeconds); updateView();
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo iniciar la captura.'); }
   }, [capture, sessionReady, updateView]);

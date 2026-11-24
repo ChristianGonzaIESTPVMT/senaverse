@@ -43,6 +43,7 @@ export type EducationalVideo = Available & {
 };
 export type PublishableMedia = IndividualImage | IllustratedSequence | EducationalVideo;
 export type EducationalVisual = DiagramResource | IndividualImage | IllustratedSequence;
+export type QuizMedia = { signId: string; kind: 'photo' | 'video' | 'diagram'; description: string };
 type PendingMedia = Identified & { kind: 'video' | 'visual'; availability: 'pending' };
 
 export type SignMedia = {

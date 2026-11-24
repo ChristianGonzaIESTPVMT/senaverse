@@ -37,7 +37,11 @@ def date(value):
 
 def read_document(path):
     raw = path.read_bytes()
-    document = json.loads(raw)
+    document = validate_document(json.loads(raw))
+    return document, hashlib.sha256(raw).hexdigest()
+
+
+def validate_document(document):
     if (not isinstance(document, dict) or type(document.get("schemaVersion")) is not int
             or document["schemaVersion"] != 1 or document.get("exportType") not in ("dataset", "backup")
             or not all(isinstance(document.get(key), list) for key in ("participants", "signs", "samples"))):
@@ -49,7 +53,7 @@ def read_document(path):
             or not all(isinstance(value, str) and 0 < len(value) <= 120 for value in detector.values())
             or detector["task"] != "HandLandmarker" or not re.fullmatch(r"[a-f0-9]{64}", detector["sha256"])):
         raise ValueError("Configuración o procedencia MediaPipe incompatible con este módulo.")
-    return document, hashlib.sha256(raw).hexdigest()
+    return document
 
 
 def index_by_id(records, kind):
@@ -193,7 +197,9 @@ def inspect_frames(frames, duration, metadata, expected, freshness, issues, warn
         warnings.add("falta-al-menos-una-mano-esperada")
     coverage = times[-1] - times[0] if len(times) > 1 else 0
     fps = 1000 * (len(times) - 1) / coverage if coverage > 0 else 0
-    ratio = (counts.get(expected, 0) / len(frames) if frames else 0) if expected else 1
+    campaign = metadata.get("campaign")
+    exact_zero = isinstance(campaign, dict) and campaign.get("negativeSubtype") == "no-hands"
+    ratio = (counts.get(expected, 0) / len(frames) if frames else 0) if expected or exact_zero else 1
     exact = [key for key, _ in keys if key is not None]
     duplicate_count = len(exact) - len(set(exact))
     if duplicate_count:

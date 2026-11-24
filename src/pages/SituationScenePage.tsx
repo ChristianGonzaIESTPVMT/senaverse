@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, Info, MessageSquare
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
+import { SituationDialogue } from '../components/SituationDialogue';
 import { getEducationalSign } from '../data/library';
 import { nextSituationScene, summarizeSituation } from '../data/situationStudy';
 import { getSituation, getSituationFilter, getSituationPath, getSituationResultsPath, getSituationScenePath, getSituationsPath,
@@ -67,6 +68,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
         <progress value={completed} max={situation.scenes.length} aria-label="Interacciones completadas de la situación" />
       </div>
 
+      {scene.dialogue ? <SituationDialogue situation={situation} scene={scene} answer={answer} filter={filter} onEvent={recordActivity} /> : <>
       <section className="situation-scenario" aria-labelledby="situation-scene-title">
         <div className="situation-story">
           {!illustrationAfterAnswer && <SituationIllustration situation={situation} />}
@@ -98,7 +100,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
           {answer?.checked && <div className={`situation-answer-feedback${isCorrect ? ' is-correct' : ''}`} role="status">
             {isCorrect ? <CheckCircle2 size={21} aria-hidden="true" /> : <Info size={21} aria-hidden="true" />}
             <p><strong>{isCorrect ? 'Respuesta adecuada.' : 'Esta opción no corresponde a la pregunta.'}</strong> {scene.explanation}
-              {!isCorrect && !answer.practice && ' Puedes probar otra respuesta o repasar la opción que elegiste.'}</p>
+              {!isCorrect && !answer.practice && ' Elige otra respuesta para continuar.'}</p>
           </div>}
           {!answer?.practice && <div className="situation-question-actions">
             <button className="button button-primary" type="submit" disabled={!answer || answer.checked}>Comprobar alternativa <ArrowRight size={18} aria-hidden="true" /></button>
@@ -109,8 +111,9 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
         <SituationIllustration situation={situation} />
       </div>}
 
-      {sign && <SituationPracticeStep key={sign.id} sign={sign} scene={scene} situationId={situationId} filter={filter}
+      {sign && (isCorrect || answer?.practice) && <SituationPracticeStep key={sign.id} sign={sign} scene={scene} situationId={situationId} filter={filter}
         practice={answer?.practice} onComplete={input => recordActivity({ type: 'situation-practice', situationId, sceneId, input })} />}
+      </>}
 
       <div className="situation-navigation">
         <Link className="button button-outline" to={getSituationsPath(filter)}><ArrowLeft size={18} aria-hidden="true" /> Volver a Situaciones</Link>

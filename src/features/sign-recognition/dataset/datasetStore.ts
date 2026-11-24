@@ -2,11 +2,40 @@ import { CAPTURE_DEFAULTS, CONSENT_VERSION, DATASET_DATABASE_NAME, MODEL_METADAT
 import { validateDatasetDocument, validateDatasetSample, validateSign } from './datasetExport.ts';
 import { isOperatorReviewed, type SampleReviewAction } from './datasetTypes.ts';
 import { catalogAdditions, createDatasetCatalog, signConfigurationErrors } from './signCatalog.ts';
+import { buildPayloads, encodeBlocks, mergeParticipant, sameDataset, sameRecord, type ExportScope } from './datasetBlocks.ts';
+import { partitions, type DatasetPartition } from './datasetCampaign.ts';
 
 const STORES = ['meta', 'participants', 'signs', 'samples', 'sequences'];
 const request = <T>(value: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
   value.onsuccess = () => resolve(value.result); value.onerror = () => reject(value.error ?? new Error('No se pudo acceder al almacenamiento.'));
 });
+
+async function verifyBackup(tx: IDBTransaction, backup: DatasetDocument | null) {
+  const samples = tx.objectStore('samples'), sequences = tx.objectStore('sequences');
+  const [meta, participants, signs, count] = await Promise.all([
+    request<DatasetMeta>(tx.objectStore('meta').get('dataset')),
+    request<DatasetParticipant[]>(tx.objectStore('participants').getAll()),
+    request<DatasetSign[]>(tx.objectStore('signs').getAll()), request(samples.count()),
+  ]);
+  if (!backup) {
+    if (participants.length || count) throw new Error('Verifica primero un respaldo completo y actual del almacén local.');
+    return;
+  }
+  const byId = <T extends { id: string }>(records: T[]) => records.toSorted((a, b) => a.id.localeCompare(b.id));
+  if (!sameDataset(meta, backup) || meta.nextParticipantNumber !== backup.nextParticipantNumber || count !== backup.samples.length
+    || !sameRecord(byId(participants), byId(backup.participants)) || !sameRecord(byId(signs), byId(backup.signs))) {
+    throw new Error('El respaldo no coincide con el almacén local completo y actual.');
+  }
+  for (const sample of backup.samples) {
+    const [summary, sequence] = await Promise.all([
+      request<SampleSummary | undefined>(samples.get(sample.sampleId)),
+      request<{ frames: DatasetSample['frames'] } | undefined>(sequences.get(sample.sampleId)),
+    ]);
+    if (!summary || !sequence || !sameRecord({ ...summary, frames: sequence.frames }, sample)) {
+      throw new Error(`El respaldo no coincide con la toma local ${sample.sampleId}.`);
+    }
+  }
+}
 
 async function transaction<T>(db: IDBDatabase, stores: string[], mode: IDBTransactionMode, work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
   const tx = db.transaction(stores, mode);
@@ -100,6 +129,19 @@ export class DatasetStore {
     });
   }
 
+  async setParticipantPartition(id: string, partition: DatasetPartition) {
+    if (!Object.hasOwn(partitions, partition)) throw new Error('La partición no es válida.');
+    return transaction(await this.open(), ['participants', 'samples'], 'readwrite', async tx => {
+      const store = tx.objectStore('participants');
+      const person = await request<DatasetParticipant | undefined>(store.get(id));
+      if (!person) throw new Error('El participante ya no existe.');
+      if (person.partition !== partition && await request(tx.objectStore('samples').index('participantId').count(id))) {
+        throw new Error('Este participante ya tiene tomas. Conserva su partición y usa otro ID para otra persona.');
+      }
+      store.put({ ...person, partition });
+    });
+  }
+
   async saveSign(sign: DatasetSign) {
     validateSign(sign);
     return transaction(await this.open(), ['signs'], 'readwrite', async tx => {
@@ -114,6 +156,9 @@ export class DatasetStore {
     return transaction(await this.open(), ['samples', 'sequences', 'participants', 'signs'], 'readwrite', async tx => {
       const participant = await request<DatasetParticipant | undefined>(tx.objectStore('participants').get(sample.participantId));
       if (!participant?.consentedAt || participant.consentVersion !== CONSENT_VERSION) throw new Error('Falta consentimiento del participante.');
+      if (sample.captureMetadata.campaign && (!participant.partition || participant.consentedAt !== sample.captureMetadata.consentedAt)) {
+        throw new Error('La partición o el consentimiento de la sesión cambió. Confírmalo y repite la captura.');
+      }
       if (!await request(tx.objectStore('signs').get(sample.labelId))) throw new Error('La etiqueta no existe en este dataset.');
       const samples = tx.objectStore('samples');
       if (await request(samples.get(sample.sampleId))) throw new Error('Esta muestra ya está guardada.');
@@ -148,6 +193,20 @@ export class DatasetStore {
       if (!sample) throw new Error('La muestra ya no existe.');
       if (excluded) sample.excludedFromV2 = true;
       else delete sample.excludedFromV2;
+      store.put(sample);
+    });
+  }
+
+  async annotateCampaign(id: string, notes: string) {
+    if (notes.length > 500) throw new Error('La anotación admite hasta 500 caracteres.');
+    return transaction(await this.open(), ['samples'], 'readwrite', async tx => {
+      const store = tx.objectStore('samples');
+      const sample = await request<SampleSummary | undefined>(store.get(id));
+      const campaign = sample?.captureMetadata.campaign;
+      if (!sample || !campaign) throw new Error('La toma no tiene metadatos de la guía.');
+      const text = notes.trim();
+      if (text) campaign.notes = text;
+      else delete campaign.notes;
       store.put(sample);
     });
   }
@@ -208,9 +267,88 @@ export class DatasetStore {
     });
   }
 
-  async replace(document: DatasetDocument) {
+  async blocks(scope: ExportScope, maxBytes: number) {
+    const { payloads, sampleCount } = await transaction(await this.open(), STORES, 'readonly', async tx => {
+      const [meta, participants, signs, summaries] = await Promise.all([
+        request<DatasetMeta>(tx.objectStore('meta').get('dataset')), request<DatasetParticipant[]>(tx.objectStore('participants').getAll()),
+        request<DatasetSign[]>(tx.objectStore('signs').getAll()), request<SampleSummary[]>(tx.objectStore('samples').getAll()),
+      ]);
+      const ids = scope.sampleIds && new Set(scope.sampleIds);
+      const chosen = summaries.filter(sample => (!ids || ids.has(sample.sampleId))
+        && (!scope.participantId || sample.participantId === scope.participantId)
+        && (!scope.session || sample.captureMetadata.campaign?.session === scope.session));
+      if (ids && chosen.length !== ids.size) throw new Error('La selección cambió. Vuelve a seleccionar las muestras.');
+      const people = new Set(chosen.map(sample => sample.participantId));
+      const sequences = tx.objectStore('sequences');
+      async function* recordings() {
+        for (const summary of chosen) {
+          const sequence = await request<{ frames: DatasetSample['frames'] } | undefined>(sequences.get(summary.sampleId));
+          if (!sequence) throw new Error(`Falta la secuencia de ${summary.sampleId}.`);
+          yield { ...summary, frames: sequence.frames };
+        }
+      }
+      const payloads = await buildPayloads({ ...meta, signs, exportType: 'backup', exportedAt: new Date().toISOString(),
+        participants: scope.participantId || ids || scope.session ? participants.filter(person => people.has(person.id)) : participants,
+      }, recordings(), maxBytes);
+      return { payloads, sampleCount: chosen.length };
+    });
+    return encodeBlocks(payloads, sampleCount, maxBytes);
+  }
+
+  async merge(document: DatasetDocument) {
+    validateDatasetDocument(document);
+    return transaction(await this.open(), STORES, 'readwrite', async tx => {
+      const meta = tx.objectStore('meta'), participants = tx.objectStore('participants'), signs = tx.objectStore('signs');
+      const samples = tx.objectStore('samples'), sequences = tx.objectStore('sequences');
+      const [current, peopleCount, sampleCount] = await Promise.all([
+        request<DatasetMeta>(meta.get('dataset')), request(participants.count()), request(samples.count()),
+      ]);
+      if ((peopleCount || sampleCount) && !sameDataset(current, document)) throw new Error('El dataset local y los archivos tienen identidades distintas.');
+      let added = 0, duplicates = 0;
+      for (const person of document.participants) {
+        const previous = await request<DatasetParticipant | undefined>(participants.get(person.id));
+        const merged = mergeParticipant(previous, person);
+        if (previous?.partition === undefined && merged.partition && await request(samples.index('participantId').count(person.id))) {
+          throw new Error(`No se puede reasignar automáticamente a ${person.id}: ya tiene tomas sin partición.`);
+        }
+        participants.put(merged);
+      }
+      for (const sign of document.signs) {
+        if (!peopleCount && !sampleCount) signs.put(sign);
+        else if (!await request(signs.get(sign.id))) signs.add(sign);
+      }
+      for (const sample of document.samples) {
+        const existing = await request<SampleSummary | undefined>(samples.get(sample.sampleId));
+        if (existing) {
+          const sequence = await request<{ frames: DatasetSample['frames'] } | undefined>(sequences.get(sample.sampleId));
+          if (!sequence || !sameRecord({ ...existing, frames: sequence.frames }, sample)) {
+            throw new Error(`Conflicto de contenido para sampleId ${sample.sampleId}. No se importó ningún cambio.`);
+          }
+          duplicates++;
+          continue;
+        }
+        const key = [sample.participantId, sample.labelId, sample.repetition];
+        if (await request(samples.index('repetition').getKey(key))) throw new Error(`Conflicto de repetición ${key.join('/')}.`);
+        const { frames, ...summary } = sample;
+        samples.add(summary); sequences.add({ sampleId: sample.sampleId, frames });
+        added++;
+      }
+      const { datasetId, createdAt, schemaVersion, captureConfiguration, mediaPipeModel } = document;
+      meta.put({ datasetId, createdAt, schemaVersion, captureConfiguration, mediaPipeModel,
+        nextParticipantNumber: Math.max(current.nextParticipantNumber, document.nextParticipantNumber) }, 'dataset');
+      return { added, duplicates };
+    });
+  }
+
+  async verifyBackup(document: DatasetDocument) {
+    validateDatasetDocument(document);
+    return transaction(await this.open(), STORES, 'readonly', tx => verifyBackup(tx, document));
+  }
+
+  async replace(document: DatasetDocument, backup?: DatasetDocument | null) {
     validateDatasetDocument(document); // Validate everything before opening a write transaction.
     return transaction(await this.open(), STORES, 'readwrite', async tx => {
+      if (backup !== undefined) await verifyBackup(tx, backup);
       for (const name of STORES) tx.objectStore(name).clear();
       const { datasetId, createdAt, schemaVersion, nextParticipantNumber, captureConfiguration, mediaPipeModel } = document;
       tx.objectStore('meta').put({ datasetId, createdAt, schemaVersion, nextParticipantNumber, captureConfiguration, mediaPipeModel }, 'dataset');

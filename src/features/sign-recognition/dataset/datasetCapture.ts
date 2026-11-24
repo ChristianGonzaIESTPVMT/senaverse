@@ -2,10 +2,11 @@ import type { FreshHandInference } from '../types';
 import { expectedHandsMatch, NADA_EXECUTION, signConfigurationErrors } from './signCatalog.ts';
 import { calculateQuality, workerResultFrame } from './datasetValidation.ts';
 import type { CountdownSeconds } from './countdownPreferences';
+import { campaignCaptureMatches, type CampaignCapture } from './datasetCampaign.ts';
 import { CAPTURE_DEFAULTS, CONSENT_VERSION, MODEL_METADATA, type CaptureIncident, type DatasetFrame, type DatasetParticipant, type DatasetSample, type DatasetSign } from './datasetTypes.ts';
 
 export type DatasetCapturePhase = 'idle' | 'countdown' | 'recording' | 'finishing' | 'review';
-export type CaptureSelection = { participant: DatasetParticipant; sign: DatasetSign; repetition: number; sessionConsent: boolean };
+export type CaptureSelection = { participant: DatasetParticipant; sign: DatasetSign; repetition: number; sessionConsent: boolean; campaign?: CampaignCapture };
 type Clock = { now: () => number; isoNow: () => string; id: () => string };
 export type DatasetCaptureView = { phase: DatasetCapturePhase; countdownRemainingMs: number; elapsedMs: number; frameCount: number; warning: string; draft: DatasetSample | null };
 
@@ -33,6 +34,9 @@ export class DatasetCapture {
     if (!selection.sessionConsent || !selection.participant.consentedAt || selection.participant.consentVersion !== CONSENT_VERSION) throw new Error('Confirma el consentimiento de esta persona para la sesión.');
     const errors = signConfigurationErrors(selection.sign);
     if (errors.length) throw new Error(errors.join(' '));
+    if (selection.campaign && (!selection.participant.partition || !campaignCaptureMatches(selection.campaign, selection.sign.id, selection.sign.expectedHands, selection.sign.durationMs))) {
+      throw new Error('Completa la sesión, la partición y la mano utilizada en la guía.');
+    }
     this.selection = structuredClone(selection);
     this.frames = []; this.incidents = []; this.configuration = null; this.draft = null; this.warning = '';
     this.lastInferenceTimestamp = -Infinity; this.lastCapturedAt = -Infinity; this.gapActive = false;
@@ -96,15 +100,16 @@ export class DatasetCapture {
   private finish() {
     if (!this.selection) return;
     if (!this.configuration || this.frames.length === 0) { this.cancel('No se recibieron resultados frescos; no se creó ninguna muestra.'); return; }
-    const { participant, sign, repetition } = this.selection;
+    const { participant, sign, repetition, campaign } = this.selection;
     this.draft = { sampleId: this.clock.id(), labelId: sign.id, participantId: participant.id, repetition,
       recordedAt: this.recordedAt, durationMs: sign.durationMs, frames: this.frames, incidents: this.incidents,
       qualityMetrics: calculateQuality(this.frames, sign.durationMs, sign.expectedHands,
-        { incidents: this.incidents, completed: true, requestedDurationMs: sign.durationMs }), reviewStatus: 'pending',
+        { incidents: this.incidents, completed: true, requestedDurationMs: sign.durationMs, campaign }), reviewStatus: 'pending',
       captureMetadata: { configuration: this.configuration, model: structuredClone(MODEL_METADATA),
         labelSnapshot: sign.id === 'LSP-007' ? { ...sign, instructions: NADA_EXECUTION } : sign,
         consentedAt: participant.consentedAt!, consentVersion: CONSENT_VERSION, requestedDurationMs: sign.durationMs, completed: true,
         qualityPolicyVersion: 2, recordingStartedAtMs: this.startAt, coordinates: 'mediapipe-original', visualMirrored: true,
+        ...(campaign && { campaign }),
         ...(sign.category && { collectionProtocol: 'hito-4.3' }) } };
     this.phase = 'review';
   }

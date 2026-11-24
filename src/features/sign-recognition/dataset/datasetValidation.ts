@@ -1,5 +1,6 @@
 import { CAPTURE_DEFAULTS, type CaptureIncident, type DatasetFrame, type DatasetSample, type QualityMetrics, type SampleSummary } from './datasetTypes.ts';
 import type { HandDetectionResult } from '../types';
+import type { CampaignCapture } from './datasetCampaign.ts';
 
 export function workerResultFrame(result: HandDetectionResult, timestampMs: number): DatasetFrame | null {
   if (!Array.isArray(result.landmarks) || result.landmarks.length > 2) return null;
@@ -21,7 +22,7 @@ export function workerResultFrame(result: HandDetectionResult, timestampMs: numb
   return { timestampMs, handCount: hands.length, hands };
 }
 
-type QualityContext = { incidents?: CaptureIncident[]; completed?: boolean; requestedDurationMs?: number };
+type QualityContext = { incidents?: CaptureIncident[]; completed?: boolean; requestedDurationMs?: number; campaign?: CampaignCapture };
 
 function integrityWarnings(quality: Pick<QualityMetrics, 'minimumHands' | 'observedDurationMs'>, durationMs: number, expectedHands: number, context: QualityContext) {
   const warnings: string[] = [];
@@ -37,7 +38,8 @@ function integrityWarnings(quality: Pick<QualityMetrics, 'minimumHands' | 'obser
 
 /** Without context, preserve the original policy so historical metrics still round-trip exactly. */
 export function calculateQuality(frames: DatasetFrame[], durationMs: number, expectedHands: number, context?: QualityContext): QualityMetrics {
-  const expectedHandFrames = frames.filter(frame => expectedHands === 0 || frame.handCount === expectedHands).length;
+  const exactZero = context?.campaign?.negativeSubtype === 'no-hands';
+  const expectedHandFrames = frames.filter(frame => (expectedHands === 0 && !exactZero) || frame.handCount === expectedHands).length;
   const validLandmarkFrames = frames.filter(frame => frame.handCount > 0).length;
   const observedDurationMs = frames.length > 1 ? frames.at(-1)!.timestampMs - frames[0].timestampMs : 0;
   const averageFps = observedDurationMs > 0 ? (frames.length - 1) * 1000 / observedDurationMs : 0;
@@ -52,6 +54,9 @@ export function calculateQuality(frames: DatasetFrame[], durationMs: number, exp
   if (frames.some(frame => frame.hands.some(hand => hand.handedness.length === 0))) warnings.push('Falta lateralidad de MediaPipe en alguna mano.');
   if (frames.some((frame, index) => index > 0 && frame.timestampMs - frames[index - 1].timestampMs > 250)) warnings.push('Hubo interrupciones entre resultados del Worker.');
   if (context) {
+    if (context.campaign && frames.some(frame => frame.handCount > expectedHands)) {
+      warnings.push(exactZero ? 'Aparecieron manos en una toma que debía estar vacía.' : 'Apareció una mano adicional en esta toma.');
+    }
     warnings.push(...integrityWarnings({ minimumHands: frames.length ? Math.min(...frames.map(frame => frame.handCount)) : 0, observedDurationMs }, durationMs, expectedHands, context));
     if (frames.some((frame, index) => index > 0 && frame.timestampMs <= frames[index - 1].timestampMs)) warnings.push('La secuencia contiene timestamps repetidos o desordenados.');
     if (frames.length && (frames[0].timestampMs > 250 || durationMs - frames.at(-1)!.timestampMs > 250)) warnings.push('Faltan observaciones al inicio o al final de la muestra.');

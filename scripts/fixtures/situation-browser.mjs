@@ -1,156 +1,186 @@
 import assert from 'node:assert/strict';
-import { loadTraces, replayTrace } from './lesson-browser.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { loadStaticTraces, replayTrace } from './lesson-browser.mjs';
 
-const progress = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
-const route = '/simulador/cantidad';
+const storage = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
 const released = 'window.labStreams.flatMap(stream => stream.getTracks()).every(track => track.readyState === "ended") && window.labWorkers.every(worker => worker.ended)';
 
-export async function checkSituations({ send, evaluate, requests }, origin, until, datasetPath) {
+export async function checkSituations({ send, evaluate, requests }, origin, until, datasetPath, screenshots) {
   const button = label => evaluate(`Array.from(document.querySelectorAll('button')).find(node =>
     node.textContent.trim() === ${JSON.stringify(label)} && !node.disabled).click()`);
   const link = label => evaluate(`Array.from(document.querySelectorAll('a')).find(node =>
     node.textContent.trim() === ${JSON.stringify(label)} && node.getClientRects().length).click()`);
-  const radio = (group, value) => evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(`${group} input[type=radio]`)}))
-    .find(node => node.value === ${JSON.stringify(value)}).click()`);
+  const radio = (group, value) => evaluate(`document.querySelector(${JSON.stringify(`${group} input[value="${value}"]`)}).click()`);
   const contains = (selector, message) => until(message, () => evaluate(`document.querySelector(${JSON.stringify(selector)})
     ?.textContent.includes(${JSON.stringify(message)})`));
   const scene = title => contains('#situation-scene-title', title);
-  const feedback = message => contains('.situation-question .situation-answer-feedback', message);
-  const method = message => contains('.situation-practice-step [role=status]', message);
+  const feedback = message => contains('.situation-attempt-feedback', message);
   const selection = value => radio('.situation-options', value);
-  const activateCamera = async () => {
-    await until('control de cámara disponible', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
-    await evaluate('document.querySelector(".practice-camera-button").click()');
-  };
+  const available = () => until('control de cámara disponible', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
+  const activate = async () => { await available(); await evaluate('document.querySelector(".practice-camera-button").click()'); };
   const cameraRunning = () => until('Worker activo', () => evaluate('window.labWorkers.some(worker => !worker.ended && worker.results > 0)'), 30000);
-  const stopConfirmed = () => until('recursos liberados', () => evaluate(released));
-  const readRun = () => evaluate(`(${progress}).situationStudy.cantidad`);
-  const completionCount = () => evaluate(`(${progress}).activities.filter(item => item.id === 'situation:cantidad').length`);
-  const noCamera = () => evaluate('!document.querySelector(".practice-camera-button")');
-  async function answer(value, ok = true) {
-    await selection(value);
-    await button('Comprobar alternativa');
-    await feedback(ok ? 'Respuesta adecuada' : 'no corresponde');
-  }
-  async function alternative(value, retry = false) {
-    await button('Hacer ejercicio sin cámara');
-    assert.equal(await noCamera(), true);
-    assert.equal(await evaluate(released), true);
-    if (retry) {
-      await radio('.situation-alternative', 'two');
-      await button('Comprobar ejercicio sin cámara');
-      await contains('.situation-alternative [role=status]', 'vuelve a intentarlo');
-    }
-    await radio('.situation-alternative', value);
-    await button('Comprobar ejercicio sin cámara');
-    await method('Ejercicio sin cámara completado');
-  }
-  async function visitCard() {
-    await link('Ver ficha de Uno en Biblioteca');
-    await contains('.library-dialog[open] h2', 'Uno');
-    assert.equal(await evaluate('location.pathname'), '/biblioteca');
-    assert.match(await evaluate('document.querySelector(".library-meaning a").href'), /minedu\.gob\.pe.*#page=14$/);
-    await stopConfirmed();
-    await link('Volver a la situación');
-    await scene('Hojas para el taller');
-    await feedback('no corresponde');
-    assert.equal(await evaluate('document.querySelector(".situation-options input:checked").value'), 'LSP-001');
-    assert.equal(await noCamera(), true);
+  const stop = () => until('recursos liberados', () => evaluate(released));
+  const submit = () => button('Comprobar intento con cámara');
+  const canAdvance = () => evaluate('!!document.querySelector(".situation-navigation .button-primary")');
+  const current = () => evaluate(`(${storage}).situationStudy.utiles.scenes.cuadernos`);
+  const completions = () => evaluate(`(${storage}).activities.filter(item => item.id === 'situation:utiles').length`);
+  const pane = '.situation-attempt-feedback';
+  const device = (width, height, mobile) => send('Emulation.setDeviceMetricsOverride', { width, height, mobile, deviceScaleFactor: 1 });
+
+  async function capture(name, focusSelector) {
+    if (!screenshots) return;
+    await mkdir(screenshots, { recursive: true });
+    await until('ilustración lista para la captura', () => evaluate(`[...document.querySelectorAll('.situation-context-art img')].every(image => image.complete && image.naturalWidth > 0)`));
+    await evaluate(focusSelector
+      ? `document.fonts.ready.then(() => document.querySelector(${JSON.stringify(focusSelector)}).scrollIntoView({ block: 'center' }))`
+      : 'document.fonts.ready.then(() => window.scrollTo(0, 0))');
+    const { cssContentSize } = await send('Page.getLayoutMetrics');
+    const { data } = await send('Page.captureScreenshot', { format: 'png', ...(focusSelector ? {} : { captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width: cssContentSize.width, height: cssContentSize.height, scale: 1 } }) });
+    await writeFile(join(screenshots, name + '.png'), Buffer.from(data, 'base64'));
   }
 
+  async function startCamera(label = 'Practicar con cámara') {
+    await button(label);
+    await activate();
+    await cameraRunning();
+  }
+
+  async function assess(choice, trace, expected, messages, name, label) {
+    await selection(choice);
+    await startCamera(label);
+    await replayTrace(evaluate, until, trace, expected, () => until('observación vigente al comprobar', () => evaluate(`(() => {
+      const result = document.querySelector('.practice-student-result');
+      const control = [...document.querySelectorAll('button')].find(node =>
+        node.textContent.trim() === 'Comprobar intento con cámara' && !node.disabled);
+      if (!control || !result?.textContent.includes(${JSON.stringify(expected)})) return false;
+      control.click();
+      return true;
+    })()`)));
+    for (const message of messages) await feedback(message);
+    assert.equal(await canAdvance(), name === '06-ambas-correctas');
+    await stop();
+    await capture(name);
+  }
+
+  async function completeVisual(choice) {
+    await selection(choice);
+    await button('Hacer ejercicio sin cámara');
+    assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
+    const signAssets = await evaluate('[...document.querySelectorAll(".situation-alternative img")].map(node => [node.alt, node.title])');
+    assert.ok(signAssets.length >= 2 && signAssets.every(([alt, title]) => alt && !title));
+    await radio('.situation-alternative', choice);
+    await button('Comprobar ejercicio sin cámara');
+    await feedback('Comprensión visual correcta');
+  }
+
+  await device(1390, 900, false);
   await send('Page.navigate', { url: origin + '/simulador' });
   await until('seis situaciones', () => evaluate('document.querySelectorAll(".situation-card").length === 6'));
   await button('Intermedio');
   await until('filtro Intermedio', () => evaluate('document.querySelectorAll(".situation-card").length === 3 && location.search === "?nivel=intermedio"'));
-  await send('Page.navigate', { url: origin + route + '/escena/faltante' });
-  await scene('Hojas para el taller');
-  assert.match(await evaluate('location.pathname'), /\/escena\/total$/);
-  assert.equal(await evaluate('window.studentAttempts'), 0);
-  await answer('LSP-001', false);
-  assert.match(await evaluate('document.querySelector("#situation-practice-title").textContent'), /«Uno»/);
-  assert.equal(await evaluate('!!document.querySelector(\'.sign-media[data-sign="LSP-001"] img[src*="lsp-001-uno"]\')'), true);
-  assert.equal(await evaluate('!!document.querySelector(".sign-media video")'), false);
-  await visitCard();
-  assert.ok(!requests.some(url => url.endsWith('/models/lsp-v1.json') || /handDetection\.worker/.test(url)));
+  await send('Page.navigate', { url: origin + '/simulador/utiles/escena/lapices' });
+  await scene('Cuadernos por curso');
+  assert.match(await evaluate('location.pathname'), /\/escena\/cuadernos$/);
+  await selection('LSP-003');
+  assert.equal(await evaluate(`!!document.querySelector("${pane}, .situation-context-art")`), false);
+  assert.equal(await canAdvance(), false);
+  assert.ok(!requests.some(url => url.endsWith('/models/lsp-v1.json')));
 
   await button('Practicar con cámara');
-  await until('práctica dirigida montada', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
-  assert.equal(await evaluate('window.studentAttempts'), 0);
-  assert.equal(await evaluate('window.labWorkers.length'), 0);
   await evaluate('window.studentDeny = true');
-  await activateCamera();
+  await activate();
   await contains('.practice-camera-error', 'permiso de cámara');
   await button('Hacer ejercicio sin cámara');
-  assert.equal(await noCamera(), true);
+  await radio('.situation-alternative', 'LSP-002');
+  await button('Comprobar ejercicio sin cámara');
+  await feedback('Comprensión visual por revisar');
+  assert.equal(await canAdvance(), false);
   await evaluate('window.studentDeny = false');
-  await button('Practicar con cámara');
-  await activateCamera();
-  await cameraRunning();
-  await visitCard();
-  await button('Practicar con cámara');
-  await activateCamera();
-  await cameraRunning();
-  assert.equal(await evaluate('Math.max(...window.labWorkers.map(worker => worker.maxActive))'), 1);
+  await startCamera();
+  await contains('.practice-student-result', 'Buscando manos');
+  await submit();
+  await feedback('Seguimiento insuficiente');
+  await stop();
+  await capture('01-seguimiento-insuficiente');
 
   if (datasetPath) {
-    const traces = await loadTraces(datasetPath);
-    await replayTrace(evaluate, until, traces.different, 'confirmó una seña distinta');
-    assert.equal(await evaluate('document.querySelector(".situation-directed-practice").textContent.includes("Guardar práctica con cámara")'), false);
-    await button('Reintentar práctica');
-    await replayTrace(evaluate, until, traces.correct, 'Coincide con la seña');
-    assert.equal((await readRun()).scenes.total.practice, undefined);
-    await button('Guardar práctica con cámara');
-    await method('coincidencia experimental');
-    await stopConfirmed();
-    assert.equal((await readRun()).scenes.total.practice.method, 'camera');
-  } else await alternative('one');
+    const traces = await loadStaticTraces(datasetPath, ['LSP-001', 'LSP-002', 'LSP-003', 'NEG-001']);
+    await startCamera('Reintentar con cámara');
+    await replayTrace(evaluate, until, traces['LSP-003'], 'Tres');
+    await until('la confirmación desaparece al perder la mano', () => evaluate(`/Buscando manos|Seguimiento insuficiente/
+      .test(document.querySelector('.practice-student-result').textContent)`));
+    await submit();
+    assert.equal((await current()).evaluations.at(-1).observation.status, 'tracking');
+    await stop();
 
+    await startCamera('Reintentar con cámara');
+    await button('Reiniciar intento');
+    await stop();
+    assert.equal(await evaluate('document.querySelector(".practice-camera-button")?.textContent.includes("Activar")'), true);
+    await activate();
+    await cameraRunning();
+    await replayTrace(evaluate, until, traces['LSP-002'], 'Dos', async () => selection('LSP-002'));
+    await stop();
+    assert.equal(await evaluate(`!!document.querySelector("${pane}, .practice-camera-button")`), false);
+
+    await assess('LSP-002', traces['LSP-002'], 'Dos', ['Contexto por revisar', 'Coincidencia gestual'], '02-contexto-incorrecto-coincidencia');
+    await assess('LSP-002', traces['LSP-001'], 'Uno', ['Contexto por revisar', 'Seña diferente', '«Uno»'], '03-ambas-incorrectas', 'Reintentar con cámara');
+    await assess('LSP-003', traces['LSP-002'], 'Dos', ['Contexto correcto', 'Seña diferente', '«Dos»'], '04-contexto-correcto-sena-diferente');
+    await assess('LSP-003', traces['NEG-001'], 'Gesto no reconocido', ['Contexto correcto', 'Gesto desconocido'], '05-gesto-desconocido', 'Reintentar con cámara');
+    assert.equal(await evaluate('Math.max(...window.labWorkers.map(worker => worker.maxActive))'), 1);
+
+    const persisted = await current();
+    await send('Page.reload');
+    await feedback('Gesto desconocido');
+    assert.deepEqual(await current(), persisted);
+    await assess('LSP-003', traces['LSP-003'], 'Tres', ['Contexto correcto', 'Coincidencia gestual', '«Tres»'], '06-ambas-correctas', 'Reintentar con cámara');
+    assert.equal((await current()).practice.method, 'camera');
+  } else {
+    await completeVisual('LSP-003');
+  }
+  await link('Repasar Tres en Biblioteca');
+  await contains('.library-dialog[open] h2', 'Tres');
+  await link('Volver a la situación');
+  await scene('Cuadernos por curso');
   await link('Continuar a la siguiente interacción');
-  await scene('La última hoja');
-  await answer('cero', false);
-  assert.match(await evaluate('document.querySelector("#situation-practice-title").textContent'), /«Cero»/);
-  assert.equal(await evaluate('!!document.querySelector(".situation-practice-step button[aria-pressed]") && !document.querySelector(".situation-practice-step").textContent.includes("Practicar con cámara")'), true);
-  const timeOrigin = await evaluate('performance.timeOrigin');
-  await send('Page.reload');
-  await until('recarga de la escena', () => evaluate(`performance.timeOrigin !== ${timeOrigin}`));
-  await scene('La última hoja');
-  await feedback('no corresponde');
-  assert.equal(await evaluate('window.studentAttempts'), 0);
-
+  await scene('Materiales para el grupo');
+  await device(390, 844, true);
+  assert.equal(await evaluate('document.documentElement.dataset.theme === "light" && document.documentElement.scrollWidth === innerWidth'), true);
+  await device(1390, 900, false);
   await evaluate('document.querySelector(".theme-toggle").click()');
   await until('tema oscuro', () => evaluate('document.documentElement.dataset.theme === "dark"'));
-  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 1 });
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  await device(390, 844, true);
   assert.equal(await evaluate('document.documentElement.scrollWidth === innerWidth'), true);
-  await answer('LSP-001');
-  await alternative('one', true);
-  assert.equal(await completionCount(), 0);
+  await completeVisual('LSP-004');
+  assert.equal(await evaluate('document.documentElement.scrollWidth === innerWidth'), true);
+  await capture('07-comprension-visual-movil-oscuro', pane);
+  assert.equal(await completions(), 0);
   await button('Finalizar situación');
-  await contains('#situation-results-title', 'Resumen de la situación');
-  assert.equal((await readRun()).scenes.faltante.practice.method, 'alternative');
-  assert.match(await evaluate('document.querySelector(".situation-results-metrics").textContent'), /1 adecuada · 1 por revisar.*2 intentos incorrectos/s);
   await contains('.situation-results-note', '40 XP');
-  assert.equal(await completionCount(), 1);
-  assert.equal(await evaluate('document.documentElement.scrollWidth === innerWidth'), true);
-  await send('Emulation.clearDeviceMetricsOverride');
-
-  await link('Volver a Situaciones');
-  await contains('.situation-card[aria-labelledby="situation-cantidad"]', '2 de 2 interacciones · Finalizada');
-  await evaluate('document.querySelector(\'.situation-card[aria-labelledby="situation-cantidad"] .situation-start\').click()');
-  await contains('#situation-results-title', 'Resumen de la situación');
+  await contains('.situation-result-scenes', 'Comprensión visual');
+  assert.equal(await completions(), 1);
   await button('Repetir situación');
-  await scene('Hojas para el taller');
-  await answer('LSP-005');
-  await alternative('one');
+  await scene('Cuadernos por curso');
+  assert.equal(await evaluate(`(${storage}).situationArchive.utiles.length`), 1);
+  await completeVisual('LSP-003');
   await link('Continuar a la siguiente interacción');
-  await scene('La última hoja');
-  await answer('cero', false);
-  await alternative('one');
+  await scene('Materiales para el grupo');
+  await completeVisual('LSP-004');
   await button('Finalizar situación');
   await contains('.situation-results-note', '40 XP');
-  assert.equal(await completionCount(), 1);
-  await evaluate('document.querySelector(\'a[href="/progreso"]\').click()');
-  await contains('.progress-page', 'Eligiendo una cantidad');
+  assert.equal(await completions(), 1);
+  await send('Page.navigate', { url: origin + '/simulador/preguntas' });
+  await scene('El libro reservado');
+  await selection('no');
+  await button('Comprobar alternativa');
+  await contains('.situation-answer-feedback', 'no corresponde');
+  assert.equal(await canAdvance(), false);
+  assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
   assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
-  console.log(JSON.stringify({ catalogue: 6, libraryRoundTrip: true, incompatibleSign: 'Cero', permissionDenied: true,
-    realTraces: !!datasetPath, contextsAndCameraSeparate: true, resumed: true, reward: '40 XP once', mobileDark: true, released: true }));
+  console.log(JSON.stringify({ catalogue: 6, libraryRoundTrip: true, unsupported: 'No', permissionDenied: true,
+    cameraOutcomes: datasetPath ? 6 : 1, lostTrackingAfterConfirmation: !!datasetPath, archivedOnRepeat: true,
+    reward: '40 XP once', desktopAndMobileBothThemes: true, released: true, screenshots: !!screenshots }));
 }

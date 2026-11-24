@@ -15,6 +15,11 @@ function practiceWithoutCamera(state, situation, scene) {
   const sceneId = scene.id;
   const response = getSituationExercise(scene, getEducationalSign(choiceId)).correctId;
   state = dispatch(state, situation.id, 'situation-select', { sceneId, choiceId });
+  if (scene.dialogue) {
+    const attemptId = `${situation.id}/${sceneId}`;
+    state = dispatch(state, situation.id, 'situation-attempt-start', { sceneId, attempt: { id: attemptId, method: 'visual' } });
+    return dispatch(state, situation.id, 'situation-attempt-result', { sceneId, attemptId, input: { method: 'visual', response } });
+  }
   state = dispatch(state, situation.id, 'situation-check', { sceneId });
   return dispatch(state, situation.id, 'situation-practice', { sceneId, input: { method: 'alternative', response } });
 }
@@ -57,27 +62,32 @@ test('interactions reject out-of-order, unchecked and incompatible submissions',
   state = dispatch(state, situationId, 'situation-select', { sceneId: 'confirmacion', choiceId: 'no' });
   const camera = { sceneId: 'confirmacion', input: { method: 'camera', signId: 'LSP-006' } };
   assert.equal(dispatch(state, situationId, 'situation-practice', camera), state);
+  assert.equal(dispatch(state, situationId, 'situation-attempt-start', { sceneId: 'confirmacion', attempt: { id: 'unsupported', method: 'camera' } }), state);
   state = dispatch(state, situationId, 'situation-check', { sceneId: 'confirmacion' });
   assert.equal(dispatch(state, situationId, 'situation-practice', camera), state);
   assert.equal(dispatch(state, situationId, 'situation-practice', { sceneId: 'confirmacion', input: { method: 'alternative', response: 'LSP-006' } }), state);
-  state = dispatch(state, situationId, 'situation-practice', { sceneId: 'confirmacion', input: { method: 'alternative', response: 'no' } });
-  assert.equal(nextSituationScene(getSituation(situationId), state.situationStudy[situationId]).id, 'prestamos');
+  assert.equal(dispatch(state, situationId, 'situation-practice', { sceneId: 'confirmacion', input: { method: 'alternative', response: 'no' } }), state);
+  assert.equal(nextSituationScene(getSituation(situationId), state.situationStudy[situationId]).id, 'confirmacion');
   assert.equal(summarizeSituation(getSituation(situationId), state.situationStudy[situationId]).incorrect, 1);
 });
 
-test('camera accepts only the selected compatible class and keeps the contextual score separate', () => {
-  const situationId = 'cantidad', sceneId = 'total';
-  let state = dispatch(emptyProgress(), situationId, 'situation-start');
-  state = dispatch(state, situationId, 'situation-select', { sceneId, choiceId: 'LSP-001' });
-  state = dispatch(state, situationId, 'situation-check', { sceneId });
-  const withCamera = signId => dispatch(state, situationId, 'situation-practice', { sceneId, input: { method: 'camera', signId } });
-  assert.equal(withCamera('LSP-005'), state);
-  state = withCamera('LSP-001');
-  assert.equal(withCamera('LSP-001'), state);
-  assert.deepEqual(summarizeSituation(getSituation(situationId), state.situationStudy[situationId]),
-    { completed: 1, correct: 0, incorrect: 1, camera: 1, alternative: 0, errors: 1 });
-  assert.equal(summarizeProgress(state).xp, 0);
-  assert.deepEqual(restoreProgress(JSON.stringify(state)), state);
+test('restoration preserves historical practice even if the old flow allowed an incorrect contextual response', () => {
+  const old = { ...emptyProgress(), situationStudy: { cantidad: { startedAt: at, scenes: {
+    total: { choiceId: 'LSP-001', attempts: ['LSP-001'], checked: true, practice: { method: 'camera', signId: 'LSP-001' }, practiceAt: at },
+  } } } };
+  assert.deepEqual(restoreProgress(JSON.stringify(old)), old);
+});
+
+test('the nine dialogues have visual evidence and camera is limited to the five static numeric dialogues', () => {
+  const scenes = situations.flatMap(situation => situation.scenes);
+  assert.equal(scenes.filter(scene => scene.dialogue === 'camera').length, 5);
+  assert.equal(scenes.filter(scene => scene.dialogue === 'visual').length, 4);
+  for (const scene of scenes.filter(scene => scene.dialogue)) for (const id of scene.optionIds) {
+    const sign = getEducationalSign(id);
+    assert.ok(sign.recognitionClassId);
+    assert.ok(getSituationExercise(scene, sign).options.every(option => option.media));
+    if (scene.dialogue === 'camera') assert.equal(recognitionSigns.find(sign => sign.id === id).type, 'static');
+  }
 });
 
 test('all situations can finish without a camera and the first reward survives replay and reload', () => {

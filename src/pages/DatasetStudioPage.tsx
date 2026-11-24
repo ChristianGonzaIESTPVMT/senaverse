@@ -4,6 +4,8 @@ import { ArrowLeft, Download, FileJson, FlaskConical, LockKeyhole, ShieldCheck, 
 import { Brand } from '../components/Brand';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { DatasetStatistics } from '../components/dataset/DatasetStatistics';
+import { CampaignPanel, type CampaignDraft } from '../components/dataset/CampaignPanel';
+import { DatasetBlocksPanel } from '../components/dataset/DatasetBlocksPanel';
 import { ParticipantSelector } from '../components/dataset/ParticipantSelector';
 import { RecordingPanel } from '../components/dataset/RecordingPanel';
 import { SavedSamples } from '../components/dataset/SavedSamples';
@@ -12,6 +14,8 @@ import { LegacyCatalogReview, SignEditor, SignSelector } from '../components/dat
 import { DatasetStore } from '../features/sign-recognition/dataset/datasetStore';
 import { loadCountdownPreferences, saveCountdownPreference } from '../features/sign-recognition/dataset/countdownPreferences';
 import { downloadDataset, parseDatasetJSON } from '../features/sign-recognition/dataset/datasetExport';
+import { combineDatasetFiles, type ExportScope } from '../features/sign-recognition/dataset/datasetBlocks';
+import { campaignHandWarnings, campaignSlotsById, negativeSubtypes, recordedHands, type CampaignCapture, type CampaignSession } from '../features/sign-recognition/dataset/datasetCampaign';
 import { MAX_IMPORT_BYTES, isOperatorReviewed, type DatasetDocument, type DatasetSample, type DatasetSign, type DatasetSnapshot, type SampleReviewAction, type SampleSummary } from '../features/sign-recognition/dataset/datasetTypes';
 import './DatasetStudioPage.css';
 
@@ -25,6 +29,11 @@ export default function DatasetStudioPage() {
   const [signId, setSignId] = useState('LSP-001');
   const [countdowns, setCountdowns] = useState(loadCountdownPreferences);
   const [consentId, setConsentId] = useState('');
+  const [session, setSession] = useState<CampaignSession | ''>('');
+  const [draft, setDraft] = useState<CampaignDraft>();
+  const [exportSelection, setExportSelection] = useState<string[]>([]);
+  const [blockScope, setBlockScope] = useState('all');
+  const [verifiedBackup, setVerifiedBackup] = useState<DatasetDocument | null>(null);
   const [operation, setOperation] = useState(false);
   const [recordingLocked, setRecordingLocked] = useState(false);
   const [error, setError] = useState('');
@@ -59,7 +68,7 @@ export default function DatasetStudioPage() {
         const next = await store.snapshot();
         if (mounted.current) setSnapshot(next);
       }
-      if (mounted.current) setNotice(message);
+      if (mounted.current && message) setNotice(message);
       return true;
     } catch (error) { if (mounted.current) setError(error instanceof Error && error.name === 'QuotaExceededError' ? 'Se agotó el espacio del navegador. La operación se canceló sin guardar datos parciales. Descarga un respaldo y libera espacio.' : error instanceof Error ? error.message : 'No se pudo completar la operación local.'); return false; }
     finally { if (mounted.current) setOperation(false); }
@@ -68,8 +77,16 @@ export default function DatasetStudioPage() {
   function closeDetail() { detailRef.current?.close(); setEditingSign(null); setReviewing(null); }
   const locked = operation || recordingLocked;
   const participant = snapshot?.participants.find(person => person.id === participantId);
-  const sign = snapshot?.signs.find(item => item.id === signId);
-  const repetition = Math.max(0, ...(snapshot?.samples.filter(sample => sample.participantId === participantId && sample.labelId === signId).map(sample => sample.repetition) ?? [])) + 1;
+  const slot = session && draft ? campaignSlotsById.get(draft.slotId) : undefined;
+  const campaign: CampaignCapture | undefined = draft?.hand && slot ? { ...draft, hand: draft.hand } : undefined;
+  const selectedSign = snapshot?.signs.find(item => item.id === (session ? slot?.labelId : signId));
+  const sign = slot && selectedSign ? { ...selectedSign, durationMs: slot.durationMs, expectedHands: slot.hands } : selectedSign;
+  const participantSamples = snapshot?.samples.filter(sample => sample.participantId === participantId) ?? [];
+  const repetition = Math.max(0, ...participantSamples.filter(sample => sample.labelId === sign?.id).map(sample => sample.repetition)) + 1;
+
+  function selectParticipant(id: string) {
+    setParticipantId(id); setConsentId(''); setSession(''); setDraft(undefined);
+  }
 
   function reviewOne(sample: DatasetSample, action: SampleReviewAction) {
     void perform(async () => {
@@ -111,13 +128,13 @@ export default function DatasetStudioPage() {
   }
 
   function createParticipant() {
-    void perform(async () => { const person = await store.createParticipant(); setParticipantId(person.id); setConsentId(''); }, 'Participante creado. Confirma su consentimiento antes de activar la cámara.');
+    void perform(async () => { const person = await store.createParticipant(); selectParticipant(person.id); }, 'Participante creado. Confirma su consentimiento antes de activar la cámara.');
   }
   function deleteParticipant() {
     if (!participant) return;
     const id = participant.id;
     setConfirmation({ title: `Eliminar participante ${id}`, message: 'Se eliminarán este identificador y todas sus muestras y secuencias de este navegador. Los archivos JSON que hayas descargado se gestionan por separado.', actionLabel: 'Eliminar participante y muestras',
-      action: () => perform(async () => { await store.deleteParticipant(id); setParticipantId(''); setConsentId(''); }, 'Participante y muestras eliminados.') });
+      action: () => perform(async () => { await store.deleteParticipant(id); selectParticipant(''); }, 'Participante y muestras eliminados.') });
   }
   function deleteSample(sampleId: string) {
     setConfirmation({ title: 'Eliminar esta muestra', message: 'Se eliminarán sus puntos y metadatos del almacenamiento local. Esta acción no afecta otras repeticiones.', actionLabel: 'Eliminar muestra',
@@ -126,14 +143,36 @@ export default function DatasetStudioPage() {
   function exportFile(type: DatasetDocument['exportType']) {
     void perform(async () => { downloadDataset(await store.document(type)); }, type === 'backup' ? 'Respaldo JSON generado para descargar.' : 'Dataset JSON generado para descargar.');
   }
+  async function exportBlocks(scope: ExportScope, maxBytes: number) {
+    let files: Awaited<ReturnType<DatasetStore['blocks']>> | undefined;
+    await perform(async () => { files = await store.blocks(scope, maxBytes); }, 'Bloques preparados. Descarga todos los archivos del lote.', false);
+    return files;
+  }
+  function importBlocks(files: File[], action: 'verify' | 'backup' | 'merge') {
+    void perform(async () => {
+      const document = await combineDatasetFiles(files);
+      if (action === 'backup') {
+        setVerifiedBackup(null);
+        await store.verifyBackup(document);
+        setVerifiedBackup(document);
+        setNotice(`Respaldo comprobado contra el almacén local. ${document.samples.length} tomas.`);
+      } else if (action === 'merge') {
+        const result = await store.merge(document);
+        setNotice(`Combinación completa. ${result.added} nuevas y ${result.duplicates} idénticas omitidas.`);
+        setSnapshot(await store.snapshot());
+      } else setNotice(`Archivos válidos. ${document.samples.length} tomas únicas y ${document.participants.length} participantes. El almacenamiento local no cambió.`);
+    }, undefined, false);
+  }
   async function importFile(file: File | undefined) {
     if (!file) return;
     setOperation(true); setError(''); setNotice('');
     try {
-      if (file.size > MAX_IMPORT_BYTES) throw new Error('El archivo supera el límite de importación de 100 MB.');
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('El archivo supera el límite de importación de 100 MiB.');
       const document = parseDatasetJSON(await file.text());
-      if (mounted.current) setConfirmation({ title: 'Restaurar dataset validado', message: `${document.participants.length} participantes, ${document.signs.filter(sign => sign.validationStatus !== 'unconfigured').length} etiquetas configuradas y ${document.samples.length} muestras. Sustituirá por completo el dataset local actual. Exporta antes un respaldo si necesitas conservarlo.`, actionLabel: 'Sustituir dataset local',
-        action: () => perform(async () => { await store.replace(document); setParticipantId(''); setConsentId(''); setSignId('LSP-001'); setReviewTableVersion(previous => previous + 1); setReviewNotice(''); }, 'Dataset restaurado. Las etiquetas anteriores se conservan; se incorporó el catálogo LSP sin reetiquetar muestras. Confirma el consentimiento de cada persona antes de continuar recopilando.') });
+      setAcknowledged(false);
+      if (mounted.current) setConfirmation({ title: 'Restaurar dataset validado', message: `${document.participants.length} participantes, ${document.signs.filter(sign => sign.validationStatus !== 'unconfigured').length} etiquetas configuradas y ${document.samples.length} muestras. Sustituirá por completo el dataset local actual.`, actionLabel: 'Sustituir dataset local',
+        acknowledgement: snapshot?.participants.length ? 'Confirmo que quiero sustituir el almacén local tras comprobar su respaldo en Bloques verificables.' : undefined,
+        action: () => perform(async () => { await store.replace(document, verifiedBackup); selectParticipant(''); setSignId('LSP-001'); setExportSelection([]); setBlockScope('all'); setVerifiedBackup(null); setReviewTableVersion(previous => previous + 1); setReviewNotice(''); }, 'Dataset restaurado. Las etiquetas anteriores se conservan; se incorporó el catálogo LSP sin reetiquetar muestras. Confirma el consentimiento de cada persona antes de continuar recopilando.') });
     } catch (error) { if (mounted.current) setError(error instanceof Error ? error.message : 'No se pudo validar el archivo.'); }
     finally { if (mounted.current) setOperation(false); if (fileRef.current) fileRef.current.value = ''; }
   }
@@ -146,12 +185,16 @@ export default function DatasetStudioPage() {
       {!snapshot ? <section className="dataset-panel dataset-loading"><LockKeyhole size={27} aria-hidden="true" /><p>{error ? 'No se habilitará la recopilación hasta poder abrir el almacenamiento local.' : 'Abriendo el dataset local…'}</p>{error && <button className="button button-outline" type="button" onClick={() => void perform(async () => {})}>Reintentar almacenamiento</button>}</section> : <>
         <DatasetStatistics snapshot={snapshot} />
         <LegacyCatalogReview signs={snapshot.signs} samples={snapshot.samples} />
-        <div className="dataset-workspace"><aside className="dataset-setup"><ParticipantSelector key={participantId} snapshot={snapshot} selectedId={participantId} sessionConsent={consentId === participantId && !!participantId} disabled={locked}
-          onSelect={id => { setParticipantId(id); setConsentId(''); }} onCreate={createParticipant} onDelete={deleteParticipant}
+        <div className="dataset-workspace"><aside className="dataset-setup"><ParticipantSelector key={`${participantId}/${session}`} snapshot={snapshot} selectedId={participantId} sessionConsent={consentId === participantId && !!participantId} disabled={locked}
+          onSelect={selectParticipant} onCreate={createParticipant} onDelete={deleteParticipant}
           onConsent={() => { void perform(async () => { await store.consentParticipant(participantId); setConsentId(participantId); }, 'Consentimiento registrado para esta sesión.'); }} />
-          <SignSelector signs={snapshot.signs} selectedId={signId} disabled={locked} onSelect={setSignId} onEdit={() => { if (sign) setEditingSign(sign); }} />
+          {participant && <CampaignPanel participant={participant} samples={participantSamples} session={session} draft={draft} disabled={locked}
+            onPartition={partition => { void perform(() => store.setParticipantPartition(participantId, partition), 'Partición asignada.'); }}
+            onSession={next => { setSession(next); setDraft(undefined); setConsentId(''); }} onDraft={setDraft} />}
+          {!session && <SignSelector signs={snapshot.signs} selectedId={signId} disabled={locked} onSelect={setSignId} onEdit={() => { if (sign) setEditingSign(sign); }} />}
           <div className="dataset-local-note"><FileJson size={21} aria-hidden="true" /><p>Diez señas LSP pendientes de revisión lingüística, con duración individual. Los ejemplos negativos pertenecen a una categoría técnica independiente. Cada repetición conserva su secuencia temporal.</p></div>
-        </aside>{sign && <RecordingPanel key={`${participantId}/${signId}/${consentId}`} participant={participant} sign={sign} sessionConsent={!!participantId && consentId === participantId} repetition={repetition} disabled={operation} onLocked={setRecordingLocked}
+        </aside>{sign && (!session || campaign) && <RecordingPanel key={`${participantId}/${session || signId}/${consentId}`} participant={participant} sign={sign} campaign={campaign}
+          sessionConsent={!!participantId && consentId === participantId} repetition={repetition} disabled={operation} onLocked={setRecordingLocked}
           campaignCount={snapshot.samples.filter(sample => sample.labelId === signId && sample.captureMetadata.collectionProtocol === 'hito-4.3').length}
           countdownSeconds={countdowns[sign.expectedHands]} onCountdownChange={seconds => {
             saveCountdownPreference(sign.expectedHands, seconds);
@@ -160,7 +203,11 @@ export default function DatasetStudioPage() {
           onSave={sample => perform(async () => { await store.saveSample(sample); }, 'Muestra guardada como pendiente de revisión.')} />}</div>
 
         <SavedSamples key={reviewTableVersion} snapshot={snapshot} locked={locked} notice={reviewNotice} onDelete={deleteSample}
-          onReview={id => { void perform(async () => { setReviewing(await store.getSample(id)); }); }} onBulkAction={confirmBulkReview} />
+          onReview={id => { void perform(async () => { setReviewing(await store.getSample(id)); }); }} onBulkAction={confirmBulkReview}
+          onExportSelection={ids => { setExportSelection(ids); setBlockScope('selected'); document.getElementById('dataset-blocks-title')?.focus(); }} />
+
+        <DatasetBlocksPanel key={reviewTableVersion} participants={snapshot.participants} selectedIds={exportSelection} scope={blockScope}
+          disabled={locked} onScopeChange={setBlockScope} onExport={exportBlocks} onImport={importBlocks} />
 
         <section className="dataset-panel dataset-export" aria-labelledby="dataset-export-title"><div><span className="dataset-eyebrow">05 / EXPORTACIÓN Y RESPALDO</span><h2 id="dataset-export-title">Tus secuencias, listas para el siguiente paso</h2><p>JSON con secuencias, lateralidad, coordenadas, consentimiento, calidad y configuración de captura. Incluye todos los estados de revisión; la revisión lingüística sigue siendo independiente.</p><span className="dataset-id">{snapshot.meta.datasetId}</span></div><div className="dataset-export-actions"><button type="button" className="button button-primary" disabled={locked} onClick={() => exportFile('dataset')}><Download size={18} /> Exportar dataset JSON</button><button type="button" className="button button-outline" disabled={locked} onClick={() => exportFile('backup')}><FileJson size={18} /> Descargar respaldo</button><button type="button" className="button button-outline" disabled={locked} onClick={() => fileRef.current?.click()}><Upload size={18} /> Importar / restaurar JSON</button><input ref={fileRef} className="sr-only" type="file" accept="application/json,.json" disabled={locked} onChange={event => { void importFile(event.target.files?.[0]); }} /></div></section>
       </>}
@@ -173,6 +220,26 @@ export default function DatasetStudioPage() {
           <div><span className="dataset-eyebrow">{reviewing.participantId} · REPETICIÓN {reviewing.repetition}</span><h2>{reviewing.captureMetadata.labelSnapshot.name}</h2><p className="dataset-muted">{reviewing.sampleId}</p></div>
           <button className="dataset-icon-button" type="button" aria-label="Cerrar revisión" autoFocus onClick={closeDetail}><X size={21} /></button>
         </div>
+        {reviewing.captureMetadata.campaign && <div className="dataset-local-note">
+          <p>Sesión {reviewing.captureMetadata.campaign.session} · {recordedHands[reviewing.captureMetadata.campaign.hand]}
+            {reviewing.captureMetadata.campaign.negativeSubtype && ` · ${negativeSubtypes[reviewing.captureMetadata.campaign.negativeSubtype]}`}</p>
+          {campaignHandWarnings(reviewing).map(warning => <p key={warning}>{warning}</p>)}
+        </div>}
+        {reviewing.captureMetadata.campaign && <form key={reviewing.sampleId} className="dataset-campaign-notes" onSubmit={event => {
+          event.preventDefault();
+          const notes = String(new FormData(event.currentTarget).get('notes') ?? '');
+          const sampleId = reviewing.sampleId;
+          void perform(async () => {
+            await store.annotateCampaign(sampleId, notes);
+            setReviewing(await store.getSample(sampleId));
+          }, 'Anotación guardada.');
+        }}>
+          <label className="dataset-field">Anotación del movimiento
+            <textarea name="notes" rows={2} maxLength={500} disabled={operation} defaultValue={reviewing.captureMetadata.campaign.notes}
+              placeholder="Describe el gesto observado sin datos personales" />
+          </label>
+          <button className="button button-outline" type="submit" disabled={operation}>Guardar anotación</button>
+        </form>}
         <SampleQuality sample={reviewing} /><SampleFrames key={reviewing.sampleId} sample={reviewing} />
         <div className="dataset-actions">
           <button className="button button-primary" type="button" disabled={operation} onClick={() => reviewOne(reviewing, isOperatorReviewed(reviewing) ? 'unmark' : 'mark')}>

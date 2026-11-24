@@ -270,16 +270,20 @@ export async function checkFairJourneys({ send, evaluate, requests }, origin, un
       await until(path, () => evaluate(`location.pathname === ${JSON.stringify(path)}`));
       await exists('.situation-options');
       assert.equal(await evaluate('!!document.querySelector(".situation-story .situation-illustration img")'),
-        !(situation.illustrationAfterAnswer || scene.illustrationAfterAnswer));
+        !(scene.dialogue || situation.illustrationAfterAnswer || scene.illustrationAfterAnswer));
       await select('.situation-options input', scene.expectedSignId);
-      await click('.situation-question button', 'Comprobar alternativa');
-      await exists('.situation-answer-feedback.is-correct');
-      const asset = await evaluate('document.querySelector(".situation-scene-page .situation-illustration img")?.getAttribute("src")');
-      assert.equal(asset, '/' + situation.illustrationSrc.src);
+      if (!scene.dialogue) {
+        await click('.situation-question button', 'Comprobar alternativa');
+        await exists('.situation-answer-feedback.is-correct');
+      } else {
+        assert.equal(await evaluate('!!document.querySelector(".situation-context-art,.situation-attempt-feedback")'), false);
+      }
       await click('.situation-question-actions button', 'Hacer ejercicio sin cámara');
       const exercise = getSituationExercise(scene, getEducationalSign(scene.expectedSignId));
       await select('.situation-alternative input', exercise.correctId);
       await click('.situation-alternative button', 'Comprobar ejercicio sin cámara');
+      const asset = await evaluate('document.querySelector(".situation-scene-page .situation-illustration img")?.getAttribute("src")');
+      assert.equal(asset, '/' + situation.illustrationSrc.src);
       await click('.situation-navigation :is(a,button)', index + 1 === situation.scenes.length ? 'Finalizar situación' : 'Continuar a la siguiente interacción');
     }
     await exists('.situation-results-panel');

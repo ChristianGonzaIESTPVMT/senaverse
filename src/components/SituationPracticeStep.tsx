@@ -8,5 +8,5 @@ export function SituationPracticeStep({ sign, scene, situationId, filter, practi
   practice?: SituationPractice; onComplete: (input: SituationPractice) => void;
 }) {
   return <GuidedSignPractice key={sign.id} sign={sign} exercise={getSituationExercise(scene, sign)} titleId="situation-practice-title"
-    returnState={{ situationReturn: { situationId, sceneId: scene.id, filter } }} practice={practice} onComplete={onComplete} />;
+    returnState={{ situationReturn: { situationId, sceneId: scene.id, filter } }} practice={practice} onComplete={onComplete} cameraDisabled />;
 }

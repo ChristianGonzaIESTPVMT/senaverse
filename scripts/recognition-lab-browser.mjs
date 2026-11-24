@@ -16,6 +16,7 @@ import { checkStudentOverview } from './fixtures/student-overview-browser.mjs';
 import { checkCurriculum } from './fixtures/curriculum-browser.mjs';
 import { checkMedia, mediaFixturePlugin } from './fixtures/media-browser.mjs';
 import { checkFairAudit, checkFairJourneys } from './fixtures/fair-audit-browser.mjs';
+import { checkDatasetCampaign } from './fixtures/dataset-campaign-browser.mjs';
 
 const executable = process.argv[2];
 if (!executable) throw new Error('Indica la ruta de un navegador Chromium local.');
@@ -23,7 +24,7 @@ const mode = process.argv[3] ?? 'lab';
 assert.ok(['lab', 'student-development', 'student-production', 'lesson-development', 'lesson-production',
   'library-development', 'library-production', 'situation-development', 'situation-production',
   'minigames-development', 'minigames-production', 'progress-development', 'progress-production',
-  'curriculum-development', 'curriculum-production', 'media-development', 'media-production', 'audit-production', 'audit-functional'].includes(mode));
+  'curriculum-development', 'curriculum-production', 'media-development', 'media-production', 'audit-production', 'audit-functional', 'dataset-development'].includes(mode));
 const datasetPath = process.argv[4];
 const externalOrigin = process.env.SENAVERSE_FERIA_ORIGEN;
 const productionMode = mode.endsWith('-production') || mode === 'audit-functional';
@@ -336,7 +337,9 @@ try {
       terminate() { this.ended = true; super.terminate(); }
     };
   ` });
-  if (mode === 'audit-functional') {
+  if (mode === 'dataset-development') {
+    await checkDatasetCampaign({ send, evaluate }, origin, until);
+  } else if (mode === 'audit-functional') {
     await checkFairJourneys({ send, evaluate, requests }, origin, until);
   } else if (mode === 'audit-production') {
     await checkFairAudit({ send, evaluate, requests, errors, failedResponses }, origin, until, process.argv[4]);
@@ -349,7 +352,7 @@ try {
   } else if (mode.startsWith('minigames-')) {
     await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('situation-')) {
-    await checkSituations({ send, evaluate, requests }, origin, until, datasetPath);
+    await checkSituations({ send, evaluate, requests }, origin, until, datasetPath, process.argv[5]);
   } else if (mode.startsWith('library-')) {
     await checkLibrary({ send, evaluate, requests }, origin, until);
   } else if (mode.startsWith('lesson-')) {
