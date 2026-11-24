@@ -1,25 +1,25 @@
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3, House, Layers3, Play, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Layers3, Play } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
-import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units, type Unit } from '../data/curriculum';
+import { Illustration } from '../components/Illustration';
+import { functionalLessons, getCurriculumProgress, getLessonLocation, getLessonPath, getUnitPath, units } from '../data/curriculum';
 import { useStudentProgress } from '../hooks/progressContext';
 import type { LearningActivity } from '../hooks/useLearningActivity';
 import './AcademyPage.css';
 
 type AcademyProps = { completed: string[]; activity: LearningActivity };
 
-function UnitIllustration({ unit }: { unit: Unit }) {
+type CurriculumUnit = typeof units[number];
+
+function UnitIllustration({ unit }: { unit: CurriculumUnit }) {
   return (
-    <div className={`learning-unit-art learning-unit-art-${unit.illustration}`} aria-hidden="true">
-      {unit.illustration === 'greetings' && <HomeVisual name="welcome" />}
-      {unit.illustration === 'numbers' && <span className="learning-alphabet"><span>1</span><span>2</span><span>3</span></span>}
-      {unit.illustration === 'everyday' && <span className="learning-family"><House className="learning-family-house" strokeWidth={1.8} /><UsersRound className="learning-family-people" strokeWidth={1.8} /></span>}
-      {unit.illustration === 'review' && <span className="learning-review"><ClipboardCheck size={72} strokeWidth={1.8} /></span>}
+    <div className="learning-unit-art" aria-hidden="true">
+      <Illustration asset={unit.cover} />
     </div>
   );
 }
 
-function UnitLessons({ unit, completed }: AcademyProps & { unit: Unit }) {
+function UnitLessons({ unit, completed }: AcademyProps & { unit: CurriculumUnit }) {
   const { progress } = useStudentProgress();
   const unitProgress = getCurriculumProgress(progress).unitProgress.find(item => item.unit.id === unit.id);
 

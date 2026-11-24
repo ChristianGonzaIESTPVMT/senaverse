@@ -1,6 +1,7 @@
 import { ArrowLeft, Hash, LibraryBig, MessagesSquare, School, Store, UserRound, Utensils } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getSituationPath, getSituationsPath, type Situation, type SituationFilter } from '../data/situations';
+import { Illustration } from './Illustration';
 
 const sceneryIcons = { institute: School, meeting: MessagesSquare, shop: Store, library: LibraryBig, food: Utensils, numbers: Hash };
 
@@ -9,7 +10,7 @@ export function SituationIllustration({ situation }: { situation: Situation }) {
 
   return (
     <div className="situation-illustration" data-setting={situation.illustration} aria-hidden="true">
-      {situation.illustrationSrc ? <img src={situation.illustrationSrc} alt="" loading="lazy" decoding="async" /> : <>
+      {situation.illustrationSrc ? <Illustration asset={situation.illustrationSrc} /> : <>
         <span className="situation-art-cloud" />
         <Icon className="situation-art-setting" strokeWidth={1.5} />
         <span className="situation-art-person situation-art-person-left"><UserRound strokeWidth={1.4} /></span>

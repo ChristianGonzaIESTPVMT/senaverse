@@ -14,13 +14,25 @@ import './ProgressPage.css';
 
 const dayLabel = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeZone: STUDENT_TIME_ZONE });
 const unitIcons = { greetings: Hand, alphabet: Hash, numbers: Hash, everyday: UsersRound, review: ClipboardCheck };
+const achievementIcons: Record<string, typeof Award> = {
+  'first-step': GraduationCap,
+  explorer: Star,
+  consistency: Layers,
+  numbers: Hash,
+  'first-practice': Hand,
+  communicator: UsersRound,
+  play: Gamepad2,
+  streak: CalendarDays,
+  'reference-explorer': BookOpen,
+  learner: Zap,
+};
 
 function ProgressGlyph() {
   return <span className="progress-glyph" aria-hidden="true"><i /><i /><i /></span>;
 }
 
 function AchievementCard({ achievement, detailed = false }: { achievement: StudentAchievement; detailed?: boolean }) {
-  const Icon = achievement.id === 'first-step' ? GraduationCap : achievement.id === 'explorer' ? Star : achievement.obtained ? Award : LockKeyhole;
+  const Icon = achievementIcons[achievement.id] ?? Award;
   return (
     <article className={`progress-achievement progress-achievement-${achievement.id}${achievement.obtained ? ' is-obtained' : ' is-locked'}`} title={achievement.description}>
       <div className="progress-badge-art" aria-hidden="true"><Award className="progress-badge-rays" /><span><Icon strokeWidth={1.8} /></span></div>

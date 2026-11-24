@@ -21,12 +21,24 @@ const buildRequired = [
 const buildExtras = new Set(['fonts/OFL-Nunito.txt', 'models/README.md']);
 const generatedAsset = /^assets\/[A-Za-z0-9][A-Za-z0-9_.-]*-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
 const educationalMedia = /^media\/signs\/lsp-0(?:0[1-9]|10)-[a-z]+\.(?:jpeg|mp4)$/;
+const illustrationDirectory = 'images/illustrations';
+const illustrationGroups = {
+  aprender: ['unidad-01-primeros-pasos', 'unidad-02-numeros', 'unidad-03-saludos', 'unidad-04-expresiones', 'unidad-05-entorno', 'unidad-06-evaluacion'],
+  situaciones: ['situacion-01-tienda', 'situacion-02-comida', 'situacion-03-preguntas', 'situacion-04-actividad', 'situacion-05-utiles', 'situacion-06-cantidad'],
+  minijuegos: ['juego-01-memoria', 'juego-02-adivina', 'juego-03-contrarreloj', 'juego-04-desafio-senas', 'juego-05-relaciona'],
+  cabeceras: ['cabecera-presentacion', 'cabecera-ruta-aprendizaje', 'cabecera-centro-practica'],
+  recursos: ['recurso-comunicacion-visual'],
+};
+const educationalIllustrations = new Set(Object.entries(illustrationGroups).flatMap(([group, files]) =>
+  files.map(file => `${illustrationDirectory}/${group}/${file}.webp`)));
+const buildDirectories = new Set(['assets', 'images', 'fonts', 'models', 'mediapipe', 'mediapipe/wasm', 'media', 'media/signs',
+  illustrationDirectory, ...Object.keys(illustrationGroups).map(group => `${illustrationDirectory}/${group}`)]);
 const publicView = new Set(['', 'panel', 'presentacion', 'academia', 'biblioteca', 'camara', 'simulador', 'minijuegos', 'progreso', 'perfil', 'leccion']);
 const contentTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.wasm': 'application/wasm', '.task': 'application/octet-stream',
   '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
-  '.jpeg': 'image/jpeg', '.mp4': 'video/mp4',
+  '.jpeg': 'image/jpeg', '.mp4': 'video/mp4', '.webp': 'image/webp',
 };
 
 export function sha256(content) {
@@ -39,10 +51,11 @@ async function enumerateBuild(directory, relative = '') {
     const name = relative + entry.name;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      if (!['assets', 'images', 'fonts', 'models', 'mediapipe', 'mediapipe/wasm', 'media', 'media/signs'].includes(name)) throw new Error(`Carpeta no esperada en dist: ${name}.`);
+      if (!buildDirectories.has(name)) throw new Error(`Carpeta no esperada en dist: ${name}.`);
       for (const [key, file] of await enumerateBuild(path, `${name}/`)) files.set(key, file);
     } else {
-      if (!entry.isFile() || !(buildRequired.includes(name) || buildExtras.has(name) || generatedAsset.test(name) || educationalMedia.test(name))) {
+      if (!entry.isFile() || !(buildRequired.includes(name) || buildExtras.has(name) || generatedAsset.test(name)
+        || educationalMedia.test(name) || educationalIllustrations.has(name))) {
         throw new Error(`Archivo no esperado en dist: ${name}. Genera un build limpio o recupera el paquete verificado.`);
       }
       const metadata = await lstat(path);

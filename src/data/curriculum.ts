@@ -2,6 +2,7 @@ import type { LessonPlan } from './lessonPlan.ts';
 import type { StudyRun } from './lessonStudy.ts';
 import { numbersLesson } from './numbersLesson.ts';
 import { basicLessons } from './basicLessons.ts';
+import { localIllustration, type IllustrationAsset } from './illustrations.ts';
 
 type ActivityOption = { id: string; label: string };
 type ActivityBase = { question: string; success: string; explanation?: string; diagramId?: string };
@@ -26,6 +27,7 @@ export type Lesson = {
   description: string;
 } & ({ content: LegacyLessonContent; plan?: never } | { plan: LessonPlan; content?: never });
 export type Unit = { id: number; title: string; subtitle: string; illustration: 'greetings' | 'alphabet' | 'numbers' | 'everyday' | 'review'; lessons: Lesson[] };
+type CurriculumUnit = Unit & { cover: IllustrationAsset };
 
 const previousUnits: Unit[] = [
   {
@@ -274,18 +276,24 @@ function lessons(...ids: string[]): Lesson[] {
   });
 }
 
-export const units: Unit[] = [
+export const units: CurriculumUnit[] = [
   { id: 1, title: 'Primeros pasos', subtitle: 'Conoce la LSP y practica la atención visual.', illustration: 'greetings',
+    cover: localIllustration('aprender/unidad-01-primeros-pasos', 1200, 600),
     lessons: lessons('introduccion', 'comunicacion-visual', 'repaso-basico', 'evaluacion-inicial') },
   { id: 2, title: 'Números básicos', subtitle: 'Identifica cantidades y estudia los números del cero al diez.', illustration: 'numbers',
+    cover: localIllustration('aprender/unidad-02-numeros', 1200, 600),
     lessons: lessons('numeros', 'cero', 'seis-a-diez', 'abecedario', 'dactilologia', 'repaso-alfabeto') },
   { id: 3, title: 'Saludos y cortesía', subtitle: 'Elige un saludo según el momento y practica cómo pedir disculpas.', illustration: 'greetings',
+    cover: localIllustration('aprender/unidad-03-saludos', 1200, 600),
     lessons: lessons('saludos', 'cortesia') },
   { id: 4, title: 'Expresiones cotidianas', subtitle: 'Practica respuestas, cantidades y compañía.', illustration: 'everyday',
+    cover: localIllustration('aprender/unidad-04-expresiones', 1200, 600),
     lessons: lessons('expresiones', 'elecciones-y-compania') },
   { id: 5, title: 'Personas, familia y entorno', subtitle: 'Identifica vínculos familiares y lugares frecuentes.', illustration: 'everyday',
+    cover: localIllustration('aprender/unidad-05-entorno', 1200, 600),
     lessons: lessons('familia', 'comunidad', 'presentaciones', 'alimentos') },
   { id: 6, title: 'Aplicación y evaluación', subtitle: 'Usa el vocabulario estudiado en situaciones cotidianas.', illustration: 'review',
+    cover: localIllustration('aprender/unidad-06-evaluacion', 1200, 600),
     lessons: lessons('repaso-cotidiano') },
 ];
 

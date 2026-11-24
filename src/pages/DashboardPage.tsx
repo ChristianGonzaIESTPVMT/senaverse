@@ -1,9 +1,11 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeVisual } from '../components/HomeVisual';
+import { Illustration } from '../components/Illustration';
 import { StudentActivityList } from '../components/StudentActivityList';
 import { StudentLevel } from '../components/StudentLevel';
 import type { HomeVisualName } from '../data/homeVisuals';
+import { headerIllustrations } from '../data/illustrations';
 import { useStudentOverview } from '../hooks/useStudentOverview';
 
 const exploreItems: { title: string; description: string; action: string; to: string; visual: HomeVisualName }[] = [
@@ -41,9 +43,7 @@ export function DashboardPage() {
           </Link>
         </div>
         <div className="home-banner-art" aria-hidden="true">
-          <span className="home-banner-rays"><i /><i /><i /></span>
-          <HomeVisual name="hero" />
-          <span className="home-banner-shadow" />
+          <Illustration asset={headerIllustrations.learningRoute} priority />
         </div>
         <svg className="home-banner-wave" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true">
           <path d="M0 180C105 105 156 53 270 85S430 46 479 20 561 4 600 0v180Z" fill="currentColor" />

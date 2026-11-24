@@ -14,13 +14,9 @@
 .camera-center-heading-copy { min-width: 0; }
 .camera-center-heading h1 { margin: 0 0 9px; font-size: clamp(30px, 2.8vw, 47px); line-height: 1.13; font-weight: 950; letter-spacing: -1.4px; }
 .camera-center-heading p { margin: 0; color: var(--muted); font-size: clamp(16px, 1.35vw, 21px); line-height: 1.45; }
+.camera-center-illustration { position: absolute; top: 8px; right: 4px; width: 176px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 17px; background: var(--color-surface); }
+.camera-center-illustration > img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
-.camera-center-illustration { position: absolute; right: 4px; top: 6px; display: grid; place-items: center; width: 184px; height: 135px; color: #784ee0; }
-.camera-center-illustration::before { content: ''; position: absolute; inset: 0 -7px -3px -15px; border-radius: 43% 57% 24% 48% / 50% 61% 35% 42%; background: #eae1fc; transform: rotate(-7deg); }
-.camera-illustration-screen { position: relative; width: 145px; height: 98px; overflow: hidden; border: 5px solid #8659e5; border-radius: 9px 9px 2px 2px; background: #fcfaff; box-shadow: inset 0 0 0 3px #eee7fc; }
-.camera-illustration-person { position: absolute; bottom: -9px; right: 18px; width: 77px; height: 88px; stroke-width: 1.4; fill: #b59aef; }
-.camera-illustration-hand { position: absolute; left: 17px; top: 28px; width: 39px; height: 43px; fill: #fff; stroke-width: 1.5; transform: rotate(-15deg); }
-.camera-illustration-base { position: absolute; left: 9px; bottom: 14px; width: 167px; height: 9px; border: 2px solid #784ee0; border-radius: 2px 2px 8px 8px; background: #cdb9f5; }
 
 .camera-center-banner { display: flex; align-items: center; gap: 18px; min-height: 62px; margin: 0 0 25px; padding: 12px 23px; border-radius: 20px; background: linear-gradient(110deg, light-dark(#eee6fc, var(--color-surface)), light-dark(#f1ebfd, var(--color-surface))); color: var(--violet-dark); }
 .camera-center-banner > span { display: grid; place-items: center; padding-right: 18px; border-right: 1px solid light-dark(#c6a9f2, var(--color-line)); color: light-dark(#7c3ee4, var(--color-primary)); }
@@ -145,7 +141,7 @@
   .camera-center-heading { padding-right: 165px; gap: 16px; }
   .camera-center-icon { flex-basis: 72px; height: 72px; border-radius: 21px; }
   .camera-center-icon svg { width: 52px; height: 52px; }
-  .camera-center-illustration { right: -5px; transform: scale(.8); transform-origin: right center; }
+  .camera-center-illustration { right: 0; width: 142px; }
   .camera-center-grid { grid-template-columns: minmax(0, 1.8fr) minmax(250px, 1fr); gap: 16px; }
   .camera-modes { gap: 14px; }
   .camera-mode-card { padding: 19px 17px 21px; }
@@ -168,13 +164,13 @@
 }
 
 @media (max-width: 700px) {
-  .camera-center-heading { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 13px 15px; min-height: 0; padding: 10px 0 24px; }
+  .camera-center-heading { display: grid; grid-template-columns: 65px minmax(0, 1fr) clamp(56px, 16vw, 91px); gap: 13px 15px; min-height: 0; padding: 10px 0 24px; }
   .camera-center-icon { width: 65px; height: 65px; border-radius: 19px; }
   .camera-center-icon svg { width: 47px; height: 47px; }
   .camera-center-heading-copy { display: contents; }
   .camera-center-heading h1 { align-self: center; margin: 0; font-size: 32px; letter-spacing: -.9px; }
   .camera-center-heading p { grid-column: 1 / -1; font-size: 16px; }
-  .camera-center-illustration { display: none; }
+  .camera-center-illustration { position: static; grid-column: 3; grid-row: 1; width: 100%; align-self: center; border-radius: 10px; }
   .camera-center-banner { gap: 13px; margin-bottom: 20px; padding: 13px 17px; border-radius: 16px; }
   .camera-center-banner > span { padding-right: 13px; }
   .camera-center-banner p { font-size: 16px; }

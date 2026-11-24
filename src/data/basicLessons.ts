@@ -1,6 +1,7 @@
 import type { Lesson } from './curriculum.ts';
+import { localIllustration } from './illustrations.ts';
 import { getEducationalSign, guideReference, numbersReference } from './library.ts';
-import type { LessonReference, Question, StudyStep } from './lessonPlan.ts';
+import type { LessonIllustration, LessonReference, Question, StudyStep } from './lessonPlan.ts';
 
 function choices(labels: string[]) {
   return labels.map((label, index) => ({ id: String(index), label }));
@@ -28,8 +29,8 @@ function lesson(id: string, title: string, duration: string, description: string
   } };
 }
 
-function reading(title: string, paragraphs: string[], references?: LessonReference[]): StudyStep {
-  return { id: 'lectura', kind: 'reading', title, paragraphs, references };
+function reading(title: string, paragraphs: string[], references?: LessonReference[], illustration?: LessonIllustration): StudyStep {
+  return { id: 'lectura', kind: 'reading', title, paragraphs, references, illustration };
 }
 
 function study(title: string, text: string, ids: string[]): StudyStep {
@@ -94,7 +95,10 @@ export const basicLessons = [
       reading('Prepara el espacio', [
         'Ubícate frente a tu compañera o compañero de práctica en un lugar con buena iluminación. Espera a que haya atención visual para empezar.',
         'Mira una primera vez la demostración completa. Después vuelve a observar el lugar de inicio, el recorrido de las manos y la expresión que acompaña al movimiento. Ensaya despacio con el material a la vista.',
-      ], [guideReference(14), guideReference(16)]),
+      ], [guideReference(14), guideReference(16)], {
+        ...localIllustration('recursos/recurso-comunicacion-visual', 960, 720),
+        alt: 'Personas frente a frente en un espacio iluminado, con el rostro, el torso y las manos a la vista',
+      }),
       exercise('Organiza la práctica', order('secuencia', '¿En qué orden harías esta práctica por parejas?',
         ['Ensayar la demostración', 'Comprobar que hay atención visual', 'Observar la demostración completa'], [1, 2, 0],
         'Asegura la atención visual, observa la demostración y luego ensaya.')),

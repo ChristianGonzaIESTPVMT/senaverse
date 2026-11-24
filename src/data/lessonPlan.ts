@@ -1,13 +1,15 @@
 import type { LessonActivity } from './curriculum.ts';
+import type { IllustrationAsset } from './illustrations.ts';
 
 export type LessonReference = { title: string; url: string };
+export type LessonIllustration = IllustrationAsset & { alt: string };
 export type Question = { id: string; activity: LessonActivity };
 export type Answers = Record<string, Record<string, string>>;
 
 type Step = { id: string; title: string };
 export type StudyStep = Step & (
   | { kind: 'intro'; text: string }
-  | { kind: 'reading'; paragraphs: string[]; references?: LessonReference[] }
+  | { kind: 'reading'; paragraphs: string[]; references?: LessonReference[]; illustration?: LessonIllustration }
   | { kind: 'study'; text: string; signs: ({ id: string } & ({ name: string; explanation: string } | { name?: never; explanation?: never }))[]; reference?: LessonReference }
   | { kind: 'question' | 'assessment'; questions: Question[] }
   | { kind: 'practice'; targetId: string; instruction: string; reference: LessonReference; alternative: Question[]; notice?: string }

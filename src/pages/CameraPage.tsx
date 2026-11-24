@@ -1,6 +1,8 @@
-import { ArrowRight, Camera, Hand, UserRound } from 'lucide-react';
+import { ArrowRight, Camera } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { RecognitionPractice } from '../components/RecognitionPractice';
+import { Illustration } from '../components/Illustration';
+import { headerIllustrations } from '../data/illustrations';
 
 export function CameraPage() {
   const [params] = useSearchParams();
@@ -13,10 +15,7 @@ export function CameraPage() {
         <p>Practica señas con tu cámara en modo libre o elige una seña como objetivo.</p>
       </div>
       <div className="camera-center-illustration" aria-hidden="true">
-        <div className="camera-illustration-screen">
-          <UserRound className="camera-illustration-person" /><Hand className="camera-illustration-hand" />
-        </div>
-        <span className="camera-illustration-base" />
+        <Illustration asset={headerIllustrations.practice} />
       </div>
     </header>
     <RecognitionPractice key={sign} initialSign={sign} />

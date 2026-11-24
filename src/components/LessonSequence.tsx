@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { Illustration } from './Illustration';
 import { LessonAnswerFields } from './LessonActivity';
 import { MediaSourceLink, SignMediaViewer } from './SignMediaViewer';
 import { gradeAnswers, type Answers, type LessonPlan, type Question, type StudyStep } from '../data/lessonPlan';
@@ -164,6 +165,9 @@ export function LessonSequence({ lessonId, plan, unitPath, nextPath }: {
           <p>Tu finalización anterior sigue registrada. Puedes recorrer esta versión de la lección.</p>}</>}
       {step?.kind === 'reading' && <div className="lesson-sequence-stack">
         {step.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
+        {step.illustration && <figure className="lesson-reading-illustration">
+          <Illustration asset={step.illustration} alt={step.illustration.alt} />
+        </figure>}
         {step.references?.map(reference => <MediaSourceLink key={reference.url} reference={reference} />)}
       </div>}
       {step?.kind === 'study' && <>

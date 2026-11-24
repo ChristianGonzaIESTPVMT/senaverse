@@ -1,19 +1,26 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { units } from '../../src/data/curriculum.ts';
+import { headerIllustrations } from '../../src/data/illustrations.ts';
 import { getEducationalSign } from '../../src/data/library.ts';
+import { minigames } from '../../src/data/minigames.ts';
 import { getSituationExercise } from '../../src/data/situationStudy.ts';
 import { getSituationPath, getSituationScenePath, situations } from '../../src/data/situations.ts';
 
-const dimensions = [[360, 800], [390, 844], [768, 1024], [1024, 768], [1366, 768], [1920, 1080]];
+const dimensions = [[320, 720], [360, 800], [390, 844], [768, 1024], [1024, 768], [1366, 768], [1920, 1080]];
+const reading = units[0].lessons.find(lesson => lesson.id === 'comunicacion-visual')
+  .plan.steps.find(step => step.kind === 'reading');
 const pages = [
   ['inicio', '/', '.home-dashboard'],
   ['aprender', '/academia', '.learning-page'],
   ['unidad', '/academia/unidad/2', '.learning-unit-page'],
   ['leccion', '/academia/unidad/2/leccion/numeros', '#study-step-title'],
+  ['lectura', '/academia/unidad/1/leccion/comunicacion-visual', '#study-step-title'],
   ['biblioteca', '/biblioteca', '.library-page'],
   ['ficha', '/biblioteca?sena=LSP-001', '.library-dialog[open]'],
-  ['camara', '/camara/libre?sena=LSP-001', '.practice-workspace'],
+  ['camara', '/camara?sena=LSP-001', '.camera-center .practice-workspace'],
+  ['practica-libre', '/camara/libre?sena=LSP-001', '.practice-page .practice-workspace'],
   ['situaciones', '/simulador', '.situations-page'],
   ['escena', '/simulador/tienda', '.situation-scene-page'],
   ['minijuegos', '/minijuegos', '.minigames-page'],
@@ -22,8 +29,19 @@ const pages = [
   ['perfil', '/perfil', '.profile-page'],
   ['presentacion', '/presentacion', '.landing'],
 ];
+const covers = {
+  inicio: [headerIllustrations.learningRoute],
+  aprender: units.map(unit => unit.cover),
+  unidad: [units[1].cover],
+  lectura: [reading.illustration],
+  camara: [headerIllustrations.practice],
+  situaciones: situations.map(situation => situation.illustrationSrc),
+  escena: [situations[0].illustrationSrc],
+  minijuegos: minigames.map(game => game.cover),
+  presentacion: [headerIllustrations.presentation],
+};
 
-export async function checkFairAudit({ send, evaluate, requests, errors }, origin, until, output) {
+export async function checkFairAudit({ send, evaluate, requests, errors, failedResponses }, origin, until, output) {
   const data = [];
   const layoutIssues = [];
   const snapshots = [];
@@ -37,6 +55,37 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
   };
   const exists = selector => until(selector, () => evaluate(`location.origin === ${JSON.stringify(origin)} && !!document.querySelector(${JSON.stringify(selector)})`));
   const navigate = path => send('Page.navigate', { url: origin + path });
+  const navigateInApp = path => evaluate(`(() => {
+    history.pushState({ idx: (history.state?.idx ?? 0) + 1 }, '', ${JSON.stringify(path)});
+    dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  })()`);
+  const illustrationSelector = 'img[src*="/images/illustrations/"]';
+  const checkIllustrations = async name => {
+    if (name === 'lectura') {
+      await until('lección Comunicación visual', () => evaluate('document.querySelector(".learning-lesson-page h1")?.textContent === "Comunicación visual"'));
+      await evaluate(`document.querySelector(".lesson-sequence-nav .button-primary").textContent.includes("Comenzar lección")
+        && document.querySelector(".lesson-sequence-nav .button-primary").click()`);
+      await exists('.lesson-reading-illustration');
+    }
+    const expected = covers[name];
+    if (expected) await exists(illustrationSelector);
+    const actual = await evaluate(`Promise.all([...document.querySelectorAll(${JSON.stringify(illustrationSelector)})].map(async image => {
+      const { loading, alt } = image;
+      image.loading = 'eager';
+      await image.decode();
+      const rect = image.getBoundingClientRect();
+      return { src: image.getAttribute('src'), width: image.naturalWidth, height: image.naturalHeight,
+        reserved: image.naturalWidth === +image.getAttribute('width') && image.naturalHeight === +image.getAttribute('height'),
+        visible: rect.width > 0 && rect.height > 0,
+        intact: getComputedStyle(image).objectFit === 'contain' || Math.abs(rect.width * image.naturalHeight / image.naturalWidth - rect.height) < 1,
+        loading, alt };
+    }))`);
+    assert.deepEqual(actual.map(({ src, width, height }) => ({ src, width, height })), (expected ?? []).map(asset =>
+      ({ src: '/' + asset.src, width: asset.width, height: asset.height })), name);
+    assert.ok(actual.every(image => image.reserved && image.visible && image.intact), name);
+    assert.ok(actual.every(image => image.loading === (['inicio', 'presentacion'].includes(name) ? 'eager' : 'lazy')), name);
+    if (name === 'lectura') assert.match(actual[0].alt, /iluminado/);
+  };
   await send('Runtime.enable');
   await send('Log.enable');
   await send('Performance.enable');
@@ -65,12 +114,16 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
 
   for (const theme of ['light', 'dark']) {
     await evaluate(`localStorage.setItem('senaverse-theme-v1', ${JSON.stringify(theme)})`);
+    await navigate('/');
+    await exists('.home-dashboard');
     for (const [width, height] of dimensions) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 768 });
       for (const [name, route, selector] of pages) {
-        await navigate(route);
+        await navigateInApp(route);
         await exists(selector);
+        await checkIllustrations(name);
         await evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => resolve(true))))');
+        await evaluate('window.scrollTo({ top: 0, behavior: "instant" })');
         const report = await evaluate(`(() => {
           const { clientWidth, scrollWidth } = document.documentElement;
           const controlOutside = [...document.querySelectorAll('a, button, input, select, textarea, canvas')].flatMap(el => {
@@ -84,15 +137,28 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
             return rect.height > 0 && (rect.top < frame.top - 1 || rect.bottom > frame.bottom + 1)
               ? [[canvas.getAttribute('aria-label'), Math.round(frame.height), Math.round(rect.height)]] : [];
           });
-          return { clientWidth, scrollWidth, innerWidth, actualTheme: document.documentElement.dataset.theme, controlOutside, clippedDiagrams };
+          const internalOverflow = [];
+          for (const field of document.querySelectorAll('.learning-banner-stat dt, .learning-banner-stat dd')) {
+            const panel = field.closest('.learning-banner-stat').getBoundingClientRect();
+            const range = document.createRange();
+            range.selectNodeContents(field);
+            if ([...range.getClientRects()].some(rect => rect.right > panel.right + 1 || rect.left < panel.left - 1)) internalOverflow.push(field.textContent);
+          }
+          const teaser = document.querySelector('.lesson-teaser'), benefits = document.querySelector('.hero-benefits');
+          if (teaser && benefits && teaser.getBoundingClientRect().bottom > benefits.getBoundingClientRect().top) internalOverflow.push('Etiquetas de Presentación');
+          return { clientWidth, scrollWidth, innerWidth, actualTheme: document.documentElement.dataset.theme, controlOutside, clippedDiagrams, internalOverflow };
         })()`);
         const row = { name, route, width, height, theme, ...report };
         data.push(row);
-        if (report.actualTheme !== theme || report.scrollWidth > width + 1 || report.controlOutside.length || report.clippedDiagrams.length) layoutIssues.push(row);
-        const exhibition = [1366, 1920].includes(width) && ['inicio', 'aprender', 'biblioteca', 'camara', 'situaciones', 'minijuegos', 'progreso', 'perfil'].includes(name);
-        const mobile = width === 360 && ['inicio', 'ficha', 'camara', 'progreso', 'perfil'].includes(name);
-        if ((exhibition || mobile) && ((width === 1366 && theme === 'light') || (width === 1920 && theme === 'dark') || width === 360)) {
+        if (report.actualTheme !== theme || report.scrollWidth > width + 1 || report.controlOutside.length || report.clippedDiagrams.length || report.internalOverflow.length) layoutIssues.push(row);
+        const exhibition = ['presentacion', 'inicio', 'aprender', 'situaciones', 'escena', 'minijuegos', 'camara', 'lectura'];
+        if (exhibition.includes(name) && (width === 390 || (width === 1366 && theme === 'light') || (width === 1920 && theme === 'dark'))) {
+          if (name === 'lectura') await evaluate('document.querySelector(".lesson-sequence-step").scrollIntoView({ behavior: "instant" })');
           await capture(name, width, height, theme);
+          if (name === 'presentacion' && width === 390) {
+            await evaluate('document.querySelector(".lesson-teaser").scrollIntoView({ behavior: "instant", block: "center" })');
+            await capture('presentacion-detalle', width, height, theme);
+          }
         }
       }
     }
@@ -119,9 +185,17 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
   await evaluate('document.querySelector(".app-bottom-nav button").click()');
   await exists('.app-menu-dialog[open]');
   await capture('menu', 390, 844, 'dark');
+  await navigate('/progreso');
+  await exists('.progress-achievements button');
+  await evaluate('document.querySelector(".progress-achievements button").click()');
+  await exists('.progress-dialog[open]');
+  const badges = await evaluate(`[...document.querySelectorAll('.progress-dialog[open] .progress-badge-art > span > svg')].map(icon => icon.outerHTML)`);
+  assert.equal(badges.length, 10);
+  assert.equal(new Set(badges).size, 10);
+  await capture('insignias', 390, 844, 'dark');
   await send('Emulation.clearDeviceMetricsOverride');
 
-  const summary = { cases: data.length, layoutIssues, performance, errors, snapshots,
+  const summary = { cases: data.length, layoutIssues, performance, errors, failedResponses, snapshots,
     metrics: { jsHeapBytes: coldMetrics.JSHeapUsedSize, jsHeapTotalBytes: coldMetrics.JSHeapTotalSize },
     requests: requests.length, external: requests.filter(url => !url.startsWith(origin + '/') && !/^(blob:|data:)/.test(url)),
     engineRequests: requests.filter(url => /\.wasm|hand_landmarker|handDetection\.worker/.test(url)) };
@@ -130,6 +204,7 @@ export async function checkFairAudit({ send, evaluate, requests, errors }, origi
   assert.equal(summary.external.length, 0);
   assert.equal(summary.engineRequests.length, 0);
   assert.deepEqual(summary.errors, []);
+  assert.deepEqual(summary.failedResponses, []);
   assert.deepEqual(summary.layoutIssues, []);
 }
 
@@ -182,6 +257,7 @@ export async function checkFairJourneys({ send, evaluate, requests }, origin, un
 
   await navigate('/biblioteca?sena=LSP-001');
   await exists('.library-dialog[open] .sign-media-image img');
+  await evaluate('document.querySelector(".library-dialog[open] .sign-media-image img").decode().then(() => true)');
   await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
   await exists('.library-dialog[open] .external-reference-status');
   assert.equal(await evaluate('!!document.querySelector(".library-dialog[open] .sign-media-image img")'), true);
@@ -192,9 +268,14 @@ export async function checkFairJourneys({ send, evaluate, requests }, origin, un
     for (const [index, scene] of situation.scenes.entries()) {
       const path = getSituationScenePath(situation.id, scene.id);
       await until(path, () => evaluate(`location.pathname === ${JSON.stringify(path)}`));
+      await exists('.situation-options');
+      assert.equal(await evaluate('!!document.querySelector(".situation-story .situation-illustration img")'),
+        !(situation.illustrationAfterAnswer || scene.illustrationAfterAnswer));
       await select('.situation-options input', scene.expectedSignId);
       await click('.situation-question button', 'Comprobar alternativa');
       await exists('.situation-answer-feedback.is-correct');
+      const asset = await evaluate('document.querySelector(".situation-scene-page .situation-illustration img")?.getAttribute("src")');
+      assert.equal(asset, '/' + situation.illustrationSrc.src);
       await click('.situation-question-actions button', 'Hacer ejercicio sin cámara');
       const exercise = getSituationExercise(scene, getEducationalSign(scene.expectedSignId));
       await select('.situation-alternative input', exercise.correctId);

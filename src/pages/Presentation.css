@@ -1,0 +1,62 @@
+.hero-visual {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+  min-width: 0;
+  background: radial-gradient(ellipse at center, var(--color-surface) 0%, transparent 73%);
+}
+
+.lesson-teaser {
+  width: min(100%, 545px);
+  padding: clamp(12px, 2vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--color-card);
+  box-shadow: var(--shadow);
+}
+
+.lesson-teaser > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+}
+
+.teaser-details { margin: 14px 0; }
+.teaser-details strong { font-size: 17px; }
+.teaser-details p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+.teaser-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.teaser-bottom a { color: var(--violet); text-decoration: underline; text-underline-offset: 3px; }
+
+.hero-benefits {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hero-benefits > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--color-card);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hero-benefits svg { flex-shrink: 0; color: var(--violet); }

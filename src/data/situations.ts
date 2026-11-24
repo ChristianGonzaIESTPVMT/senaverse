@@ -1,3 +1,5 @@
+import { localIllustration, type IllustrationAsset } from './illustrations.ts';
+
 export type SituationDifficulty = 'basico' | 'intermedio';
 export type SituationFilter = 'todos' | SituationDifficulty;
 
@@ -5,6 +7,7 @@ export type SituationScene = {
   id: string;
   title: string;
   context: string;
+  illustrationAfterAnswer?: true;
   question: string;
   optionIds: readonly [string, string, ...string[]];
   expectedSignId: string;
@@ -20,7 +23,8 @@ export type Situation = {
   objectives: readonly string[];
   rewardXp?: number;
   illustration: 'institute' | 'meeting' | 'shop' | 'library' | 'food' | 'numbers';
-  illustrationSrc?: string;
+  illustrationSrc?: IllustrationAsset;
+  illustrationAfterAnswer?: true;
   scenes: [SituationScene, ...SituationScene[]];
 };
 
@@ -153,6 +157,7 @@ const shopSituation: Situation = {
   objectives: ['Identificar el vocabulario de una compra.', 'Indicar dos unidades en el contexto de la compra.'],
   rewardXp: SITUATION_XP,
   illustration: 'shop',
+  illustrationSrc: localIllustration('situaciones/situacion-01-tienda', 1200, 1200),
   scenes: [
     {
       id: 'llegada',
@@ -166,6 +171,7 @@ const shopSituation: Situation = {
     {
       id: 'producto',
       title: 'El producto que necesitas',
+      illustrationAfterAnswer: true,
       context: 'Después de una caminata tienes sed. Quieres comprar una botella de agua.',
       question: '¿Qué palabra corresponde al producto que buscas?',
       optionIds: ['agua', 'comida', 'ayuda'],
@@ -197,6 +203,8 @@ export const situations: Situation[] = [
   shopSituation,
   {
     id: 'comida', title: 'Pidiendo comida', difficulty: 'intermedio', illustration: 'food',
+    illustrationSrc: localIllustration('situaciones/situacion-02-comida', 1200, 1200),
+    illustrationAfterAnswer: true,
     description: 'Elige una porción y describe cuánto queda.',
     context: 'En el comedor eliges una porción y miras qué queda en las bandejas.',
     objectives: ['Indicar una porción.', 'Distinguir ausencia de abundancia.'], rewardXp: SITUATION_XP,
@@ -217,6 +225,7 @@ export const situations: Situation[] = [
   },
   {
     id: 'preguntas', title: 'Respondiendo preguntas', difficulty: 'basico', illustration: 'library',
+    illustrationSrc: localIllustration('situaciones/situacion-03-preguntas', 1200, 1200),
     description: 'Confirma un dato e indica cuando una cantidad es cero.',
     context: 'En la biblioteca confirmas tu reserva y revisas tus préstamos.',
     objectives: ['Reconocer una respuesta afirmativa.', 'Identificar el número cero.'], rewardXp: SITUATION_XP,
@@ -233,6 +242,8 @@ export const situations: Situation[] = [
   },
   {
     id: 'actividad', title: 'Organizando una actividad', difficulty: 'intermedio', illustration: 'meeting',
+    illustrationSrc: localIllustration('situaciones/situacion-04-actividad', 1200, 1200),
+    illustrationAfterAnswer: true,
     description: 'Distingue entre participar por tu cuenta y hacerlo en compañía.',
     context: 'En tu grupo de estudio están repartiendo las tareas de una exposición.',
     objectives: ['Distinguir si una persona realiza una tarea sola o en compañía.'], rewardXp: SITUATION_XP,
@@ -249,6 +260,7 @@ export const situations: Situation[] = [
   },
   {
     id: 'utiles', title: 'Comprando útiles escolares', difficulty: 'basico', illustration: 'institute',
+    illustrationSrc: localIllustration('situaciones/situacion-05-utiles', 1200, 1200),
     description: 'Usa la lista del aula para elegir cuántos útiles comprar.',
     context: 'Vas a la papelería con la lista de útiles para un trabajo de clase.',
     objectives: ['Distinguir las cantidades tres y cuatro en una lista de compra.'], rewardXp: SITUATION_XP,
@@ -265,6 +277,8 @@ export const situations: Situation[] = [
   },
   {
     id: 'cantidad', title: 'Eligiendo una cantidad', difficulty: 'basico', illustration: 'numbers',
+    illustrationSrc: localIllustration('situaciones/situacion-06-cantidad', 1200, 1200),
+    illustrationAfterAnswer: true,
     description: 'Cuenta los materiales entregados y los que faltan.',
     context: 'Preparas materiales para las personas de un taller.',
     objectives: ['Elegir el número que representa el total.', 'Indicar una unidad pendiente.'], rewardXp: SITUATION_XP,

@@ -9,13 +9,8 @@
 .minigames-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .minigame-card { display: flex; flex-direction: column; min-width: 0; padding: 20px; border: 1.5px solid var(--line); border-radius: 24px; background: light-dark(#fff, var(--color-card)); box-shadow: 0 4px 12px #4c338105; }
 
-.minigame-art { position: relative; isolation: isolate; display: grid; place-items: center; height: clamp(160px, 14vw, 210px); overflow: hidden; border-radius: 18px; background: #eee8fc; }
-.minigame-art::before { content: ''; position: absolute; z-index: -1; width: 142px; height: 142px; border: 1px solid #ffffff8c; border-radius: 50%; background: #ffffff38; }
-.minigame-art[data-tone='mint'] { background: #e3f5f0; }
-.minigame-art[data-tone='peach'] { background: #fff1da; }
-.minigame-illustration { display: block; width: clamp(60px, 6.8vw, 90px); height: auto; color: #6330da; filter: drop-shadow(0 7px 0 #43305f0b); transform: rotate(-7deg); }
-.minigame-art[data-tone='mint'] .minigame-illustration { transform: rotate(9deg); }
-.minigame-art[data-tone='peach'] .minigame-illustration { transform: rotate(-12deg); }
+.minigame-art { aspect-ratio: 3 / 2; max-height: 220px; overflow: hidden; border-radius: 18px; background: var(--color-surface); }
+.minigame-art > img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 .minigame-copy { flex: 1; padding: 22px 2px 24px; }
 .minigame-copy h2 { margin: 0 0 9px; color: var(--ink); font-size: clamp(21px, 1.8vw, 28px); font-weight: 950; line-height: 1.2; letter-spacing: -.6px; }
@@ -66,7 +61,7 @@
 @media (max-width: 1200px) {
   .minigames-grid { gap: 14px; }
   .minigame-card { padding: 16px; border-radius: 21px; }
-  .minigame-art { height: 155px; border-radius: 15px; }
+  .minigame-art { max-height: 170px; border-radius: 15px; }
   .minigame-copy { padding-top: 19px; }
   .minigame-copy p { font-size: 15px; }
   .minigames-learning-note { grid-template-columns: 46px minmax(0, 1fr); }
@@ -78,10 +73,9 @@
   .minigames-heading h1 { font-size: 33px; letter-spacing: -.9px; }
   .minigames-heading p { font-size: 16px; }
   .minigames-grid { grid-template-columns: 1fr; gap: 16px; }
-  .minigame-card { padding: 20px; border-radius: 22px; }
-  .minigame-art { height: 175px; border-radius: 17px; }
-  .minigame-illustration { width: 72px; }
-  .minigame-copy { padding: 20px 2px 22px; }
+  .minigame-card { padding: 14px; border-radius: 22px; }
+  .minigame-art { aspect-ratio: auto; height: clamp(120px, 38vw, 155px); border-radius: 15px; }
+  .minigame-copy { padding: 14px 2px; }
   .minigame-copy h2 { font-size: 25px; }
   .minigame-copy p { font-size: 16px; }
   .minigames-learning-note { grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 13px; margin-top: 18px; padding: 19px; }

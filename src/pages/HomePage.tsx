@@ -1,7 +1,10 @@
 import { ArrowRight, BookOpen, Camera, CheckCircle2, GraduationCap, HeartHandshake, Sparkles, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { Illustration } from '../components/Illustration';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { headerIllustrations } from '../data/illustrations';
+import './Presentation.css';
 
 export function HomePage() {
   return (
@@ -27,15 +30,16 @@ export function HomePage() {
             </div>
             <p className="hero-caption"><CheckCircle2 size={16} /> Prototipo académico de SeñaVerse · Material LSP pendiente de validación</p>
           </div>
-          <div className="hero-visual" aria-label="Vista ilustrativa de una lección de SeñaVerse">
-            <div className="hero-spark spark-a"/><div className="hero-spark spark-b"/>
+          <div className="hero-visual">
             <div className="lesson-teaser">
-              <div className="teaser-top"><span className="teaser-dots"><i/><i/><i/></span><span className="teaser-label">ACADEMIA SEÑAVERSE</span></div>
-              <div className="teaser-video"><div className="play-circle"><BookOpen size={28} aria-hidden="true" /></div><strong>Observa, aprende y practica</strong><span>Diagramas y ejercicios de los números en LSP</span></div>
+              <Illustration asset={headerIllustrations.presentation} alt="Estudiantes que colaboran frente a una computadora" priority />
+              <div className="teaser-details"><strong>Observa, aprende y practica</strong><p>Diagramas y ejercicios de los números en LSP</p></div>
               <div className="teaser-bottom"><strong>Números básicos</strong><Link to="/academia/unidad/2/leccion/numeros">Ver lección</Link></div>
             </div>
-            <div className="float-pill float-one"><span className="float-symbol"><GraduationCap size={19}/></span> Aprende a tu ritmo</div>
-            <div className="float-pill float-two"><span className="float-symbol mint"><Target size={18}/></span> Practica lo aprendido</div>
+            <div className="hero-benefits">
+              <span><GraduationCap size={19} aria-hidden="true" /> Aprende a tu ritmo</span>
+              <span><Target size={18} aria-hidden="true" /> Practica lo aprendido</span>
+            </div>
           </div>
         </section>
         <section className="landing-section" id="caracteristicas">

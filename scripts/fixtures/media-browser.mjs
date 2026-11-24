@@ -49,7 +49,7 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   };
 
   await navigate('/');
-  await exists('.home-banner .home-visual svg');
+  await exists('.home-banner-art img');
   await navigate('/biblioteca');
   await exists('.library-filters .library-numbers-icon');
   await click('.library-filter:has(.library-numbers-icon)');
@@ -174,11 +174,11 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
     'window.labStreams.flatMap(stream => stream.getTracks()).every(track => track.readyState === "ended") && window.labWorkers.every(worker => worker.ended)'));
 
   await navigate('/simulador');
-  await exists('.situation-illustration');
-  assert.equal(await evaluate('document.querySelectorAll(".situation-illustration").length'), 6);
+  await exists('.situation-illustration img');
+  assert.equal(await evaluate('document.querySelectorAll(".situation-illustration img").length'), 6);
   await navigate('/minijuegos');
-  await exists('.minigame-art svg');
-  assert.equal(await evaluate('document.querySelectorAll(".minigame-art svg").length'), 5);
+  await exists('.minigame-art img');
+  assert.equal(await evaluate('document.querySelectorAll(".minigame-art img").length'), 5);
   await navigate('/minijuegos/adivina');
   await exists('.game-panel');
   await label('.game-panel button', 'Iniciar partida');

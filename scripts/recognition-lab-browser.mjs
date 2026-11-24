@@ -49,10 +49,15 @@ function protocol(socket) {
   const pending = new Map();
   const requests = [];
   const errors = [];
+  const failedResponses = [];
   let id = 0;
   socket.addEventListener('message', event => {
     const item = JSON.parse(event.data);
     if (item.method === 'Network.requestWillBeSent') requests.push(item.params.request.url);
+    if (item.method === 'Network.responseReceived' && item.params.response.status >= 400) {
+      const { url, status } = item.params.response;
+      failedResponses.push({ url, status });
+    }
     if (item.method === 'Runtime.exceptionThrown') errors.push(item.params.exceptionDetails.exception?.description ?? item.params.exceptionDetails.text);
     if (item.method === 'Log.entryAdded' && item.params.entry.level === 'error') errors.push(item.params.entry.text);
     const callback = pending.get(item.id);
@@ -80,7 +85,7 @@ function protocol(socket) {
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
     return result.result.value;
   }
-  return { send, evaluate, requests, errors };
+  return { send, evaluate, requests, errors, failedResponses };
 }
 
 async function checkStudent({ send, evaluate, requests }, origin) {
@@ -273,7 +278,7 @@ try {
   const list = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
   socket = new WebSocket(list.find(target => target.type === 'page').webSocketDebuggerUrl);
   await once(socket, 'open');
-  const { send, evaluate, requests, errors } = protocol(socket);
+  const { send, evaluate, requests, errors, failedResponses } = protocol(socket);
   await send('Page.enable');
   await send('Network.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
@@ -334,7 +339,7 @@ try {
   if (mode === 'audit-functional') {
     await checkFairJourneys({ send, evaluate, requests }, origin, until);
   } else if (mode === 'audit-production') {
-    await checkFairAudit({ send, evaluate, requests, errors }, origin, until, process.argv[4]);
+    await checkFairAudit({ send, evaluate, requests, errors, failedResponses }, origin, until, process.argv[4]);
   } else if (mode.startsWith('media-')) {
     await checkMedia({ send, evaluate, requests }, origin, until, mode === 'media-development');
   } else if (mode.startsWith('curriculum-')) {

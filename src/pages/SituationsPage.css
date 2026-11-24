@@ -62,7 +62,10 @@
 
 .situation-illustration { position: relative; isolation: isolate; min-width: 0; min-height: 205px; overflow: hidden; border-radius: 17px; background: linear-gradient(#b9dcf9 0%, #e3f1fd 65%, #b9d0b1 65%); color: #8c78b7; }
 .situation-illustration::after { content: ''; position: absolute; z-index: -1; bottom: -10px; left: -20px; width: calc(100% + 40px); height: 60px; border-radius: 40% 50% 0 0; background: #cbbde0; }
-.situation-illustration > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.situation-illustration[data-setting]:has(> img) { display: grid; place-items: center; min-height: 0; background: var(--color-surface); }
+.situation-illustration:has(> img)::after { content: none; }
+.situation-illustration > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.situation-card .situation-illustration:has(> img) { align-self: center; aspect-ratio: 1; }
 .situation-art-cloud { position: absolute; z-index: -1; top: 23px; left: 10px; width: 62px; height: 20px; border-radius: 20px; background: #ffffffba; box-shadow: 107px 18px 0 #ffffff8c; }
 .situation-art-setting { position: absolute; left: calc(50% - 62px); top: 17px; width: 124px; height: 100px; fill: #eae4f5; color: #8f83b1; }
 .situation-art-person { position: absolute; bottom: -24px; display: block; width: 105px; height: 160px; color: #6a4c9b; }
@@ -104,6 +107,8 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 .situation-scene-progress progress { margin: 0; }
 .situation-scenario { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); gap: 24px; padding: 24px; border: 1.5px solid light-dark(#e4d9f7, var(--color-line)); border-radius: 24px; background: light-dark(#ffffffdf, color-mix(in srgb, var(--color-card) 87%, transparent)); box-shadow: 0 3px 7px #4c338109; }
 .situation-story { min-width: 0; }
+.situation-context-art { width: min(100%, 235px); margin: 18px auto 0; }
+.situation-context-art .situation-illustration { aspect-ratio: 1; }
 .situation-story .situation-illustration { height: 270px; }
 .situation-story .situation-art-person { width: 140px; height: 205px; }
 .situation-story .situation-art-person-right { width: 133px; height: 190px; }
@@ -186,6 +191,7 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 @media (max-width: 1100px) and (min-width: 951px) {
   .situation-scenario { grid-template-columns: 1fr; }
   .situation-story { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); gap: 19px; }
+  .situation-story:not(:has(.situation-illustration)) { display: block; }
   .situation-story .situation-illustration { height: 215px; }
   .situation-story-copy { padding-top: 0; }
 }
@@ -235,6 +241,8 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
   .situations-filter .situation-level-bars { width: 15px; gap: 1px; }
   .situation-card { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
   .situation-card .situation-illustration { min-height: 190px; height: 190px; }
+  .situation-card .situation-illustration:has(> img) { height: clamp(125px, 42vw, 175px); aspect-ratio: auto; }
+  .situation-story .situation-illustration:has(> img) { height: clamp(155px, 48vw, 205px); }
   .situation-card h2 { font-size: 25px; }
   .situation-card-copy > p { font-size: 16px; }
   .situation-card .situation-start { width: 100%; margin-top: 2px; }

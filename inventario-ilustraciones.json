@@ -1,0 +1,191 @@
+[
+  {
+    "id": "A1",
+    "title": "Primeros pasos",
+    "file": "public/images/illustrations/aprender/unidad-01-primeros-pasos.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 67678,
+    "original": "estudio_creativo_entre_libros_y_plantas.png"
+  },
+  {
+    "id": "A2",
+    "title": "Números básicos",
+    "file": "public/images/illustrations/aprender/unidad-02-numeros.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 91126,
+    "original": "aprendiendo_números_con_creatividad.png"
+  },
+  {
+    "id": "A3",
+    "title": "Saludos y cortesía",
+    "file": "public/images/illustrations/aprender/unidad-03-saludos.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 88820,
+    "original": "saludos_en_la_entrada_escolar.png"
+  },
+  {
+    "id": "A4",
+    "title": "Expresiones cotidianas",
+    "file": "public/images/illustrations/aprender/unidad-04-expresiones.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 87216,
+    "original": "conversación_y_estudio_entre_amigos.png"
+  },
+  {
+    "id": "A5",
+    "title": "Personas, familia y entorno",
+    "file": "public/images/illustrations/aprender/unidad-05-entorno.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 150068,
+    "original": "familia_y_comunidad_en_armonía.png"
+  },
+  {
+    "id": "A6",
+    "title": "Aplicación y evaluación",
+    "file": "public/images/illustrations/aprender/unidad-06-evaluacion.webp",
+    "width": 1200,
+    "height": 600,
+    "bytes": 83800,
+    "original": "espacio_de_estudio_y_progreso.png"
+  },
+  {
+    "id": "B1",
+    "title": "Comprando en una tienda",
+    "file": "public/images/illustrations/situaciones/situacion-01-tienda.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 165264,
+    "original": "encuentro_cálido_en_la_bodega_vecinal.png"
+  },
+  {
+    "id": "B2",
+    "title": "Pidiendo comida",
+    "file": "public/images/illustrations/situaciones/situacion-02-comida.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 168890,
+    "original": "almuerzo_en_la_cafetería_escolar.png"
+  },
+  {
+    "id": "B3",
+    "title": "Respondiendo preguntas",
+    "file": "public/images/illustrations/situaciones/situacion-03-preguntas.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 140244,
+    "original": "encuentro_amable_en_la_biblioteca.png"
+  },
+  {
+    "id": "B4",
+    "title": "Organizando una actividad",
+    "file": "public/images/illustrations/situaciones/situacion-04-actividad.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 148312,
+    "original": "a_clean_colorful_vector_style_illustration_of_a_g.png"
+  },
+  {
+    "id": "B5",
+    "title": "Comprando útiles escolares",
+    "file": "public/images/illustrations/situaciones/situacion-05-utiles.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 164158,
+    "original": "a_brightly_lit_colorful_modern_flat_clean_vector.png"
+  },
+  {
+    "id": "B6",
+    "title": "Eligiendo una cantidad",
+    "file": "public/images/illustrations/situaciones/situacion-06-cantidad.webp",
+    "width": 1200,
+    "height": 1200,
+    "bytes": 140800,
+    "original": "a_bright_clean_modern_vector_illustration_scene.png"
+  },
+  {
+    "id": "C1",
+    "title": "Memoria de señas",
+    "file": "public/images/illustrations/minijuegos/juego-01-memoria.webp",
+    "width": 960,
+    "height": 640,
+    "bytes": 82072,
+    "original": "a_clean_colorful_modern_vector_style_illustratio.png"
+  },
+  {
+    "id": "C2",
+    "title": "Adivina la seña",
+    "file": "public/images/illustrations/minijuegos/juego-02-adivina.webp",
+    "width": 960,
+    "height": 640,
+    "bytes": 70272,
+    "original": "a_clean_colorful_vector_illustration_style_scene.png"
+  },
+  {
+    "id": "C3",
+    "title": "Reto contrarreloj",
+    "file": "public/images/illustrations/minijuegos/juego-03-contrarreloj.webp",
+    "width": 960,
+    "height": 640,
+    "bytes": 69540,
+    "original": "a_vibrant_modern_flat_illustration_scene_in_a_cle.png"
+  },
+  {
+    "id": "C4",
+    "title": "Desafío de señas",
+    "file": "public/images/illustrations/minijuegos/juego-04-desafio-senas.webp",
+    "width": 960,
+    "height": 640,
+    "bytes": 66334,
+    "original": "a_clean_colorful_modern_digital_illustration_ve.png"
+  },
+  {
+    "id": "C5",
+    "title": "Relaciona y aprende",
+    "file": "public/images/illustrations/minijuegos/juego-05-relaciona.webp",
+    "width": 960,
+    "height": 640,
+    "bytes": 77378,
+    "original": "a_high_quality_vector_illustration_style_scene_cl.png"
+  },
+  {
+    "id": "D1",
+    "title": "Presentación de SeñaVerse",
+    "file": "public/images/illustrations/cabeceras/cabecera-presentacion.webp",
+    "width": 1280,
+    "height": 720,
+    "bytes": 111664,
+    "original": "estudiantes_andinos_colaborando_en_señaverse.png"
+  },
+  {
+    "id": "D2",
+    "title": "Tu ruta de aprendizaje",
+    "file": "public/images/illustrations/cabeceras/cabecera-ruta-aprendizaje.webp",
+    "width": 600,
+    "height": 600,
+    "bytes": 27120,
+    "original": "cuaderno_y_fichas_de_estudio.png"
+  },
+  {
+    "id": "D3",
+    "title": "Centro de práctica",
+    "file": "public/images/illustrations/cabeceras/cabecera-centro-practica.webp",
+    "width": 640,
+    "height": 480,
+    "bytes": 27212,
+    "original": "práctica_de_cámara_en_casa.png"
+  },
+  {
+    "id": "D4",
+    "title": "Comunicación visual",
+    "file": "public/images/illustrations/recursos/recurso-comunicacion-visual.webp",
+    "width": 960,
+    "height": 720,
+    "bytes": 60518,
+    "original": "conexión_a_través_de_la_mirada.png"
+  }
+]

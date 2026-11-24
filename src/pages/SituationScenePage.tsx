@@ -37,6 +37,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
   const situationId = situation.id, sceneId = scene.id;
   const run = progress.situationStudy?.[situationId];
   const answer = run?.scenes[sceneId];
+  const illustrationAfterAnswer = situation.illustrationAfterAnswer || scene.illustrationAfterAnswer;
   const sign = answer?.checked ? getEducationalSign(answer.choiceId) : undefined;
   const isCorrect = answer?.choiceId === scene.expectedSignId;
   const { completed } = summarizeSituation(situation, run);
@@ -68,7 +69,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
 
       <section className="situation-scenario" aria-labelledby="situation-scene-title">
         <div className="situation-story">
-          <SituationIllustration situation={situation} />
+          {!illustrationAfterAnswer && <SituationIllustration situation={situation} />}
           <div className="situation-story-copy">
             <h2 id="situation-scene-title">{scene.title}</h2>
             <p><MessageSquareText size={22} aria-hidden="true" /><span>{scene.context}</span></p>
@@ -104,6 +105,9 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
           </div>}
         </form>
       </section>
+      {illustrationAfterAnswer && answer?.checked && <div className="situation-context-art">
+        <SituationIllustration situation={situation} />
+      </div>}
 
       {sign && <SituationPracticeStep key={sign.id} sign={sign} scene={scene} situationId={situationId} filter={filter}
         practice={answer?.practice} onComplete={input => recordActivity({ type: 'situation-practice', situationId, sceneId, input })} />}

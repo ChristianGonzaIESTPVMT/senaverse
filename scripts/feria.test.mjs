@@ -119,6 +119,25 @@ test('el servidor local entrega fotos y permite saltar a un tramo de video', asy
   await assert.rejects(readFairBuild(root), /Archivo no esperado.*video-privado/);
 });
 
+test('el servidor local entrega ilustraciones WebP y rechaza un dataset en su carpeta', async t => {
+  const { root } = await fixture(t);
+  const asset = 'images/illustrations/cabeceras/cabecera-presentacion.webp';
+  const destination = join(root, 'dist', asset);
+  await mkdir(dirname(destination), { recursive: true });
+  await writeFile(destination, 'illustration');
+  const server = await serveFairBuild(await readFairBuild(root), 0);
+  t.after(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/${asset}`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Content-Type'), 'image/webp');
+  assert.equal(await response.text(), 'illustration');
+  await writeFile(join(dirname(destination), 'dataset.json'), '{}');
+  await assert.rejects(readFairBuild(root), /Archivo no esperado.*dataset/);
+  await rm(join(dirname(destination), 'dataset.json'));
+  await writeFile(join(dirname(destination), 'cabecera-privada.webp'), 'private');
+  await assert.rejects(readFairBuild(root), /Archivo no esperado.*cabecera-privada/);
+});
+
 test('las opciones aíslan el perfil de exposición y permiten ejecutar un ensayo', () => {
   assert.deepEqual(parseFairOptions([]), { port: 4173, profile: 'feria', browser: 'auto', verify: false, open: true });
   assert.deepEqual(parseFairOptions(['--puerto=4174', '--perfil=ensayo', '--navegador=chrome', '--verificar', '--solo-servidor']),
