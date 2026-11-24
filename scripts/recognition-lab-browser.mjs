@@ -305,24 +305,53 @@ try {
       return stream;
     };
     const NativeWorker = window.Worker;
+    const numberedCaptures = new WeakMap();
+    const bitmapFrom = window.createImageBitmap.bind(window);
+    window.createImageBitmap = (input, ...options) => {
+      const videoTag = window.gameVideoTag;
+      if (!videoTag || !(input instanceof HTMLVideoElement)) return bitmapFrom(input, ...options);
+      const at = performance.now();
+      return bitmapFrom(input, ...options).then(bitmap => {
+        numberedCaptures.set(bitmap, { tag: videoTag, at });
+        return bitmap;
+      });
+    };
     window.Worker = class extends NativeWorker {
       constructor(...args) {
         super(...args);
         this.ended = false;
         this.results = 0;
+        this.detectorSamples = {};
+        this.frameCaptures = new Map();
         window.labWorkers.push(this);
         this.maxActive = window.labWorkers.filter(worker => !worker.ended).length;
         this.addEventListener('error', event => window.labWorkerErrors.push(event.message));
         this.addEventListener('message', event => {
+          if (event.data.type === 'ready') this.delegate = event.data.delegate;
           if (event.data.type === 'error') window.labWorkerErrors.push(event.data.message);
           if (event.data.type === 'result') {
             this.results++;
             this.firstResultAt ??= performance.now();
+            const capture = this.frameCaptures.get(event.data.id);
+            if (capture) {
+              this.frameCaptures.delete(event.data.id);
+              const sample = this.detectorSamples[capture.tag] ??= { delays: [], withHands: 0 };
+              const delay = performance.now() - capture.at;
+              sample.delays.push(delay);
+              if (event.data.result.landmarks.length) {
+                sample.withHands++;
+                sample.landmarkExample ??= event.data.result;
+              }
+            }
           }
         });
       }
       postMessage(message, transfer) {
         const trace = window.studentTrace;
+        if (message.type === 'frame' && !trace) {
+          const capture = numberedCaptures.get(message.frame);
+          if (capture) this.frameCaptures.set(message.id, capture);
+        }
         if (message.type !== 'frame' || !trace) return super.postMessage(message, transfer);
         message.frame.close();
         const { id, timestamp } = message;
@@ -346,13 +375,13 @@ try {
   } else if (mode.startsWith('media-')) {
     await checkMedia({ send, evaluate, requests }, origin, until, mode === 'media-development');
   } else if (mode.startsWith('curriculum-')) {
-    await checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath);
+    await checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath, process.env.SENAVERSE_TEST_EVIDENCE ?? process.argv[5]);
   } else if (mode.startsWith('progress-')) {
     await checkStudentOverview({ send, evaluate, requests }, origin, until, datasetPath);
   } else if (mode.startsWith('minigames-')) {
     await checkMinigames({ send, evaluate, requests }, origin, until, datasetPath, process.env.SENAVERSE_GAME_EVIDENCE ?? process.argv[5]);
   } else if (mode.startsWith('situation-')) {
-    await checkSituations({ send, evaluate, requests }, origin, until, datasetPath, process.argv[5]);
+    await checkSituations({ send, evaluate, requests }, origin, until, datasetPath, process.env.SENAVERSE_TEST_EVIDENCE ?? process.argv[5]);
   } else if (mode.startsWith('library-')) {
     await checkLibrary({ send, evaluate, requests }, origin, until);
   } else if (mode.startsWith('lesson-')) {

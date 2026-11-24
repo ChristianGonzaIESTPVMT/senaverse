@@ -251,6 +251,7 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
   ready: (ready: boolean) => void; gesture: (id: string, step: number) => void }) {
   const showing = board.phase !== 'recall';
   const camera = run.settings.mode === 'camera';
+  const resumeCamera = useCallback((available: boolean) => ready(available && !showing), [ready, showing]);
   return <section className="game-panel game-sequence" aria-label="Secuencia de señas">
     <h2>{showing ? 'Memoriza el orden' : camera ? 'Reproduce la secuencia' : 'Reconstruye la secuencia'}</h2>
     <ol className="game-sequence-track">{board.targets.map((id, index) => {
@@ -261,13 +262,17 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
         {showing || placed ? <Sign id={showing ? id : placed} diagram /> : confirmed ? <Check size={24} aria-label="Confirmada" /> : <span aria-label="Por completar">·</span>}
       </li>;
     })}</ol>
+    {!showing && <p role="status">{camera ? 'Posición ' + (board.step + 1) + ' de ' + run.limit + (run.errors ? ' · Intenta de nuevo si el modelo confirma otra seña.' : '')
+      : board.step ? 'El comienzo es correcto. Corrige a partir de la posición ' + (board.step + 1) + '.' : 'Añade las tarjetas en el orden que recuerdas.'}</p>}
+    {camera && board.phase !== 'study' && <div hidden={showing}>
+      <Suspense fallback={<p role="status">Cargando cámara…</p>}>
+        <CameraGame accepting={!showing} step={board.step} onReady={resumeCamera} onGesture={gesture} />
+      </Suspense>
+    </div>}
     {showing ? <button className="button button-primary" type="button" onClick={() => send({ type: 'recall', at: Date.now() })}>
       {board.phase === 'hint' ? 'Ocultar ayuda' : 'Ocultar secuencia y empezar'} <ArrowRight size={17} aria-hidden="true" />
     </button> : <>
-      <p role="status">{camera ? 'Posición ' + (board.step + 1) + ' de ' + run.limit + (run.errors ? ' · Intenta de nuevo si el modelo confirma otra seña.' : '')
-        : board.step ? 'El comienzo es correcto. Corrige a partir de la posición ' + (board.step + 1) + '.' : 'Añade las tarjetas en el orden que recuerdas.'}</p>
-      {camera ? <Suspense fallback={<p role="status">Cargando cámara…</p>}><CameraGame accepting step={board.step} onReady={ready} onGesture={gesture} /></Suspense>
-        : <div className="game-sequence-choices" role="group" aria-label="Tarjetas para ordenar">{board.choices.map((id, index) => <button key={id} type="button"
+      {!camera && <div className="game-sequence-choices" role="group" aria-label="Tarjetas para ordenar">{board.choices.map((id, index) => <button key={id} type="button"
           className="button button-outline" data-choice-index={index} aria-pressed={board.ordered.includes(id)}
           disabled={board.ordered.includes(id) || board.ordered.length === run.limit}
           onClick={() => send({ type: 'pick', id, at: Date.now() })}><Sign id={id} diagram={index % 2 === 0} /></button>)}</div>}

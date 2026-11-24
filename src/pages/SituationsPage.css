@@ -140,7 +140,8 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
 .situation-dialogue-speaker p { margin: .2rem 0 0; }
 .situation-attempt-feedback { display: grid; gap: .65rem; }
 .situation-attempt-feedback .situation-answer-feedback { margin: 0; }
-.situation-dialogue-reply { grid-column: 1 / -1; margin: 0; }
+.situation-attempt-feedback > p { grid-column: 1 / -1; margin: 0; }
+.situation-scene-reply > .situation-dialogue-speaker { margin: 1rem 0 0; }
 .situation-dialogue .situation-question-actions { flex-wrap: wrap; }
 @media (min-width: 850px) {
   .situation-dialogue .situation-options { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }

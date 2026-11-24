@@ -88,6 +88,42 @@ export async function checkStudentOverview({ send, evaluate, requests }, origin,
   assert.equal(saved.activities.filter(activity => activity.id === 'minigame:old-run').length, 1);
   assert.equal(saved.activities.find(activity => activity.id === 'lesson:saludos').occurredAt, null);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("senaverse-student-profile-v1")).avatarId'), 'cat');
+  await evaluate(`(() => {
+    const original = URL.createObjectURL;
+    window.exportAttempts = 0;
+    URL.createObjectURL = function(blob) {
+      if (!(blob instanceof Blob) || !blob.type.startsWith('application/json')) return original.call(URL, blob);
+      if (++window.exportAttempts === 1) throw new Error('Prueba de descarga fallida');
+      window.exportedBackup = blob.text().then(JSON.parse);
+      return original.call(URL, blob);
+    };
+  })()`);
+  const exportButton = '.profile-setting:has(svg.lucide-download)';
+  const exportData = () => evaluate(`document.querySelector(${JSON.stringify(exportButton)}).click()`);
+  await exportData();
+  await waitText('.profile-error', 'No se pudieron exportar tus datos');
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(exportButton)}).disabled`), false);
+  await exportData();
+  await waitText('.profile-feedback', 'Se inició la descarga');
+  const backup = await evaluate('window.exportedBackup');
+  assert.equal(backup.schemaVersion, 2);
+  assert.equal(backup.profile.displayName, 'Lucía');
+  assert.equal(backup.progressSummary.xp, 100);
+  assert.deepEqual(backup.progress, saved);
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(exportButton)}).disabled`), false);
+  await evaluate('document.querySelector(".profile-setting-reset").click()');
+  await findClick('#profile-reset-dialog button', 'Restablecer perfil');
+  await waitText('#profile-student-name', 'Estudiante');
+  await waitText('.profile-learning', '100 XP acumulados');
+  assert.deepEqual(await stored(), saved);
+  // Verify rehydration from the exported JSON in the isolated test profile.
+  await evaluate(`localStorage.removeItem('${progressKey}')`);
+  await reload();
+  await waitText('.profile-learning', '0 XP acumulados');
+  await evaluate(`localStorage.setItem('${progressKey}', ${JSON.stringify(JSON.stringify(backup.progress))})`);
+  await reload();
+  await waitText('.profile-learning', '100 XP acumulados');
+  assert.deepEqual(await stored(), saved);
   await evaluate('document.querySelector(".theme-toggle").click()');
   await until('tema oscuro', () => evaluate('document.documentElement.dataset.theme === "dark"'));
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 1 });
@@ -133,5 +169,6 @@ export async function checkStudentOverview({ send, evaluate, requests }, origin,
     await waitText('.progress-motivation', '100 XP acumulados');
   }
   console.log(JSON.stringify({ freshProfile: true, historyWithoutDate: true, threeDayStreak: true, olderXp: 100, lessonResumed: true,
-    situationResumed: true, profileAndFavorites: true, cameraStoredFromRecording: !!datasetPath, darkMobile: true }));
+    situationResumed: true, profileAndFavorites: true, exportRetry: true, backupRehydration: true, profileResetKeepsProgress: true,
+    cameraStoredFromRecording: !!datasetPath, darkMobile: true }));
 }

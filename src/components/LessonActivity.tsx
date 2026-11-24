@@ -43,15 +43,18 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
     {activity.media && <QuizSignMedia key={activity.media.signId} media={activity.media} />}
     {rows?.map(pair => {
       const correct = responses[pair.id] === pair.answerId;
-      return <label className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
-        <span>{pair.label}{checked && <small>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
+      const fieldId = `${name}-${pair.id}`;
+      return <div className={`lesson-association-row${checked ? correct ? ' is-correct' : ' is-incorrect' : ''}`} key={pair.id}>
+        <div><label htmlFor={fieldId}>{pair.label}</label>
+          {checked && <small id={`${fieldId}-feedback`}>{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
           {pair.media && <QuizSignMedia media={pair.media} />}
-        </span>
-        <select value={responses[pair.id] ?? ''} onChange={event => onResponse(pair.id, event.target.value)}>
+        </div>
+        <select id={fieldId} aria-describedby={checked ? `${fieldId}-feedback` : undefined}
+          value={responses[pair.id] ?? ''} onChange={event => onResponse(pair.id, event.target.value)}>
           <option value="">Elige una respuesta</option>
           {activity.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
-      </label>;
+      </div>;
     })}
     {hasVisualOptions ? <div className="lesson-visual-options">{choices}</div> : choices}
     {checked && activity.explanation && <p className="lesson-answer-explanation">{activity.explanation}</p>}

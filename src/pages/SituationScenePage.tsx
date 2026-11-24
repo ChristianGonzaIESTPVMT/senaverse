@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, Info, MessageSquare
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration } from '../components/SituationContent';
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
-import { SituationDialogue } from '../components/SituationDialogue';
+import { SituationDialogue, SituationLine } from '../components/SituationDialogue';
 import { getEducationalSign } from '../data/library';
 import { nextSituationScene, summarizeSituation } from '../data/situationStudy';
 import { getSituation, getSituationFilter, getSituationPath, getSituationResultsPath, getSituationScenePath, getSituationsPath,
@@ -81,7 +81,8 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
           </div>
         </div>
         <form className="situation-question" onSubmit={event => { event.preventDefault(); recordActivity({ type: 'situation-check', situationId, sceneId }); }}>
-          <h2 id="situation-question">{scene.question}</h2>
+          {situation.speaker ? <SituationLine speaker={situation.speaker} id="situation-question">{scene.question}</SituationLine>
+            : <h2 id="situation-question">{scene.question}</h2>}
           <fieldset className="situation-options" aria-labelledby="situation-question" disabled={!!answer?.practice}>
             {scene.optionIds.map((id, index) => {
               const selected = answer?.choiceId === id;
@@ -115,6 +116,9 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
         practice={answer?.practice} onComplete={input => recordActivity({ type: 'situation-practice', situationId, sceneId, input })} />}
       </>}
 
+      {answer?.practice && scene.reply && situation.speaker && <div role="status" className="situation-scene-reply">
+        <SituationLine speaker={situation.speaker}>{scene.reply}</SituationLine>
+      </div>}
       <div className="situation-navigation">
         <Link className="button button-outline" to={getSituationsPath(filter)}><ArrowLeft size={18} aria-hidden="true" /> Volver a Situaciones</Link>
         {answer?.practice && (followingScene ? <Link className="button button-primary" to={getSituationScenePath(situationId, followingScene.id, filter)}>

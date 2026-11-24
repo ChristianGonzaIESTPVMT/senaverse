@@ -2,20 +2,36 @@ import type { Lesson } from './curriculum.ts';
 import { localIllustration } from './illustrations.ts';
 import { getEducationalSign, guideReference, numbersReference } from './library.ts';
 import type { LessonIllustration, LessonReference, Question, StudyStep } from './lessonPlan.ts';
+import type { QuizMedia } from './educationalMedia.ts';
+import { signQuizMedia } from './signQuizMedia.ts';
 
 function choices(labels: string[]) {
   return labels.map((label, index) => ({ id: String(index), label }));
 }
 
-function choose(id: string, question: string, labels: string[], correct: number, explanation: string, diagramId?: string): Question {
-  return { id, activity: { type: diagramId ? 'identify' : 'choice', question, options: choices(labels),
-    correctId: String(correct), success: explanation, explanation, diagramId } };
+function choose(id: string, question: string, labels: string[], correct: number, explanation: string, media?: QuizMedia): Question {
+  return { id, activity: { type: media ? 'identify' : 'choice', question, options: choices(labels),
+    correctId: String(correct), success: explanation, explanation, media } };
 }
 
-function associate(id: string, question: string, labels: string[], pairs: [string, number][], explanation: string): Question {
+function associate(id: string, question: string, labels: string[], pairs: [string, number, QuizMedia?][], explanation: string): Question {
   return { id, activity: { type: 'association', question, options: choices(labels),
-    pairs: pairs.map(([label, answer], index) => ({ id: String(index), label, answerId: String(answer) })),
+    pairs: pairs.map(([label, answer, media], index) => ({ id: String(index), label, answerId: String(answer), media })),
     success: explanation, explanation } };
+}
+
+function mediaFor(id: string, kind: QuizMedia['kind']) {
+  const sign = getEducationalSign(id);
+  const media = sign && signQuizMedia(sign, kind);
+  if (!media) throw new Error(`Falta el recurso ${kind} de ${id}`);
+  return media;
+}
+
+function selectClip(id: string, question: string, candidates: string[], correct: number): Question {
+  const options = candidates.map((signId, index) => ({ id: String(index), label: `Clip ${index + 1}`, media: mediaFor(signId, 'video') }));
+  const explanation = options[correct].media.description;
+  return { id, activity: { type: 'choice', question, options, correctId: String(correct),
+    success: explanation, explanation, reviewSignIds: candidates } };
 }
 
 function order(id: string, question: string, labels: string[], sequence: number[], explanation: string): Question {
@@ -57,8 +73,8 @@ const largerNumbers = ['seis', 'siete', 'ocho', 'nueve', 'diez'];
 const expressionIds = ['LSP-006', 'LSP-007', 'LSP-008'];
 const companyIds = ['LSP-009', 'LSP-010'];
 const numberChoices = ['Ocho', 'Seis', 'Diez', 'Siete', 'Nueve'];
-const expressionChoices = ['Mucho', 'Sí', 'Nada'];
-const companyChoices = ['Con', 'Solo'];
+const expressionClips = ['LSP-008', 'LSP-006', 'LSP-007'];
+const companyClips = ['LSP-010', 'LSP-009'];
 
 export const basicLessons = [
   lesson('introduccion', 'Introducción a la LSP', '8 min',
@@ -81,10 +97,10 @@ export const basicLessons = [
         'Una demostración de LSP permite observar los detalles de esa lengua.')),
       assessment(
         choose('lenguas', '¿Qué compruebas antes de usar una demostración para este curso?',
-          ['Que corresponde a LSP', 'Que usa una traducción palabra por palabra', 'Que el título está escrito en inglés'], 0,
+          ['La lengua de señas que identifica la fuente', 'La lengua de los subtítulos de la demostración', 'La glosa en español asignada a la seña'], 0,
           'El curso estudia LSP y las demostraciones deben corresponder a esa lengua.'),
         choose('observacion', 'Además de las manos, ¿qué puedes observar durante una demostración?',
-          ['El orden alfabético de la ficha', 'El color del material', 'El rostro y el cuerpo de quien signa'], 2,
+          ['El punto de la pantalla donde aparecen los subtítulos', 'El texto de la ficha mientras la persona signa', 'El rostro y el cuerpo de quien signa'], 2,
           'La expresión facial y corporal forma parte de la información visual.')),
     ]),
   lesson('comunicacion-visual', 'Comunicación visual', '8 min',
@@ -107,7 +123,7 @@ export const basicLessons = [
           ['Frente a ella, con luz que permita ver su rostro', 'De espaldas a ella', 'Frente a ella, con su rostro en sombra'], 0,
           'La buena iluminación y la posición de frente permiten ver la información visual.'),
         choose('mirada', 'Tu compañero está mirando sus apuntes. ¿Qué haces antes de iniciar la demostración?',
-          ['Empiezas con el movimiento', 'Esperas a que pueda mirarte', 'Reproduces la seña más deprisa'], 1,
+          ['Empiezas por la configuración y compruebas su mirada al final', 'Esperas a que pueda mirarte', 'Le pides que lea la ficha mientras haces el movimiento'], 1,
           'Esperar el contacto visual le permite ver la demostración desde el comienzo.')),
     ]),
   lesson('cero', 'Cero y cantidades vacías', '7 min',
@@ -117,12 +133,13 @@ export const basicLessons = [
     ], [
       study('Observa Cero y Uno', 'Abre la figura 2. Coloca un objeto sobre la mesa y practica Uno con la ficha. Retíralo y ensaya Cero siguiendo la lámina.', ['cero', 'LSP-001']),
       exercise('Compara las posturas', choose('uno', '¿Qué número corresponde a la postura del dibujo?', ['Cero', 'Uno'], 1,
-        'El índice extendido corresponde a Uno en esta lámina. Cero se ilustra con la mano cerrada.', 'LSP-001')),
+        'El índice extendido corresponde a Uno en esta lámina. Cero se ilustra con la mano cerrada.', mediaFor('LSP-001', 'diagram'))),
       assessment(
         choose('caja', 'Retiraste la última ficha de una caja. ¿Cuántas fichas quedaron?', ['Una', 'Dos', 'Cero'], 2,
           'Cuando no queda ningún objeto, la cantidad es cero.'),
-        choose('forma', 'En la lámina estudiada, ¿qué postura corresponde a Cero?', ['La mano cerrada', 'El índice extendido', 'Los cinco dedos extendidos'], 0,
-          'En Cero la mano se cierra. El índice extendido se usa para Uno.')),
+        choose('forma', 'La foto muestra Uno. Según la lámina, ¿qué configuración usarías para indicar Cero?',
+          ['La mano cerrada', 'El índice extendido', 'Los cinco dedos extendidos'], 0,
+          'Para pasar de Uno a Cero, recoge el índice y cierra la mano.', mediaFor('LSP-001', 'photo'))),
     ]),
   lesson('seis-a-diez', 'Del seis al diez', '10 min',
     'Estudia cinco números nuevos, compara posturas y registra cantidades de objetos.', [
@@ -148,8 +165,10 @@ export const basicLessons = [
     assessment(
       associate('momento', 'Relaciona cada horario con el saludo que estudiarías.', ['Buenos días', 'Buenas noches'],
         [['Encuentro a las 9 a. m.', 0], ['Encuentro a las 9 p. m.', 1]], 'Estos horarios permiten distinguir un saludo de mañana de uno de noche.'),
-      choose('demostracion', '¿Qué parte de la figura comparas para distinguir los dos saludos?', ['La numeración de la página',
-        'El movimiento que muestra cada secuencia', 'El color del marco'], 1, 'Las viñetas y sus flechas indican cómo se desarrolla cada saludo.')),
+      choose('demostracion', 'Ambos saludos tienen más de una viñeta. ¿Cómo comprobarías en la página 46 dónde se distinguen?',
+        ['Compararía solo la primera posición de las manos', 'Seguiría las flechas de cada secuencia hasta su posición final',
+          'Compararía las últimas viñetas sin observar cómo se llega a ellas'], 1,
+        'Recorre cada secuencia completa para comparar tanto las posiciones como los desplazamientos.')),
   ]),
   lesson('cortesia', 'Expresiones de cortesía', '8 min',
     'Estudia la viñeta Disculpar y decide cuándo pedir disculpas.', [
@@ -157,8 +176,9 @@ export const basicLessons = [
       'Elegir entre saludar y pedir disculpas según la situación.',
     ], [
       study('Observa Disculpar', 'Busca la viñeta Disculpar, arriba a la derecha. Observa el inicio y el recorrido. Ensaya con la ilustración antes de resolver el ejercicio.', ['disculpa']),
-      exercise('Resuelve una interrupción', choose('turno', 'Interrumpes sin querer el turno de tu compañera. ¿Qué expresión estudiada corresponde?',
-        ['Buenos días', 'Disculpa', 'Buenas noches'], 1, 'Disculpa sirve para reconocer la interrupción.')),
+      exercise('Revisa las pistas de la viñeta', choose('turno', 'Tu compañera detiene la imitación de «Disculpa» en la posición inicial. ¿Qué le indicarías revisar en la página 47?',
+        ['La posición inicial de ambas manos y nada más', 'El recorrido que indica la flecha tras colocar las manos', 'El último punto del recorrido sin seguir la flecha'], 1,
+        'La colocación de ambas manos es el punto de partida. La flecha de la viñeta indica el desplazamiento.')),
       assessment(associate('contextos', 'Elige una expresión para cada momento.', ['Disculpa', 'Buenas noches', 'Buenos días'],
         [['Saludas a tu grupo al llegar a las 8 a. m.', 2], ['Tropiezas con una persona por accidente', 0],
           ['Saludas al entrar a una reunión a las 9 p. m.', 1]], 'Los saludos se eligen según el momento del encuentro. Disculpa corresponde al accidente.')),
@@ -168,34 +188,33 @@ export const basicLessons = [
     'Practicar las tres señas con la guía y una actividad sin cámara o dirigida.',
   ], [
     study('Observa Sí, Nada y Mucho', 'Compara cuántas manos intervienen en cada figura y sigue sus indicaciones de movimiento.', expressionIds),
-    practise('LSP-006', choose('afirmacion', 'Te preguntan si quieres participar y respondes afirmativamente. ¿Qué seña ensayas?',
-      expressionChoices, 1, 'Sí expresa una respuesta afirmativa.')),
-    practise('LSP-007', choose('ausencia', 'La bolsa está vacía. ¿Qué seña de la lección usarías para expresar que no hay ningún objeto?',
-      expressionChoices, 2, 'Nada expresa que en la bolsa no hay objetos.'),
+    practise('LSP-006', selectClip('afirmacion', '¿En qué clip se demuestra «Sí»? Fíjate en qué parte de la mano se mueve.', expressionClips, 1)),
+    practise('LSP-007', selectClip('ausencia', '¿En qué clip se demuestra «Nada»? Compara la posición de los dedos.', expressionClips, 2),
       'La V1 puede dar resultados inconsistentes con Nada. Usa el ejercicio alternativo si te cuesta obtener una coincidencia.'),
-    practise('LSP-008', choose('abundancia', 'Quieres indicar que hay una cantidad abundante. ¿Qué seña ensayas?',
-      expressionChoices, 0, 'Mucho expresa una cantidad abundante.')),
+    practise('LSP-008', selectClip('abundancia', '¿En qué clip se demuestra «Mucho»? Compara cómo intervienen las manos.', expressionClips, 0)),
     assessment(
-      associate('sentidos', 'Relaciona cada intención con una seña estudiada.', expressionChoices,
-        [['Confirmar que asistirás', 1], ['Indicar que la caja quedó vacía', 2], ['Expresar que hay una gran cantidad', 0]],
-        'Sí afirma, Nada expresa ausencia y Mucho indica una cantidad grande.')),
+      associate('sentidos', 'Reproduce los clips y elige en qué situación usarías la seña de cada uno.',
+        ['Indicar que quedan muchas fichas', 'Confirmar que asistirás', 'Indicar que no quedan fichas'],
+        [['Clip A', 1, mediaFor('LSP-006', 'video')], ['Clip B', 2, mediaFor('LSP-007', 'video')], ['Clip C', 0, mediaFor('LSP-008', 'video')]],
+        'El movimiento de muñeca del clip A expresa «Sí». El clip B muestra «Nada» con pulgar e índice juntos. En el clip C intervienen ambas manos para expresar «Mucho».')),
   ]),
   lesson('elecciones-y-compania', 'Solo y Con', '10 min', 'Estudia cómo expresar ausencia de compañía o compañía en un contexto.', [
     'Distinguir Solo y Con en ejemplos de compañía.',
     'Comparar la configuración y el movimiento de ambas señas con la guía.',
   ], [
     study('Observa Solo y Con', 'Busca las dos viñetas en la página 135. Fíjate en qué se mueve y en la diferencia entre usar una o dos manos.', companyIds),
-    practise('LSP-009', choose('solo', 'Llegas sin ninguna compañía. ¿Qué seña de esta lección expresa esa situación?',
-      companyChoices, 1, 'Solo indica que llegas sin compañía.'),
+    practise('LSP-009', selectClip('solo', '¿Qué clip demuestra «Solo»? Observa la trayectoria de la mano.', companyClips, 1),
       'La V1 puede tener dificultades con el giro de Solo. Puedes estudiar el movimiento en la figura y usar el ejercicio alternativo.'),
-    practise('LSP-010', choose('con', 'Llegas en compañía de alguien. ¿Qué seña de esta lección indica esa relación?',
-      companyChoices, 0, 'Con indica que hay compañía.')),
+    practise('LSP-010', selectClip('con', '¿Qué clip demuestra «Con»? Observa cómo se colocan y se mueven las manos.', companyClips, 0)),
     assessment(
-      associate('compania', 'Elige la seña que corresponde al dato sobre compañía en cada caso.', companyChoices,
-        [['Lucía fue al parque sin compañía', 1], ['Mario fue al parque en compañía de su hermano', 0]],
-        'Solo expresa ausencia de compañía y Con expresa compañía en estos ejemplos.'),
-      choose('manos', 'En la página estudiada, ¿qué seña acerca ambas manos entre sí?', companyChoices, 0,
-        'Con se ilustra acercando las dos manos. Solo muestra un giro con una mano.')),
+      associate('compania', 'Mira los clips y elige qué parte de cada relato expresa la seña.',
+        ['Mario llegó acompañado por su hermano', 'Lucía llegó sin compañía'],
+        [['Clip A', 1, mediaFor('LSP-009', 'video')], ['Clip B', 0, mediaFor('LSP-010', 'video')]],
+        'El giro de una mano del clip A corresponde a «Solo». En el B se acercan ambas manos para expresar «Con».'),
+      choose('manos', 'Observa el gesto en el clip. ¿Qué secuencia de posiciones siguen las manos?',
+        ['Las manos pasan de estar separadas a acercarse con los pulgares extendidos',
+          'Las manos pasan de estar juntas a separarse con los pulgares extendidos'], 0,
+        'En «Con», las dos manos se acercan con los pulgares extendidos. Observa el punto de partida y compara la distancia al final del gesto.', mediaFor('LSP-010', 'video'))),
   ]),
   lesson('familia', 'Familia y personas', '9 min', 'Estudia Familia, Mamá y Papá en la guía ilustrada.', [
     'Comprender qué vínculo señala cada ficha.',
@@ -204,22 +223,22 @@ export const basicLessons = [
     study('Observa los vínculos familiares', 'Abre la página 79. Ensaya cada una de las tres figuras. Compara las configuraciones F, M y P tal como aparecen en la guía.', ['familia', 'mama', 'papa']),
     exercise('Compara los movimientos', choose('semicirculo', '¿Cuál de las tres figuras muestra un semicírculo hacia delante con ambas manos?',
       ['Papá', 'Familia', 'Mamá'], 1, 'La ficha Familia muestra un semicírculo con ambas manos.')),
-    assessment(associate('vinculos', 'Relaciona cada significado con la ficha de estudio.', ['Mamá', 'Familia', 'Papá'],
-      [['El conjunto de personas de un grupo familiar', 1], ['Una forma cercana de referirse a la madre', 0],
-        ['Una forma cercana de referirse al padre', 2]], 'Familia identifica al grupo. Mamá y Papá identifican vínculos familiares concretos.')),
+    assessment(associate('vinculos', 'Compara la página 79 y relaciona cada pista visual con su ficha.', ['Mamá', 'Familia', 'Papá'],
+      [['Configuración F y recorrido con ambas manos', 1], ['Configuración M', 0],
+        ['Configuración P', 2]], 'La guía distingue las entradas por sus configuraciones F, M y P. En Familia también se aprecia el recorrido de ambas manos.')),
   ]),
   lesson('comunidad', 'Comunidad y lugares', '8 min', 'Observa y practica las señas Casa y Colegio.', [
     'Elegir la seña de un lugar según su uso.',
     'Distinguir la silueta de Casa del movimiento de Colegio.',
   ], [
     study('Compara Casa y Colegio', 'Abre las dos páginas de la guía. Ensaya las figuras prestando atención a la posición de las manos y al movimiento que muestra cada una.', ['casa', 'colegio']),
-    exercise('Identifica el lugar', choose('aulas', 'Visitas un lugar con aulas donde se imparten clases. ¿Qué seña practicarías?',
-      ['Colegio', 'Casa'], 0, 'Colegio identifica un lugar en el que se imparten clases.')),
+    exercise('Compara los desplazamientos', choose('aulas', '¿En cuál de las dos fichas observas un recorrido circular con los dedos semiflexionados?',
+      ['Colegio', 'Casa'], 0, 'La figura de Colegio muestra el recorrido circular. La de Casa representa la forma de un techo.')),
     assessment(
       choose('tejado', '¿En cuál de las figuras juntas las yemas de los dedos para dibujar un techo?', ['Colegio', 'Casa'], 1,
         'La figura Casa representa la silueta de un techo.'),
-      choose('vivienda', 'Buscas la ficha del lugar donde vives con tu familia. ¿Cuál abres?', ['Casa', 'Colegio'], 0,
-        'Casa es la ficha del lugar que sirve como vivienda.')),
+      choose('vivienda', 'Una compañera mueve las manos en círculos cuando quiere indicar dónde vive. ¿Qué ficha le ayudaría a revisar la configuración?', ['Casa', 'Colegio'], 0,
+        'En Casa, las yemas de las dos manos se juntan para formar la silueta de un techo. El recorrido circular corresponde a Colegio.')),
   ]),
   lesson('repaso-cotidiano', 'Evaluación integradora', '12 min',
     'Aplica cantidades, saludos y expresiones estudiadas en pequeños casos cotidianos.', [
@@ -233,12 +252,12 @@ export const basicLessons = [
         ['Cero', 'Tres', 'Seis', 'Ocho'], 2, 'Cuatro más dos da seis. Revisa esa figura en la lámina numérica.')),
       assessment(
         choose('imagen', '¿Qué número representa esta postura?', ['Uno', 'Dos', 'Tres', 'Cinco'], 2,
-          'En Tres quedan extendidos pulgar, índice y medio.', 'LSP-003'),
+          'En Tres quedan extendidos pulgar, índice y medio.', mediaFor('LSP-003', 'photo')),
         choose('material', 'De diez fichas repartes dos. ¿Qué cantidad queda?', ['Ocho', 'Cero', 'Tres', 'Seis'], 0,
           'Diez menos dos da ocho. Puedes repasar su postura en la lámina numérica.'),
-        associate('encuentro', 'Elige una seña o saludo estudiado para cada intención.', ['Nada', 'Con', 'Colegio', 'Buenos días'],
+        associate('encuentro', 'Elige una seña o saludo para cada caso e identifica las dos demostraciones.', ['Nada', 'Con', 'Colegio', 'Buenos días'],
           [['Indicar dónde se imparte la clase', 2], ['Saludar al llegar por la mañana', 3],
-            ['Expresar que la caja quedó vacía', 0], ['Indicar que llegaste en compañía de alguien', 1]],
-          'Las elecciones comprueban el sentido de cada seña o saludo en el caso descrito.')),
+            ['Primera demostración', 0, mediaFor('LSP-007', 'video')], ['Segunda demostración', 1, mediaFor('LSP-010', 'video')]],
+          'En la primera demostración se juntan pulgar e índice para «Nada». En la segunda se acercan las dos manos para «Con».')),
     ]),
 ] satisfies Lesson[];

@@ -84,7 +84,8 @@
 
 .learning-lesson-page > .lesson-breadcrumb { margin-top: 2px; }
 .lesson-association-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(155px, .8fr); align-items: center; gap: 17px; margin-bottom: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: light-dark(#fcfaff, var(--color-card)); }
-.lesson-association-row > span { font-size: 14px; line-height: 1.5; font-weight: 750; }
+.lesson-association-row > div { min-width: 0; font-size: 14px; line-height: 1.5; font-weight: 750; }
+.lesson-association-row small { display: block; }
 .lesson-association-row select { min-width: 0; width: 100%; min-height: 43px; padding: 9px 11px; border: 1px solid light-dark(#d8c9ee, var(--color-line)); border-radius: 10px; background: light-dark(#fff, var(--color-card)); color: var(--ink); font: inherit; font-size: 14px; }
 .lesson-association-row select:focus-visible { outline: 3px solid light-dark(#21a18b, var(--color-focus)); outline-offset: 3px; }
 .lesson-association-row.is-correct { border-color: light-dark(#8bc5ac, var(--color-success-line)); background: light-dark(#f0faf4, var(--color-success-bg)); }

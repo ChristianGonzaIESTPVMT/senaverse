@@ -13,6 +13,10 @@
   width: min(100%, 11rem);
 }
 
+.quiz-sign-video {
+  aspect-ratio: auto 16 / 9;
+}
+
 .lesson-visual-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));

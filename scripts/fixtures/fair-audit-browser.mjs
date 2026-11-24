@@ -282,6 +282,7 @@ export async function checkFairJourneys({ send, evaluate, requests }, origin, un
       const exercise = getSituationExercise(scene, getEducationalSign(scene.expectedSignId));
       await select('.situation-alternative input', exercise.correctId);
       await click('.situation-alternative button', 'Comprobar ejercicio sin cámara');
+      assert.ok(await evaluate(`document.querySelector('.situation-scene-reply')?.textContent.includes(${JSON.stringify(scene.reply)})`));
       const asset = await evaluate('document.querySelector(".situation-scene-page .situation-illustration img")?.getAttribute("src")');
       assert.equal(asset, '/' + situation.illustrationSrc.src);
       await click('.situation-navigation :is(a,button)', index + 1 === situation.scenes.length ? 'Finalizar situación' : 'Continuar a la siguiente interacción');

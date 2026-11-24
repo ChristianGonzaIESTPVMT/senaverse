@@ -47,7 +47,9 @@ function legacyExercise(scene: SituationScene, sign: LibraryEntry): ChoiceExerci
 
 export function getSituationVisualExercise(scene: SituationScene, sign: LibraryEntry): ChoiceExercise | undefined {
   const kind = ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005'].includes(sign.id) ? 'photo' : 'video';
-  const supplemental = scene.dialogue || kind === 'photo' ? [] : ['LSP-007', 'LSP-009'];
+  // The food scenes include Uno alongside two clips, so its photo needs comparable distractors.
+  const supplemental = kind === 'photo' && scene.dialogue === 'visual' ? ['LSP-002', 'LSP-003']
+    : !scene.dialogue && kind === 'video' ? ['LSP-007', 'LSP-009'] : [];
   const candidates = [...new Set([...scene.optionIds, ...supplemental])];
   const options = candidates.flatMap(id => {
     const entry = getEducationalSign(id);
@@ -58,6 +60,10 @@ export function getSituationVisualExercise(scene: SituationScene, sign: LibraryE
   return { type: 'choice', question: `¿Qué demostración corresponde a «${sign.word}»?`,
     options, correctId: sign.id, success: 'Identificaste la demostración de la seña elegida.',
     explanation: signQuizMedia(sign, kind)?.description };
+}
+
+export function getSituationCameraTarget(scene: SituationScene, sign: LibraryEntry | undefined) {
+  return scene.dialogue === 'camera' ? sign?.recognitionClassId : undefined;
 }
 
 export function getSituationExercise(scene: SituationScene, sign: LibraryEntry) {
@@ -80,13 +86,14 @@ function evaluateAttempt(scene: SituationScene, id: string, choiceId: string, in
   const sign = getEducationalSign(choiceId);
   if (!scene.dialogue || !sign || !object(input)) return;
   const contextCorrect = choiceId === scene.expectedSignId;
-  if (input.method === 'camera' && scene.dialogue === 'camera' && sign.recognitionClassId && object(input.observation)) {
+  const cameraTarget = getSituationCameraTarget(scene, sign);
+  if (input.method === 'camera' && cameraTarget && object(input.observation)) {
     const { status, signId } = input.observation;
     let observation: RecognitionObservation;
     if (status === 'recognized' && typeof signId === 'string' && getEducationalSignForClass(signId)) observation = { status, signId };
     else if (status === 'unknown' || status === 'tracking') observation = { status };
     else return;
-    const matched = observation.status === 'recognized' && observation.signId === sign.recognitionClassId;
+    const matched = observation.status === 'recognized' && observation.signId === cameraTarget;
     return { id, choiceId, contextCorrect, matched, passed: contextCorrect && matched, method: 'camera', observation };
   }
   const exercise = getSituationVisualExercise(scene, sign);
@@ -146,7 +153,7 @@ export function updateSituationRun(situation: Situation, run: SituationRun | und
     const { id, method } = event.attempt;
     const sign = getEducationalSign(current.choiceId);
     if (!scene.dialogue || !id || id === current.active?.id || current.evaluations?.some(item => item.id === id) || !sign) return run;
-    if (method === 'camera' ? scene.dialogue !== 'camera' || !sign.recognitionClassId
+    if (method === 'camera' ? !getSituationCameraTarget(scene, sign)
       : method !== 'visual' || !getSituationVisualExercise(scene, sign)) return run;
     answer = { ...current, checked: false, active: { id, method } };
   } else if (event.type === 'situation-attempt-result') {

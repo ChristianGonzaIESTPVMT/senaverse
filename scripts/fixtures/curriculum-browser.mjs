@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { simulate } from '../../ml/scripts/replay_session.mjs';
 import { functionalLessons, getLessonLocation, getLessonPath } from '../../src/data/curriculum.ts';
 import { questionFields } from '../../src/data/lessonPlan.ts';
@@ -8,7 +9,7 @@ import { replayTrace } from './lesson-browser.mjs';
 
 const storage = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
 
-export async function checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath) {
+export async function checkCurriculum({ send, evaluate, requests }, origin, until, datasetPath, screenshots) {
   const navigate = path => send('Page.navigate', { url: origin + path });
   const text = (selector, value) => until(value, () => evaluate(
     `document.querySelector(${JSON.stringify(selector)})?.textContent.includes(${JSON.stringify(value)})`));
@@ -59,6 +60,34 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
     assert.equal(size.innerWidth, width, JSON.stringify(size));
     assert.ok(size.scrollWidth <= width, JSON.stringify(size));
   };
+  const evidence = async (name, selector) => {
+    if (!screenshots) return;
+    await mkdir(screenshots, { recursive: true });
+    await evaluate(`(async () => {
+      await document.fonts.ready;
+      for (const video of document.querySelectorAll('.lesson-answer-fields video')) {
+        video.currentTime = video.duration * .55;
+        if (video.seeking) await new Promise(resolve => video.addEventListener('seeked', resolve, { once: true }));
+      }
+      document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'start', behavior: 'instant' });
+    })()`);
+    const { data } = await send('Page.captureScreenshot', { format: 'png' });
+    await writeFile(join(screenshots, name + '.png'), Buffer.from(data, 'base64'));
+  };
+  const assertVideoOptions = async (count, play) => {
+    const selector = '.lesson-answer-fields video';
+    assert.equal(await evaluate(`document.querySelectorAll('${selector}').length`), count);
+    await until('metadatos de los clips', () => evaluate(`Array.from(document.querySelectorAll('${selector}')).every(video => video.readyState >= 1 && video.duration > 0)`));
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('${selector}')).every(video => {
+      const { width, height } = video.getBoundingClientRect();
+      return Math.abs(width / height - video.videoWidth / video.videoHeight) < .03;
+    })`), true);
+    if (play) {
+      await evaluate(`document.querySelector('${selector}').play().then(() => true)`);
+      await until('reproducción de la demostración', () => evaluate(`document.querySelector('${selector}').currentTime > 0`));
+      await evaluate(`document.querySelector('${selector}').pause()`);
+    }
+  };
 
   await navigate('/academia/unidad/1/leccion/saludos');
   await text('h1', 'Saludos básicos');
@@ -100,6 +129,10 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
           assert.equal(await evaluate('[...document.querySelectorAll(".lesson-sequence button")].some(button => button.textContent.includes("Practicar con cámara"))'), true);
         }
         await press('Hacer ejercicio sin cámara');
+        if (step.targetId === 'LSP-006') {
+          await assertVideoOptions(3, true);
+          await evidence('aprender-expresiones-clips', '.lesson-answer-fields');
+        }
         await answer(step.alternative);
         await press('Continuar');
       } else if (step.kind === 'question') {
@@ -118,6 +151,10 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
         await answer(step.questions);
         await press('Continuar');
       } else {
+        if (lesson.id === 'elecciones-y-compania') {
+          await assertVideoOptions(3, true);
+          assert.equal(await evaluate('!!document.querySelector(".lesson-association-row label video")'), false);
+        }
         await answer(step.questions, lesson.id === 'repaso-cotidiano');
         await press('Ver resumen');
       }
@@ -163,6 +200,10 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
     await assertFits(width);
     await press('Revisar evaluación');
     await assertFits(width);
+    if (width === 390) {
+      await assertVideoOptions(2, true);
+      await evidence('aprender-repaso-movil-oscuro', '.lesson-association-row:has(video)');
+    }
     await navigate('/academia');
     await text('.learning-banner-stats', '100%');
   }
@@ -207,6 +248,6 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
     assert.equal(run.steps.evaluacion, undefined);
   }
   console.log(JSON.stringify({ units: 6, lessons: 12, grade: '5/6 → 6/6', xp: 960, cameraRequests: 0,
-    libraryReturn: true, historicalRoute: true, refresh: true, responsiveWidths: [390, 768],
+    libraryReturn: true, historicalRoute: true, refresh: true, educationalClips: true, responsiveWidths: [390, 768],
     guidedConFromRecording: !!datasetPath }));
 }

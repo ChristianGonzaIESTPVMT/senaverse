@@ -179,8 +179,32 @@ export async function checkSituations({ send, evaluate, requests }, origin, unti
   await contains('.situation-answer-feedback', 'no corresponde');
   assert.equal(await canAdvance(), false);
   assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
+
+  await send('Page.navigate', { url: origin + '/simulador/comida' });
+  await scene('Una porción para el almuerzo');
+  await completeVisual('LSP-001');
+  await contains('.situation-scene-reply', '¿Puedes mirar si queda pan en la bandeja?');
+  await link('Continuar a la siguiente interacción');
+  await scene('Se acabó el pan');
+  await completeVisual('LSP-001');
+  await feedback('Contexto por revisar');
+  assert.equal(await canAdvance(), false);
+  assert.equal(await evaluate('!!document.querySelector(".situation-scene-reply")'), false);
+  await capture('comedor-visual-correcto-contexto-incorrecto', pane);
+  await selection('LSP-007');
+  await button('Hacer ejercicio sin cámara');
+  assert.equal(await evaluate('document.querySelectorAll(".situation-alternative video").length'), 3);
+  assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
+  await radio('.situation-alternative', 'LSP-007');
+  await button('Comprobar ejercicio sin cámara');
+  await contains('.situation-scene-reply', '¿Puedes revisar también la bandeja de arroz?');
+  await capture('comedor-transicion-narrativa', '.situation-scene-reply');
+  await link('Continuar a la siguiente interacción');
+  await scene('Arroz para todos');
+
   assert.ok(requests.every(url => url.startsWith(origin + '/') || /^(blob:|data:)/.test(url)));
   console.log(JSON.stringify({ catalogue: 6, libraryRoundTrip: true, unsupported: 'No', permissionDenied: true,
     cameraOutcomes: datasetPath ? 6 : 1, lostTrackingAfterConfirmation: !!datasetPath, archivedOnRepeat: true,
-    reward: '40 XP once', desktopAndMobileBothThemes: true, released: true, screenshots: !!screenshots }));
+    reward: '40 XP once', visualWrongContext: true, narrativeContinuity: true,
+    desktopAndMobileBothThemes: true, released: true, screenshots: !!screenshots }));
 }

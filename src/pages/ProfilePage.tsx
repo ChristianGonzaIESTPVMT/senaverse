@@ -4,7 +4,6 @@ import { StudentAvatar } from '../components/StudentAvatar';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { createProfileBackup } from '../data/profileBackup';
 import { readProfilePhoto } from '../data/profilePhotoStore';
-import { validateStoredPhoto } from '../data/profilePhoto';
 import { PROFILE_BIO_LIMIT, PROFILE_NAME_LIMIT, type PersonalInfoErrors } from '../data/profile';
 import { Link } from 'react-router-dom';
 import { StudentLevel } from '../components/StudentLevel';
@@ -55,8 +54,6 @@ export function ProfilePage() {
     setFeedback('');
     try {
       const photo = profile.photoId ? await readProfilePhoto(profile.photoId) : null;
-      if (profile.photoId && !photo) throw new Error('No se pudo leer la foto guardada. Reemplázala o elimínala antes de exportar.');
-      if (photo) await validateStoredPhoto(photo);
       const data = await createProfileBackup(profile, progress, photo);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -70,6 +67,8 @@ export function ProfilePage() {
       setFeedback('Se inició la descarga de tus datos.');
     } catch {
       setExportError('No se pudieron exportar tus datos. Inténtalo de nuevo.');
+    } finally {
+      setExporting(false);
     }
   };
 

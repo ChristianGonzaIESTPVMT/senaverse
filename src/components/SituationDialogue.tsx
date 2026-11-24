@@ -2,17 +2,19 @@ import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { Camera, CheckCircle2, Info, MessageSquareText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getEducationalSign, getEducationalSignForClass, getLibrarySignPath } from '../data/library';
-import { getSituationVisualExercise, type SceneStudy, type SituationAttempt, type SituationStudyEvent } from '../data/situationStudy';
+import { getSituationCameraTarget, getSituationVisualExercise, type SceneStudy, type SituationAttempt, type SituationStudyEvent } from '../data/situationStudy';
 import type { Situation, SituationFilter, SituationScene } from '../data/situations';
 import { LessonAnswerFields } from './LessonActivity';
 import { SituationIllustration } from './SituationContent';
 
 const CameraPractice = lazy(async () => ({ default: (await import('./RecognitionPractice')).RecognitionPractice }));
 
-const speakers: Record<string, string> = {
-  utiles: 'Persona de la papelería', tienda: 'Persona de la tienda', comida: 'Persona del comedor',
-  actividad: 'Compañera de clase', cantidad: 'Responsable del taller',
-};
+export function SituationLine({ speaker, children, id }: { speaker: string; children: ReactNode; id?: string }) {
+  return <div className="situation-dialogue-speaker">
+    <MessageSquareText size={22} aria-hidden="true" />
+    <div><strong>{speaker}</strong><p id={id}>{children}</p></div>
+  </div>;
+}
 
 function Result({ title, passed, children }: { title: string; passed: boolean; children: ReactNode }) {
   const Icon = passed ? CheckCircle2 : Info;
@@ -22,27 +24,22 @@ function Result({ title, passed, children }: { title: string; passed: boolean; c
   </div>;
 }
 
-function AttemptFeedback({ attempt, explanation, visualExplanation, speaker }: {
-  attempt: SituationAttempt; explanation: string; visualExplanation?: string; speaker: string;
+function AttemptFeedback({ attempt, explanation, visualExplanation }: {
+  attempt: SituationAttempt; explanation: string; visualExplanation?: string;
 }) {
   const observation = attempt.method === 'camera' ? attempt.observation : undefined;
   const recognized = observation?.status === 'recognized' && getEducationalSignForClass(observation.signId);
   return <div className="situation-attempt-feedback" role="status" aria-atomic="true">
     <Result title={attempt.contextCorrect ? 'Contexto correcto' : 'Contexto por revisar'} passed={attempt.contextCorrect}>{explanation}</Result>
     {attempt.method === 'visual' ? <Result title={attempt.matched ? 'Comprensión visual correcta' : 'Comprensión visual por revisar'} passed={attempt.matched}>
-      {attempt.matched ? 'Identificaste la demostración elegida.' : 'Compara las demostraciones y fíjate en la posición de la mano y su movimiento.'}
+      {attempt.matched ? 'Identificaste la demostración de la opción que elegiste.' : 'La demostración seleccionada corresponde a otra seña.'}
       {visualExplanation && ` ${visualExplanation}`}
     </Result> : <Result title={attempt.matched ? 'Coincidencia gestual' : recognized ? 'Seña diferente' : observation?.status === 'unknown'
       ? 'Gesto desconocido' : 'Seguimiento insuficiente'} passed={attempt.matched}>
-      {recognized ? `V1 reconoció «${recognized.word}». ${attempt.matched ? 'Coincide con tu respuesta.' : 'Vuelve a realizar la seña elegida.'}`
+      {recognized ? `V1 reconoció «${recognized.word}». ${attempt.matched ? 'Coincide con la opción que elegiste.' : `Vuelve a intentar «${getEducationalSign(attempt.choiceId)?.word}».`}`
         : 'Centra la mano completa, ilumínala de frente y mantenla visible. Puedes reintentar o elegir la práctica sin cámara.'}
     </Result>}
-    <div className="situation-dialogue-speaker situation-dialogue-reply">
-      <MessageSquareText size={20} aria-hidden="true" />
-      <div><strong>{speaker}</strong><p>
-        {attempt.passed ? 'De acuerdo, continuemos.' : !attempt.contextCorrect ? 'Revisemos lo que hace falta aquí.' : 'Veamos otra vez cómo expresar tu respuesta.'}
-      </p></div>
-    </div>
+    {!attempt.passed && <p>{attempt.contextCorrect ? 'Conserva tu respuesta y repite la práctica.' : 'Revisa la situación y elige otra respuesta para avanzar.'}</p>}
   </div>;
 }
 
@@ -58,8 +55,8 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
   const last = answer?.checked ? answer.evaluations?.at(-1) : undefined;
   const selected = answer && getEducationalSign(answer.choiceId);
   const exercise = selected && getSituationVisualExercise(scene, selected);
-  const cameraAvailable = scene.dialogue === 'camera' && !!selected?.recognitionClassId;
-  const speaker = speakers[situationId] ?? 'Interlocutor';
+  const cameraTarget = getSituationCameraTarget(scene, selected);
+  const speaker = situation.speaker ?? 'Interlocutor';
 
   function start(method: 'camera' | 'visual') {
     const id = crypto.randomUUID();
@@ -72,10 +69,7 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
     <div className="situation-dialogue-exchange">
       <h2 id="situation-scene-title">{scene.title}</h2>
       <p>{scene.context}</p>
-      <div className="situation-dialogue-speaker">
-        <MessageSquareText size={22} aria-hidden="true" />
-        <div><strong>{speaker}</strong><p id="situation-question">{scene.question}</p></div>
-      </div>
+      <SituationLine speaker={speaker} id="situation-question">{scene.question}</SituationLine>
       <fieldset className="situation-options" aria-labelledby="situation-question" disabled={!!answer?.practice}>
         {scene.optionIds.map((id, index) => <label className={`situation-option${selected?.id === id ? ' is-selected' : ''}`} key={id}>
           <input type="radio" name="situation-answer" value={id} checked={selected?.id === id}
@@ -88,11 +82,12 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
         </label>)}
       </fieldset>
       {selected && !answer?.practice && <>
-        <p className="situation-question-note">{cameraAvailable
+        {!last && <p className="situation-question-note">{cameraTarget
           ? `Realiza «${selected.word}» con la cámara o identifica su demostración.`
-          : 'Para esta interacción, elige la demostración visual. La fiabilidad gestual todavía está en revisión.'}</p>
+          : exercise ? 'Completa la segunda comprobación con el ejercicio sin cámara.'
+            : 'Esta opción no tiene una demostración verificable aquí. Elige otra para continuar.'}</p>}
         <div className="situation-question-actions" role="group" aria-label="Método de práctica">
-          {cameraAvailable && <button className="button button-outline" type="button" disabled={active?.method === 'camera'} onClick={() => start('camera')}>
+          {cameraTarget && <button className="button button-outline" type="button" disabled={active?.method === 'camera'} onClick={() => start('camera')}>
             <Camera size={18} aria-hidden="true" />{last?.method === 'camera' ? 'Reintentar con cámara' : 'Practicar con cámara'}
           </button>}
           {exercise && <button className="button button-outline" type="button" disabled={active?.method === 'visual'} onClick={() => start('visual')}>
@@ -102,8 +97,8 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
         </div>
       </>}
     </div>
-    {active?.method === 'camera' && selected?.recognitionClassId && <Suspense fallback={<p role="status">Abriendo la práctica con cámara…</p>}>
-      <CameraPractice key={active.id} assessment={{ targetId: selected.recognitionClassId,
+    {active?.method === 'camera' && cameraTarget && <Suspense fallback={<p role="status">Abriendo la práctica con cámara…</p>}>
+      <CameraPractice key={active.id} assessment={{ targetId: cameraTarget,
         onObserve: observation => onEvent({ type: 'situation-attempt-result', situationId, sceneId, attemptId: active.id,
           input: { method: 'camera', observation } }) }} />
     </Suspense>}
@@ -114,7 +109,7 @@ export function SituationDialogue({ situation, scene, answer, filter, onEvent }:
       <LessonAnswerFields activity={exercise} responses={{ choice: response }} onResponse={(_, value) => setResponse(value)} checked={false} />
       <button className="button button-primary" type="submit" disabled={!response}>Comprobar ejercicio sin cámara</button>
     </form>}
-    {last && <AttemptFeedback attempt={last} explanation={scene.explanation} visualExplanation={exercise?.explanation} speaker={speaker} />}
+    {last && <AttemptFeedback attempt={last} explanation={scene.explanation} visualExplanation={exercise?.explanation} />}
     {!last && answer?.practice && <p role="status">Interacción completada en tu historial.</p>}
     {(last || answer?.practice) && selected && <Link to={getLibrarySignPath(selected.id)} state={{ situationReturn: { situationId, sceneId, filter } }}>
       Repasar {selected.word} en Biblioteca

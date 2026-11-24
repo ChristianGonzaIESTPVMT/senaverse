@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { simulate } from '../../ml/scripts/replay_session.mjs';
+import { MAX_RESULT_AGE_MS } from '../../src/features/sign-recognition/config.ts';
+import { parseLabModel } from '../../src/features/sign-recognition/labModel.ts';
 import { loadStaticTraces } from './lesson-browser.mjs';
 
 const storage = 'JSON.parse(localStorage.getItem("senaverse-student-progress-v1"))';
@@ -209,41 +212,64 @@ export async function checkMinigames({ send, evaluate, requests }, origin, until
   await button('Ocultar secuencia y empezar');
   await click('.practice-camera-button');
   await wait('cámara preparada en secuencia', 'window.labWorkers.some(worker => !worker.ended && worker.results > 0)');
-  await screenshot('escritorio-dark-senas-camara-partida');
+  const resultsBeforeHint = await evaluate('window.labWorkers.at(-1).results');
+  const timerValue = () => evaluate('document.querySelector(".game-score [role=timer] strong").textContent');
+  await button('Ver ayuda');
+  await wait('vista previa oculta durante la pista', 'document.querySelector(".game-camera")?.parentElement.hidden === true');
+  const pausedTime = await timerValue();
+  await wait('misma captura durante la pista', `window.labWorkers[0].results > ${resultsBeforeHint} && !window.labWorkers[0].ended`);
+  assert.equal(await timerValue(), pausedTime);
+  assert.equal(await score(), 0);
+  await screenshot('escritorio-dark-senas-camara-pista');
+  await button('Ocultar ayuda');
+  await wait('cámara visible al salir de la pista', 'document.querySelector(".game-camera")?.parentElement.hidden === false');
+  await wait('cronómetro reanudado', `document.querySelector('.game-score [role=timer] strong')?.textContent !== ${q(pausedTime)}`);
+  assert.equal(await evaluate('window.labStreams.length === 1 && window.labWorkers.length === 1 && !window.labWorkers[0].ended'), true);
+  await screenshot('escritorio-dark-senas-camara-reanudada');
   await button('Abandonar partida');
   await wait('cámara liberada al abandonar', released);
   assert.equal((await record('senas')).length, 2);
 
   // Feed an existing educational video through a browser capture track and the real Worker.
-  await open('desafio', 'dark'); await select('Modalidad', 'camera'); await start();
+  await open('desafio', 'dark'); await select('Modalidad', 'camera'); await select('Duración', '0'); await start();
   await evaluate(`(async () => {
     const video = document.createElement('video');
     video.src = '/media/signs/lsp-001-uno.mp4';
     video.muted = video.loop = video.playsInline = true;
     await video.play();
-    video.currentTime = video.duration * .55;
-    await new Promise(resolve => video.addEventListener('seeked', resolve, { once: true }));
+    const selectFrame = async fraction => {
+      video.currentTime = video.duration * fraction;
+      if (video.seeking) await new Promise(resolve => video.addEventListener('seeked', resolve, { once: true }));
+    };
+    await selectFrame(.55);
     video.pause();
+    const photo = new Image();
+    photo.src = '/media/signs/lsp-001-uno.jpeg';
+    await photo.decode();
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 480;
     const context = canvas.getContext('2d');
     const stream = canvas.captureStream(0);
     const [track] = stream.getVideoTracks();
-    const draw = () => {
+    const draw = (source = video, zoom = 1) => {
       context.fillStyle = '#222';
       context.fillRect(0, 0, 640, 480);
-      const width = video.videoWidth * 480 / video.videoHeight;
-      context.drawImage(video, (640 - width) / 2, 0, width, 480);
+      const sourceWidth = source.videoWidth ?? source.naturalWidth;
+      const sourceHeight = source.videoHeight ?? source.naturalHeight;
+      const scale = Math.min(640 / sourceWidth, 480 / sourceHeight) * zoom;
+      const width = sourceWidth * scale;
+      const height = sourceHeight * scale;
+      context.drawImage(source, (640 - width) / 2, (480 - height) / 2, width, height);
       track.requestFrame();
     };
     draw();
-    const timer = setInterval(draw, 32);
     navigator.mediaDevices.getUserMedia = async () => {
       window.labStreams.push(stream);
       return stream;
     };
-    window.gameVideo = { video, timer };
+    window.gameVideoTag = 'original-55';
+    window.gameVideo = { video, photo, selectFrame, draw, timer: setInterval(() => draw(), 32) };
     return true;
   })()`);
   await click('.practice-camera-button');
@@ -262,6 +288,70 @@ export async function checkMinigames({ send, evaluate, requests }, origin, until
   }
   await screenshot('escritorio-dark-desafio-video-educativo');
   const educationalVideoDetector = await evaluate('document.querySelector(".game-camera .practice-recognition-state").textContent.trim()');
+  const mediaMetadata = await evaluate(`({ width: window.gameVideo.video.videoWidth, height: window.gameVideo.video.videoHeight,
+    duration: window.gameVideo.video.duration, time: window.gameVideo.video.currentTime,
+    preview: document.querySelector('.game-camera video').getVideoPlaybackQuality().totalVideoFrames })`);
+  for (const [label, fraction, zoom] of [['original-15', .15, 1], ['original-35', .35, 1], ['original-75', .75, 1],
+    ['original-90', .90, 1], ['centro-55-ampliado', .55, 2], ['foto-uno', null, 1]]) {
+    await evaluate(`(async () => {
+      const { video, photo, selectFrame, draw } = window.gameVideo;
+      clearInterval(window.gameVideo.timer);
+      window.gameVideoTag = null;
+      const fraction = ${q(fraction)};
+      if (fraction !== null) await selectFrame(fraction);
+      const frame = () => draw(fraction === null ? photo : video, ${zoom});
+      frame();
+      window.gameVideo.timer = setInterval(frame, 32);
+      // Leave the source unlabelled until the preview has presented the switched frame.
+      const preview = document.querySelector('.game-camera video');
+      await new Promise(resolve => preview.requestVideoFrameCallback(() => preview.requestVideoFrameCallback(resolve)));
+      window.gameVideoTag = ${q(label)};
+    })()`);
+    try {
+      await wait(label, `(() => {
+        const results = window.labWorkers.reduce((total, worker) => total + (worker.detectorSamples[${q(label)}]?.delays.length ?? 0), 0);
+        if (results >= 6) return true;
+        const retry = document.querySelector('.game-camera .practice-detector-retry');
+        if (retry && window.gameVideoRetried !== ${q(label)}) {
+          window.gameVideoRetried = ${q(label)};
+          retry.click();
+        }
+        return false;
+      })()`);
+    } catch (error) {
+      const diagnostic = await evaluate(`({ tag: window.gameVideoTag, errors: window.labWorkerErrors,
+        workers: window.labWorkers.map(({ ended, results, detectorSamples }) => ({ ended, results, tags: Object.keys(detectorSamples) })),
+        videoTime: window.gameVideo.video.currentTime, game: document.querySelector('.game-camera')?.textContent })`);
+      throw new Error(`${error.message} · ${q(diagnostic)}`, { cause: error });
+    }
+  }
+  const { delegates, samples, detectorErrors, retried } = await evaluate(`(() => {
+    const samples = {};
+    for (const worker of window.labWorkers) for (const [label, frames] of Object.entries(worker.detectorSamples)) {
+      const sample = samples[label] ??= { delays: [], withHands: 0 };
+      sample.delays.push(...frames.delays);
+      sample.withHands += frames.withHands;
+      sample.landmarkExample ??= frames.landmarkExample;
+    }
+    return { delegates: window.labWorkers.map(worker => worker.delegate), samples,
+      detectorErrors: window.labWorkerErrors, retried: window.gameVideoRetried ?? null };
+  })()`);
+  assert.deepEqual(detectorErrors, []);
+  const educationalVideoSamples = Object.fromEntries(Object.entries(samples).map(([label, { delays, withHands }]) => [label, {
+    frames: delays.length, withHands, within120ms: delays.filter(delay => delay <= MAX_RESULT_AGE_MS).length,
+    latencyMs: [Math.round(Math.min(...delays)), Math.round(Math.max(...delays))],
+  }]));
+  // Repeat one real detected posture on a test clock to isolate V1 from Worker latency.
+  const posture = samples['original-55']?.landmarkExample;
+  let isolatedClassifier = null;
+  if (posture) {
+    const model = parseLabModel(JSON.parse(await readFile('public/models/lsp-v1.json', 'utf8')));
+    const hands = posture.landmarks.map((landmarks, index) => ({ landmarks, handedness: posture.handedness[index] }));
+    const frames = Array.from({ length: 76 }, (_, index) => ({ timestampMs: index * 40, hands }));
+    const views = simulate(model, { frames, configuration: { processingWidth: 640, processingHeight: 480, inputMirrored: false, profile: 'baseline' } });
+    const final = views.at(-1);
+    if (final) isolatedClassifier = { status: final.status, id: final.stableId, top: final.top[0].id, reason: final.reason };
+  }
   await button('Abandonar partida');
   await wait('pista del video liberada', released);
   await evaluate('clearInterval(window.gameVideo.timer); window.gameVideo.video.pause()');
@@ -271,5 +361,7 @@ export async function checkMinigames({ send, evaluate, requests }, origin, until
   assert.equal((await record('memoria')).length, 2);
   assert.ok(requests.some(url => url.includes('/media/signs/')));
   console.log(JSON.stringify({ games: ids, layouts: 2, themes: 2, touch: true, keyboard: true, drag: true, syntheticCamera: true,
-    recordedGestures, educationalVideo: true, educationalVideoPoints, educationalVideoDetector, denied: true, absent: true, released: true }));
+    recordedGestures, educationalVideo: true, educationalVideoPoints, educationalVideoDetector, educationalVideoSamples, mediaMetadata,
+    delegates, isolatedClassifier, retried,
+    hintKeepsCamera: true, denied: true, absent: true, released: true }));
 }
