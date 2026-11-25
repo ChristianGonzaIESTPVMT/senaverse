@@ -1,5 +1,4 @@
 import { libraryEntries, type LibraryCategory } from './library.ts';
-import { getQuizVisual } from './educationalMedia.ts';
 import { localIllustration, type IllustrationAsset } from './illustrations.ts';
 
 export type MinigameKind = 'memory' | 'visual-quiz' | 'timed-quiz' | 'meaning-quiz' | 'challenge';
@@ -41,9 +40,10 @@ export function getMinigamePath(id: string) {
 }
 
 export function gameVocabulary(game: Minigame, category: GameSettings['category'] = 'todas') {
+  // Keep the vocabulary for saved games from before the current boards.
   return libraryEntries.filter(sign => (category === 'todas' || sign.category === category) && (game.kind === 'challenge'
     ? !!(sign.recognitionClassId && sign.reference && sign.instructions && sign.hands)
-    : game.kind === 'meaning-quiz' || !!getQuizVisual(sign.media)));
+    : game.kind === 'meaning-quiz' || !!sign.media.quizVisual));
 }
 
 export function gameCategories(game: Minigame) {

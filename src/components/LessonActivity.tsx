@@ -25,7 +25,7 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
     const selected = responses.choice === option.id;
     const feedback = checked && selected ? option.id === activity.correctId ? ' right' : ' wrong' : '';
     const label = <label className={`answer${selected ? ' selected' : ''}${feedback}`} key={option.id}>
-      <input type="radio" name={name} value={option.id} checked={selected} onChange={() => onResponse('choice', option.id)} />
+      <input type="radio" name={name} value={option.id} checked={selected} disabled={disabled} onChange={() => onResponse('choice', option.id)} />
       {!option.media && <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>}{option.label}
       {feedback && <small className={motion ? 'lesson-answer-result' : undefined}>{motion && (feedback === ' right' ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{feedback === ' right' ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(activity.correctId)}».`}</small>}
       {!option.media && checked && option.feedback && <small>{option.feedback}</small>}
@@ -36,7 +36,7 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
       {checked && option.feedback && <small>{option.feedback}</small>}
     </div> : label;
   });
-  return <fieldset className="lesson-answer-fields" disabled={disabled}>
+  return <fieldset className="lesson-answer-fields">
     <legend>{activity.question}</legend>
     {activity.type === 'order' && <small>Usa cada acción una sola vez.</small>}
     {visual && <div className="lesson-question-diagram"><EducationalVisual key={visual.id} visual={visual} /></div>}
@@ -49,7 +49,7 @@ export function LessonAnswerFields({ activity, responses, onResponse, checked, d
           {checked && <small className={motion ? 'lesson-answer-result' : undefined} id={`${fieldId}-feedback`}>{motion && (correct ? <Check size={15} aria-hidden="true" /> : <Info size={15} aria-hidden="true" />)}{correct ? 'Correcta' : `Incorrecta. La respuesta correcta es «${labelFor(pair.answerId)}».`}</small>}
           {pair.media && <QuizSignMedia media={pair.media} />}
         </div>
-        <select id={fieldId} aria-describedby={checked ? `${fieldId}-feedback` : undefined}
+        <select id={fieldId} disabled={disabled} aria-describedby={checked ? `${fieldId}-feedback` : undefined}
           value={responses[pair.id] ?? ''} onChange={event => onResponse(pair.id, event.target.value)}>
           <option value="">Elige una respuesta</option>
           {activity.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}

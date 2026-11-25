@@ -14,6 +14,39 @@ function apply(run, action) {
   return playMove(run, { at: run.lastAt + 100, ...action });
 }
 
+test('the expanded visual configuration has new targets and keeps camera targets and existing records separate', () => {
+  for (const id of ['memoria', 'adivina', 'relaciona', 'senas', 'desafio']) {
+    const classic = gameRun(id);
+    const expanded = gameRun(id, { vocabulary: 'ampliado' });
+    assert.equal(classic.limit, expanded.limit);
+    const board = expanded.board;
+    const targets = board.targets ?? board.sources ?? board.cards.map(card => card.id);
+    assert.ok(targets.some(target => !numberIds.includes(target)), id);
+    if (id === 'senas' || id === 'desafio') {
+      const camera = gameRun(id, { vocabulary: 'ampliado', mode: 'camera' });
+      assert.equal(camera.settings.vocabulary, undefined);
+      assert.ok(camera.board.targets.every(target => numberIds.includes(target)));
+    }
+  }
+
+  const game = getMinigame('senas');
+  let state = emptyProgress();
+  for (const vocabulary of [undefined, 'ampliado']) {
+    let run = gameRun('senas', { vocabulary }, vocabulary ?? 'clasico');
+    run = apply(run, { type: 'recall' });
+    for (const id of run.board.targets) run = apply(run, { type: 'pick', id });
+    run = apply(run, { type: 'check' });
+    const details = playResult(run);
+    assert.deepEqual(validatePlayResult(game, details), details);
+    state = recordProgressEvent(state, { type: 'minigame', gameId: game.id, runId: run.id, completed: true,
+      score: 30, maxScore: 30, details }, '2026-11-25T12:00:00Z');
+  }
+  state = restoreProgress(JSON.stringify(state));
+  assert.equal(summarizeMinigame(state, game, playSettings(game), 3).best.details.settings.vocabulary, undefined);
+  assert.equal(summarizeMinigame(state, game, playSettings(game, { vocabulary: 'ampliado' }), 3).best.details.settings.vocabulary, 'ampliado');
+  assert.equal(state.activities.reduce((xp, activity) => xp + (activity.rewardXp ?? 0), 0), 20);
+});
+
 test('association destinations are shuffled, links can change, and checks lock correct pairs only', () => {
   let run = gameRun('relaciona');
   const [a,b,c] = run.board.sources;

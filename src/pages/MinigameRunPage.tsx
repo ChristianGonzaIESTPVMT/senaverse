@@ -7,7 +7,7 @@ import { MotionValue } from '../components/MotionValue';
 import { QuizSignMedia } from '../components/QuizSignMedia';
 import { getEducationalSign } from '../data/library';
 import { signQuizMedia } from '../data/signQuizMedia';
-import { numberIds, playElapsed, playLimit, playMove, playResult, playSettings,
+import { numberQuantity, playElapsed, playLimit, playMove, playResult, playSettings,
   pointsPerMatch, startPlay, type GameBoard, type Play } from '../data/gameMechanics';
 import { gameDurations, getMinigame, type Minigame } from '../data/minigames';
 import { summarizeMinigame } from '../data/progress';
@@ -16,7 +16,6 @@ import { useStudentProgress } from '../hooks/progressContext';
 const CameraGame = lazy(async () => ({ default: (await import('../components/RecognitionPractice')).GameRecognitionPractice }));
 type Send = (action: Parameters<typeof playMove>[1]) => void;
 const word = (id: string) => getEducationalSign(id)?.word ?? '';
-const quantity = (id: string) => numberIds.findIndex(number => number === id) + 1;
 const durationLabel = (ms: number) => {
   const seconds = Math.floor(Math.max(0, ms) / 1000);
   return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
@@ -25,17 +24,18 @@ const durationLabel = (ms: number) => {
 function Sign({ id, diagram = false }: { id: string; diagram?: boolean }) {
   const sign = getEducationalSign(id);
   if (!sign) return null;
-  const media = signQuizMedia(sign, diagram ? 'diagram' : 'photo') ?? signQuizMedia(sign, 'diagram');
-  return media ? <QuizSignMedia key={id + ':' + media.kind} media={media} /> : null;
+  const media = signQuizMedia(sign, diagram ? 'diagram' : 'photo') ?? signQuizMedia(sign, diagram ? 'photo' : 'diagram');
+  return media ? <QuizSignMedia key={id + ':' + media.kind} media={media} thumbnail /> : null;
 }
 
 function explanation(id: string) {
   const sign = getEducationalSign(id);
-  return sign && signQuizMedia(sign, 'diagram')?.description;
+  return sign && (signQuizMedia(sign, 'diagram') ?? signQuizMedia(sign, 'photo'))?.description;
 }
 
 function Quantity({ id }: { id: string }) {
-  return <span className="game-quantity"><strong>{word(id)}</strong><span aria-label={'Cantidad ' + quantity(id)}>{'●'.repeat(quantity(id))}</span></span>;
+  const quantity = numberQuantity(id);
+  return <span className="game-quantity"><strong>{word(id)}</strong><span aria-label={'Cantidad ' + quantity}>{quantity === 0 ? '0' : '●'.repeat(quantity)}</span></span>;
 }
 
 export function MinigameRunPage({ viaCamera = false }: { viaCamera?: boolean }) {
@@ -109,6 +109,12 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
         {supportsCamera && <label>Modalidad<select value={settings.mode} onChange={event => setSettings(playSettings(game, { ...settings, mode: event.target.value === 'camera' ? 'camera' : 'visual' }))}>
           <option value="visual">Visual · sin cámara</option><option value="camera">Cámara experimental</option>
         </select></label>}
+        {settings.mode === 'visual' && <label>Vocabulario<select value={settings.vocabulary ?? 'clasico'} onChange={event => setSettings(playSettings(game, {
+          ...settings, vocabulary: event.target.value === 'ampliado' ? 'ampliado' : undefined,
+        }))}>
+          <option value="clasico">Uno a Cinco</option>
+          <option value="ampliado">{game.id === 'adivina' ? 'Vocabulario ampliado' : 'Cero a Diez'}</option>
+        </select></label>}
         {game.id === 'desafio' && <label>Duración<select value={settings.duration} onChange={event => setSettings(playSettings(game, { ...settings, duration: Number(event.target.value) as Play['settings']['duration'] }))}>
           {gameDurations.map(seconds => <option key={seconds} value={seconds}>{seconds ? seconds + ' segundos' : 'Sin límite de tiempo'}</option>)}
         </select></label>}
@@ -133,9 +139,9 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
         </span>
       </div>
       <div className="game-progress"><MotionProgress value={run.correct} max={run.limit} label="Aciertos de la partida" animateOnMount={false} /></div>
-      {run.board.kind === 'association' && <Association key={run.id} board={run.board} send={send} />}
-      {run.board.kind === 'memory' && <Memory key={run.id} board={run.board} send={send} />}
-      {run.board.kind === 'guess' && <Interpretation key={run.id + ':' + run.board.step} board={run.board} send={send} />}
+      {run.board.kind === 'association' && <Association key={run.id} board={run.board} send={send} photos={!!run.settings.vocabulary} />}
+      {run.board.kind === 'memory' && <Memory key={run.id} board={run.board} send={send} photos={!!run.settings.vocabulary} />}
+      {run.board.kind === 'guess' && <Interpretation key={run.id + ':' + run.board.step} board={run.board} send={send} withVideo={!!run.settings.vocabulary} />}
       {run.board.kind === 'sequence' && <Sequence key={run.id} run={run} board={run.board} send={send} ready={ready} gesture={gesture} />}
       {run.board.kind === 'sprint' && <section className="game-panel game-sprint" aria-label="Reto en curso">
         <div className="game-sprint-prompt">
@@ -160,7 +166,7 @@ function GameSession({ game, viaCamera, initialSize }: { game: Minigame; viaCame
   </div>;
 }
 
-function Association({ board, send }: { board: Extract<GameBoard, { kind: 'association' }>; send: Send }) {
+function Association({ board, send, photos }: { board: Extract<GameBoard, { kind: 'association' }>; send: Send; photos: boolean }) {
   const [selected, setSelected] = useState('');
   const [rejected, setRejected] = useState(false);
   const [dragging, setDragging] = useState('');
@@ -178,12 +184,12 @@ function Association({ board, send }: { board: Extract<GameBoard, { kind: 'assoc
     <div className="game-association-grid" ref={grid}>
       <div><h3>Señas</h3>{board.sources.map((id, index) => <button key={id} type="button" className="game-association-item"
         data-source-index={index} data-pair={board.locked.includes(id) ? 'correct' : board.checked && board.pairs[id] ? 'wrong' : undefined}
-        aria-pressed={selected === id} data-drag-source={dragging === id} aria-label={'Seña ' + (index + 1) + '. ' + explanation(id) + (board.pairs[id] ? ' Conectada con ' + word(board.pairs[id]) : '')}
+        aria-pressed={selected === id} data-drag-source={dragging === id} aria-label={`Seña ${index + 1}. ${explanation(id) ?? ''}${board.pairs[id] ? ' Conectada con ' + word(board.pairs[id]) : ''}`}
         disabled={board.locked.includes(id)} draggable={!board.locked.includes(id)}
         onDragStart={event => { event.dataTransfer.effectAllowed = 'link'; event.dataTransfer.setData('text/plain', id); setDragging(id); }}
         onDragEnd={() => setDragging('')}
         onClick={() => { setSelected(selected === id ? '' : id); setRejected(false); }}>
-        <span className="game-connector">{index + 1}</span><Sign id={id} diagram={index % 2 === 1} />
+        <span className="game-connector">{index + 1}</span><Sign id={id} diagram={!photos && index % 2 === 1} />
         {board.pairs[id] && <Link2 size={17} aria-hidden="true" />}
       </button>)}</div>
       <div><h3>Cantidades</h3>{board.destinations.map((id, index) => {
@@ -209,7 +215,7 @@ function Association({ board, send }: { board: Extract<GameBoard, { kind: 'assoc
   </section>;
 }
 
-function Memory({ board, send }: { board: Extract<GameBoard, { kind: 'memory' }>; send: Send }) {
+function Memory({ board, send, photos }: { board: Extract<GameBoard, { kind: 'memory' }>; send: Send; photos: boolean }) {
   const waiting = board.open.length === 2;
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
   return <section className="game-panel game-memory" aria-label="Tablero de memoria">
@@ -224,7 +230,7 @@ function Memory({ board, send }: { board: Extract<GameBoard, { kind: 'memory' }>
         onClick={() => send({ type: 'flip', index, at: Date.now() })}>
         <span className="game-card-rotor" aria-hidden="true">
           <span className="game-card-face game-card-covered">?</span>
-          <span className="game-card-face game-card-revealed">{visible && (card.visual ? <Sign id={card.id} diagram={quantity(card.id) % 2 === 0} /> : <Quantity id={card.id} />)}</span>
+          <span className="game-card-face game-card-revealed">{visible && (card.visual ? <Sign id={card.id} diagram={!photos && numberQuantity(card.id) % 2 === 0} /> : <Quantity id={card.id} />)}</span>
         </span>
         {matched ? <Check className="game-match-check" size={17} aria-hidden="true" /> : waiting && visible && <CircleX className="game-match-error" size={17} aria-hidden="true" />}
       </button>;
@@ -236,10 +242,14 @@ function Memory({ board, send }: { board: Extract<GameBoard, { kind: 'memory' }>
   </section>;
 }
 
-function Interpretation({ board, send, sprint = false }: { board: Extract<GameBoard, { kind: 'guess' | 'sprint' }>; send: Send; sprint?: boolean }) {
+function Interpretation({ board, send, sprint = false, withVideo = false }: {
+  board: Extract<GameBoard, { kind: 'guess' | 'sprint' }>; send: Send; sprint?: boolean; withVideo?: boolean;
+}) {
   const id = board.targets[board.step];
   const answered = board.answer !== undefined;
   const [diagram, setDiagram] = useState(false);
+  const sign = getEducationalSign(id);
+  const clip = withVideo && sign && signQuizMedia(sign, 'video');
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
   return <div className={'game-interpretation' + (sprint ? '' : ' game-panel')}>
@@ -247,7 +257,8 @@ function Interpretation({ board, send, sprint = false }: { board: Extract<GameBo
       <p className="game-progress-label">{sprint ? 'Interpretación rápida' : 'Ronda ' + (board.step + 1) + ' de ' + board.targets.length}</p>
       <h2 ref={heading} tabIndex={-1}>¿Qué seña observas?</h2>
       <div className="game-observation"><Sign id={id} diagram={diagram} /></div>
-      {answered && <button className="button button-outline game-restart sv-motion-action" type="button" onClick={() => setDiagram(!diagram)}>{diagram ? 'Volver a la fotografía' : 'Volver a observar con el diagrama'}</button>}
+      {clip && <QuizSignMedia media={clip} />}
+      {answered && sign?.media.quizVisual && <button className="button button-outline game-restart sv-motion-action" type="button" onClick={() => setDiagram(!diagram)}>{diagram ? 'Volver a la fotografía' : 'Volver a observar con el diagrama'}</button>}
     </div>
     <div>
       <div className="game-options" role="group" aria-label="Significados posibles">
@@ -289,7 +300,7 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
       return <li key={index} className="game-sequence-slot" style={{ '--game-entry-step': index } as CSSProperties}
         data-confirmed={confirmed} aria-current={!showing && index === (camera ? board.step : board.ordered.length) ? 'step' : undefined}>
         <span>{index + 1}</span>
-        {showing || placed ? <Sign id={showing ? id : placed} diagram /> : confirmed ? <Check size={24} aria-label="Confirmada" /> : <span aria-label="Por completar">·</span>}
+        {showing || placed ? <Sign id={showing ? id : placed} diagram={!run.settings.vocabulary} /> : confirmed ? <Check size={24} aria-label="Confirmada" /> : <span aria-label="Por completar">·</span>}
       </li>;
     })}</ol>
     {!showing && <p role="status">{camera ? 'Posición ' + (board.step + 1) + ' de ' + run.limit + (run.errors ? ' · Intenta de nuevo si el modelo confirma otra seña.' : '')
@@ -307,7 +318,7 @@ function Sequence({ run, board, send, ready, gesture }: { run: Play; board: Extr
       {!camera && <div className="game-sequence-choices" role="group" aria-label="Tarjetas para ordenar">{board.choices.map((id, index) => <button key={id} type="button"
           className="button button-outline sv-motion-action" data-choice-index={index} aria-pressed={board.ordered.includes(id)}
           disabled={board.ordered.includes(id) || board.ordered.length === run.limit}
-          onClick={() => send({ type: 'pick', id, at: Date.now() })}><Sign id={id} diagram={index % 2 === 0} /></button>)}</div>}
+          onClick={() => send({ type: 'pick', id, at: Date.now() })}><Sign id={id} diagram={!run.settings.vocabulary && index % 2 === 0} /></button>)}</div>}
       <div className="game-actions">
         {!camera && <>
           <button className="button button-primary sv-motion-action" type="button" disabled={board.ordered.length !== run.limit} onClick={() => send({ type: 'check', at: Date.now() })}>Comprobar secuencia</button>
@@ -333,6 +344,7 @@ function Results({ game, run, result, reward, best, newRecord, repeat, options }
     </span>
     <h2 id="game-results-title" tabIndex={-1} ref={title}>Resultados de la partida</h2>
     <p>{run.settings.mode === 'camera' ? 'Cámara experimental' : 'Modalidad visual'}
+      {run.settings.vocabulary === 'ampliado' && ' · Vocabulario ampliado'}
       {game.id === 'senas' && (result.assisted ? ' · Con ayuda' : ' · Sin ayuda')}
       {run.settings.duration > 0 && result.elapsedMs === run.settings.duration * 1000 && ' · Tiempo agotado'}</p>
     {newRecord && <p className="game-new-record" role="status"><Trophy size={18} aria-hidden="true" /> Nuevo récord personal</p>}

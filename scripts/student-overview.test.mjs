@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { functionalLessons, getLessonLocation } from '../src/data/curriculum.ts';
 import { questionFields } from '../src/data/lessonPlan.ts';
 import { summarizeLearningDays } from '../src/data/learningCalendar.ts';
-import { getEducationalSign, libraryEntries } from '../src/data/library.ts';
+import { countsTowardReferenceBadge, getEducationalSign, libraryEntries } from '../src/data/library.ts';
 import { minigames, normalizeGameSettings } from '../src/data/minigames.ts';
 import { canWriteProgress, emptyProgress, recordProgressEvent, recordSignConsultation, restoreProgress } from '../src/data/progress.ts';
 import { getSituationExercise } from '../src/data/situationStudy.ts';
@@ -195,7 +195,11 @@ test('a credited prototype with the same ID keeps its XP and can resume the func
 });
 
 test('the reference badge keeps canonical consultations, counts only ten eligible fichas and retains date evidence', () => {
-  const eligible = libraryEntries.filter(sign => sign.reference).slice(0, 10);
+  const historical = libraryEntries.filter(sign => countsTowardReferenceBadge(sign.id));
+  assert.equal(historical.length, 24);
+  assert.ok(getEducationalSign('hola').media.document);
+  assert.equal(countsTowardReferenceBadge('hola'), false);
+  const eligible = historical.slice(0, 10);
   let state = recordSignConsultation(emptyProgress(), 'hola', date);
   eligible.forEach((sign, index) => { state = recordSignConsultation(state, sign.id, `2026-11-${11 + index}T13:00:00Z`); });
   const dated = restoreProgress(JSON.stringify(state));

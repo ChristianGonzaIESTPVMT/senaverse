@@ -1,9 +1,12 @@
-import { getEducationalSign } from './library.ts';
+import { getEducationalSign, libraryEntries } from './library.ts';
 import { gameDurations, type GameSettings, type Minigame } from './minigames.ts';
 
 export const numberIds = ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005'] as const;
+const allNumbers = ['cero', ...numberIds, 'seis', 'siete', 'ocho', 'nueve', 'diez'];
+export const numberQuantity = (id: string) => allNumbers.indexOf(id);
+const visualSigns = libraryEntries.filter(sign => sign.media.visual.kind === 'image').map(sign => sign.id);
 export type GameMode = 'visual' | 'camera';
-export type PlaySettings = GameSettings & { mode: GameMode };
+export type PlaySettings = GameSettings & { mode: GameMode; vocabulary?: 'ampliado' };
 export const pointsPerMatch = 10;
 export const countdownMs = 3000;
 
@@ -17,11 +20,13 @@ export function shuffle<T>(items: readonly T[], random = Math.random) {
 }
 
 export function playSettings(game: Minigame, value: Partial<PlaySettings> = {}): PlaySettings {
+  const mode = (game.id === 'senas' || game.id === 'desafio') && value.mode === 'camera' ? 'camera' : 'visual';
   return {
     category: 'numeros',
     difficulty: value.difficulty === 'intermedio' || value.difficulty === 'avanzado' ? value.difficulty : 'basico',
     duration: game.id === 'desafio' ? gameDurations.find(duration => duration === value.duration) ?? 0 : 0,
-    mode: (game.id === 'senas' || game.id === 'desafio') && value.mode === 'camera' ? 'camera' : 'visual',
+    mode,
+    ...(mode === 'visual' && value.vocabulary === 'ampliado' && { vocabulary: 'ampliado' }),
   };
 }
 
@@ -61,18 +66,24 @@ function targetsFor(limit: number, random: () => number, pool: readonly string[]
   return targets;
 }
 
-function alternatives(id: string, count: number, random: () => number) {
-  const index = numberIds.findIndex(number => number === id);
-  const similar = shuffle(numberIds.filter(number => number !== id), random).sort((a, b) =>
-    Math.abs(numberIds.indexOf(a) - index) - Math.abs(numberIds.indexOf(b) - index));
+function alternatives(id: string, count: number, random: () => number, pool: readonly string[]) {
+  const target = getEducationalSign(id);
+  const distance = (candidate: string) => getEducationalSign(candidate)?.category !== target?.category ? 20
+    : target?.category === 'numeros' ? Math.abs(numberQuantity(candidate) - numberQuantity(id)) : 0;
+  const similar = shuffle(pool.filter(candidate => candidate !== id), random).sort((a, b) => distance(a) - distance(b));
   return shuffle([id, ...similar.slice(0, count - 1)], random);
+}
+
+function visualVocabulary(game: Minigame, settings: PlaySettings) {
+  return settings.mode === 'visual' && settings.vocabulary === 'ampliado'
+    ? game.id === 'adivina' ? visualSigns : allNumbers : numberIds;
 }
 
 export function startPlay(game: Minigame, settings: PlaySettings, id: string, at: number, random = Math.random): Play {
   const limit = playLimit(game, settings);
   const vocabularySize = settings.difficulty === 'basico' ? 3 : settings.difficulty === 'intermedio' ? 4 : 5;
-  const targets = targetsFor(limit, random, game.id === 'desafio' && settings.mode === 'camera'
-    ? numberIds.slice(0, vocabularySize) : numberIds);
+  const pool = game.id === 'desafio' && settings.mode === 'camera' ? numberIds.slice(0, vocabularySize) : visualVocabulary(game, settings);
+  const targets = targetsFor(limit, random, pool);
   let board: GameBoard;
   if (game.id === 'relaciona') {
     const destinations = shuffle(targets, random);
@@ -81,11 +92,13 @@ export function startPlay(game: Minigame, settings: PlaySettings, id: string, at
   } else if (game.id === 'memoria') {
     board = { kind: 'memory', cards: shuffle(targets.flatMap(id => [{ id, visual: true }, { id, visual: false }]), random), open: [], matched: [] };
   } else if (game.id === 'senas') {
-    board = { kind: 'sequence', targets, choices: shuffle(numberIds, random), ordered: [], step: 0, phase: 'study' };
+    const candidates = settings.vocabulary === 'ampliado'
+      ? [...targets, ...shuffle(pool.filter(item => !targets.includes(item)), random).slice(0, 5 - targets.length)] : pool;
+    board = { kind: 'sequence', targets, choices: shuffle(candidates, random), ordered: [], step: 0, phase: 'study' };
   } else {
     const kind = game.id === 'desafio' ? 'sprint' : 'guess';
     const count = settings.difficulty === 'basico' ? 2 : settings.difficulty === 'intermedio' ? 3 : 4;
-    board = { kind, targets, options: targets.map(target => alternatives(target, count, random)), step: 0 };
+    board = { kind, targets, options: targets.map(target => alternatives(target, count, random, settings.mode === 'camera' ? numberIds : pool)), step: 0 };
   }
   const activeSince = board.kind === 'sequence' || (board.kind === 'sprint' && settings.mode === 'camera') ? null
     : board.kind === 'sprint' ? at + countdownMs : at;
@@ -207,7 +220,7 @@ export function validatePlayResult(game: Minigame, value: Record<string, unknown
   if (value.rules !== 2 || !value.settings || typeof value.settings !== 'object') return;
   const raw = value.settings as Partial<PlaySettings>;
   const settings = playSettings(game, raw);
-  if (Object.entries(settings).some(([key, item]) => raw[key as keyof PlaySettings] !== item)) return;
+  if (raw.vocabulary !== settings.vocabulary || Object.entries(settings).some(([key, item]) => raw[key as keyof PlaySettings] !== item)) return;
   const { limit, elapsedMs, correct, errors, bestStreak, camera, alternative, assisted, moves, practicedSignIds } = value;
   const count = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
   if (!count(limit) || !count(elapsedMs) || !count(correct) || !count(errors) || !count(bestStreak) || !count(camera) || !count(alternative)
@@ -223,7 +236,7 @@ export function validatePlayResult(game: Minigame, value: Record<string, unknown
   if (['memoria', 'relaciona', 'senas'].includes(game.id) && correct !== limit) return;
   if (game.id === 'memoria' ? moves !== correct + errors : moves !== undefined) return;
   if (game.id === 'senas' && (!Array.isArray(practicedSignIds) || practicedSignIds.length !== correct
-    || new Set(practicedSignIds).size !== correct || !practicedSignIds.every(id => numberIds.some(number => number === id) && getEducationalSign(id)))) return;
+    || new Set(practicedSignIds).size !== correct || !practicedSignIds.every(id => visualVocabulary(game, settings).some(number => number === id)))) return;
   return { rules: 2, settings, limit, elapsedMs, correct, errors, bestStreak, camera, alternative, assisted,
     ...(typeof moves === 'number' && { moves }), ...(Array.isArray(practicedSignIds) && game.id === 'senas' && { practicedSignIds }) };
 }

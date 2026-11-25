@@ -1,6 +1,7 @@
 export type Finger = 'thumb' | 'index' | 'middle' | 'ring' | 'little';
 export type HandDiagram = { extended: readonly Finger[]; description: string };
 export type MediaValidation = 'pending' | 'validated';
+export type MediaIdentification = 'user-confirmed' | 'inventory';
 export type MediaLink = { title: string; url: string };
 
 export type MediaSource = {
@@ -20,6 +21,8 @@ type Available = Identified & {
   source: MediaSource;
   usage: Usage;
   alt: string;
+  identification?: MediaIdentification;
+  quizDescription?: string;
 };
 
 export type IllustratedReference = Available & {
@@ -27,6 +30,7 @@ export type IllustratedReference = Available & {
   location: { type: 'external'; url: string };
   link: MediaLink;
   locator: string;
+  referenceKind?: 'figure' | 'mention' | 'related' | 'dictionary';
 };
 export type DiagramResource = Available & {
   kind: 'diagram';
@@ -34,7 +38,7 @@ export type DiagramResource = Available & {
   diagram: HandDiagram;
   quizSafe: true;
 };
-export type IndividualImage = Available & ImageFile & { kind: 'image'; quizSafe?: boolean };
+export type IndividualImage = Available & ImageFile & { kind: 'image'; quizSafe?: boolean; thumbnail?: Omit<ImageFile, 'alt'> };
 export type IllustratedSequence = Available & { kind: 'sequence'; frames: readonly [ImageFile, ImageFile, ...ImageFile[]] };
 export type EducationalVideo = Available & {
   kind: 'video';
@@ -55,7 +59,8 @@ export type SignMedia = {
 
 export function getQuizVisual(media: SignMedia) {
   const { visual } = media;
-  return visual.availability === 'available' && visual.kind !== 'sequence' && visual.quizSafe ? visual : media.quizVisual;
+  if (visual.availability !== 'available' || visual.kind === 'sequence' || !visual.quizSafe) return media.quizVisual;
+  return visual.kind === 'image' && visual.quizDescription ? { ...visual, alt: visual.quizDescription } : visual;
 }
 
 export function hasEducationalMedia({ document, visual, video }: SignMedia) {

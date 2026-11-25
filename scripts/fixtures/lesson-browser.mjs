@@ -103,6 +103,8 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
   assert.equal(await evaluate('document.querySelectorAll(".lesson-number-list dt").length'), 5);
   await next();
   await step('De la seña a la cantidad');
+  assert.equal(await evaluate('!!document.querySelector(".quiz-sign-video")'), false);
+  await evaluate('document.querySelector(".lesson-answer-fields .sign-media-load").click()');
   await until('video de cantidades listo', () => evaluate('document.querySelector(".quiz-sign-video")?.readyState >= 1'));
   assert.equal(await evaluate('!!document.querySelector(".lesson-quiz-review,.lesson-answer-explanation")'), false);
   await radio(0, 'LSP-001');
@@ -212,7 +214,8 @@ export async function checkLesson({ send, evaluate, requests }, origin, until, d
   await alternative('LSP-005');
   await step('Evaluación final');
   assert.equal(await evaluate(`(${storage}).activities.length`), 0);
-  assert.equal(await evaluate('document.querySelectorAll(".lesson-answer-fields :is(.quiz-sign-image,.quiz-sign-video,.quiz-sign-diagram)").length'), 5);
+  assert.equal(await evaluate('document.querySelectorAll(".lesson-answer-fields :is(.quiz-sign-image,.sign-media-load,.quiz-sign-diagram)").length'), 5);
+  assert.equal(await evaluate('!!document.querySelector(".lesson-answer-fields .quiz-sign-video")'), false);
   assert.equal(await evaluate('!!document.querySelector(".lesson-quiz-review,.lesson-answer-explanation,.sign-media-credit")'), false);
   assert.equal(await evaluate(`[...document.querySelectorAll('.lesson-answer-fields [alt],.lesson-answer-fields [aria-label]')]
     .every(element => !/\\b(Uno|Dos|Tres|Cuatro|Cinco)\\b/i.test(element.getAttribute('alt') ?? element.getAttribute('aria-label')))`), true);

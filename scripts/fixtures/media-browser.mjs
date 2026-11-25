@@ -38,9 +38,9 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   const navigate = path => send('Page.navigate', { url: origin + path });
   const exists = selector => until(selector, () => evaluate(`!!document.querySelector(${JSON.stringify(selector)})`));
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
-  const decodedPhoto = selector => until('foto cargada', () => evaluate(`(() => {
+  const decodedPhoto = (selector, width = 1200, height = 1600) => until('foto cargada', () => evaluate(`(() => {
     const image = document.querySelector(${JSON.stringify(selector)});
-    return image?.naturalWidth === 1200 && image?.naturalHeight === 1600;
+    return image?.naturalWidth === ${width} && image?.naturalHeight === ${height};
   })()`));
   const label = (selector, value) => evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].find(
     button => button.textContent.trim() === ${JSON.stringify(value)}).click()`);
@@ -126,6 +126,9 @@ export async function checkMedia({ send, evaluate, requests }, origin, until, te
   await until('la ficha sigue abierta y se restaura el foco', () => evaluate(
     '!!document.querySelector(".library-dialog[open]") && !document.querySelector(".sign-media-dialog[open]") && document.activeElement.classList.contains("sign-media-open")'));
   await navigate('/biblioteca?sena=hola');
+  await decodedPhoto('.library-dialog[open] .sign-media-preview img', 1280, 720);
+  assert.equal(await evaluate('!!document.querySelector(".library-dialog .sign-media-load") && !document.querySelector(".library-dialog video")'), true);
+  await navigate('/biblioteca?sena=comida');
   await exists('.library-dialog[open] .sign-media');
   assert.equal(await evaluate('document.querySelector(".library-dialog .sign-media").textContent.includes("Referencia visual pendiente")'), true);
   assert.equal(await evaluate('!!document.querySelector(".library-dialog .sign-media-open, .library-dialog video")'), false);

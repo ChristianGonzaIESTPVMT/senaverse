@@ -47,7 +47,8 @@ export function GuidedSignPractice({ sign, exercise, returnState, titleId, pract
     </div> : <>
       <p className="situation-question-note">{supportsCamera
         ? 'El reconocimiento es experimental. Puedes reintentar o completar el ejercicio sin cámara.'
-        : sign.reference ? 'Esta seña se puede practicar con la lámina y un ejercicio sin cámara.'
+        : sign.media.video.availability === 'available' ? 'Puedes practicar con una demostración y un ejercicio sin cámara.'
+          : sign.reference ? 'Esta seña se puede practicar con la lámina y un ejercicio sin cámara.'
           : 'Por ahora puedes repasar el significado con un ejercicio sin cámara.'}</p>
       <div className="situation-question-actions" role="group" aria-label="Método de práctica">
         {supportsCamera && <button className="button button-outline" type="button" aria-pressed={mode === 'camera'} onClick={() => setMode('camera')}>
