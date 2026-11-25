@@ -359,3 +359,5 @@ body:has(.situations-help-dialog[open]) { overflow: hidden; }
   28% { opacity: .85; }
   100% { opacity: 0; transform: scale(1.12); }
 }
+.situation-option-preview { display: block; flex: 0 0 clamp(44px, 10vw, 96px); width: clamp(44px, 10vw, 96px); }
+.situation-option-preview img { max-height: 64px; object-fit: contain; border-radius: 6px; }

@@ -29,7 +29,7 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
       [...group.querySelectorAll('input')].find(control => control.value === choice).click();
       return;
     }
-    const select = group.querySelectorAll('select')[${JSON.stringify(index)}];
+    const select = group.querySelectorAll('.lesson-association-row > select')[${JSON.stringify(index)}];
     select.value = choice;
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
@@ -76,6 +76,10 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
   };
   const assertVideoOptions = async (count, play) => {
     const selector = '.lesson-answer-fields video';
+    assert.equal(await evaluate(`document.querySelectorAll('${selector}').length`), 0);
+    assert.equal(await evaluate('document.querySelectorAll(".lesson-answer-fields .sign-media-load").length'), count);
+    assert.equal(await evaluate('document.querySelectorAll(".lesson-answer-fields .sign-media-load:disabled").length'), 0);
+    await evaluate('document.querySelectorAll(".lesson-answer-fields .sign-media-load").forEach(button => button.click())');
     assert.equal(await evaluate(`document.querySelectorAll('${selector}').length`), count);
     await until('metadatos de los clips', () => evaluate(`Array.from(document.querySelectorAll('${selector}')).every(video => video.readyState >= 1 && video.duration > 0)`));
     assert.equal(await evaluate(`Array.from(document.querySelectorAll('${selector}')).every(video => {
@@ -117,7 +121,7 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
           assert.equal(await evaluate('!!document.querySelector(".lesson-sequence .sign-media-image img")'), true);
           await click('.lesson-number-list a', 'Ver ficha en Biblioteca');
           await text('.library-dialog[open]', 'Cero');
-          assert.match(await evaluate('document.querySelector(".library-meaning a").href'), /#page=14$/);
+          assert.match(await evaluate('document.querySelector(".library-meaning a").href'), /#page=73$/);
           assert.equal(await evaluate(`!!document.querySelector('.library-dialog-actions a[href^="/camara"]')`), false);
           await click('.library-dialog-actions a', 'Volver a la lección');
           await stepTitle(step.title);
@@ -201,6 +205,7 @@ export async function checkCurriculum({ send, evaluate, requests }, origin, unti
     await press('Revisar evaluación');
     await assertFits(width);
     if (width === 390) {
+      assert.ok(await evaluate('document.querySelectorAll(".lesson-answer-fields input:disabled, .lesson-association-row > select:disabled").length'));
       await assertVideoOptions(2, true);
       await evidence('aprender-repaso-movil-oscuro', '.lesson-association-row:has(video)');
     }

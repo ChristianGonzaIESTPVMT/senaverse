@@ -3,7 +3,7 @@
 .quiz-sign-diagram {
   display: block;
   width: min(100%, 15rem);
-  aspect-ratio: 3 / 4;
+  aspect-ratio: auto 3 / 4;
   height: auto;
   object-fit: contain;
   border-radius: .7rem;
@@ -13,7 +13,9 @@
   width: min(100%, 11rem);
 }
 
-.quiz-sign-video {
+.sign-media-player .quiz-sign-video {
+  width: min(100%, 660px, 97dvh);
+  max-height: none;
   aspect-ratio: auto 16 / 9;
 }
 

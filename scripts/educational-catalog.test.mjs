@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getEducationalSign, getEducationalSignForClass, libraryCategories,
-  libraryEntries, normalizeLibrarySignIds, numbersReference, searchLibrary } from '../src/data/library.ts';
+  libraryEntries, normalizeLibrarySignIds, searchLibrary } from '../src/data/library.ts';
 import { numbersLesson } from '../src/data/numbersLesson.ts';
 import { recognitionSigns, resolvePracticeSign } from '../src/features/sign-recognition/recognitionCatalog.ts';
 import { createDatasetCatalog } from '../src/features/sign-recognition/dataset/signCatalog.ts';
@@ -11,8 +11,8 @@ import { emptyProgress, recordSignConsultation, restoreProgress, summarizeProgre
 const search = (query, options = {}) => searchLibrary({ query, category: 'all', compatible: false, ...options });
 
 test('educational entries are unique and explicitly map only the ten V1 classes', () => {
-  assert.equal(libraryEntries.length, 35);
-  assert.equal(libraryEntries.filter(entry => entry.reference).length, 24);
+  assert.equal(libraryEntries.length, 36);
+  assert.equal(libraryEntries.filter(entry => entry.reference).length, 35);
   assert.equal(new Set(libraryEntries.map(entry => entry.id)).size, libraryEntries.length);
   assert.equal(libraryEntries.filter(entry => entry.recognitionClassId).length, 10);
   assert.ok(libraryEntries.every(entry => libraryCategories.some(category => category.id === entry.category)));
@@ -28,9 +28,12 @@ test('educational entries are unique and explicitly map only the ten V1 classes'
   }
   assert.equal(getEducationalSign('NEG-001'), undefined);
   assert.ok(createDatasetCatalog().some(entry => entry.id === 'NEG-001'));
-  assert.equal(getEducationalSign('cero').reference, numbersReference);
+  assert.match(getEducationalSign('cero').reference.url, /#page=73$/);
   assert.equal(getEducationalSign('cero').recognitionClassId, undefined);
-  assert.equal(getEducationalSign('hola').reference, undefined);
+  assert.equal(getEducationalSign('hola').media.document.referenceKind, 'mention');
+  assert.equal(getEducationalSign('carne').source.page, 107);
+  assert.notEqual(getEducationalSign('carne').id, getEducationalSign('comida').id);
+  assert.equal(getEducationalSignForClass('LSP-036'), undefined);
   assert.equal(getEducationalSign('__proto__'), undefined);
 });
 

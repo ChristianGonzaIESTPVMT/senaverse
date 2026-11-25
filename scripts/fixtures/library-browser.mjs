@@ -40,7 +40,7 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   })()`);
 
   await send('Page.navigate', { url: origin + list });
-  await result(35);
+  await result(36);
   assert.equal(modelRequests().length, 0);
   await search('MAMÁ');
   await result(1);
@@ -73,7 +73,7 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   assert.equal(await evaluate('document.querySelector(".library-card h2").textContent'), 'Sí');
   await aria('Sí en favoritos');
   await reload();
-  await result(35);
+  await result(36);
   await toggle(1);
   await result(0);
   assert.deepEqual(await evaluate(`JSON.parse(localStorage.getItem('${key}')).favoriteSignIds`), []);
@@ -121,10 +121,10 @@ export async function checkLibrary({ send, evaluate, requests }, origin, until) 
   await until('respuesta del modelo local', () => evaluate('document.querySelector(".practice-camera-button")?.disabled === false'));
   assert.ok(modelRequests().length > 0);
   await send('Page.navigate', { url: origin + '/camara/libre?sena=cero' });
-  await until('destino sin clase rechazado', () => evaluate('document.body?.textContent.includes("fuera del catálogo")'));
-  assert.equal(await evaluate('document.querySelector(".practice-select-field select").value'), '');
+  await until('destino sin clase disponible como práctica visual', () => evaluate('document.querySelector(".practice-page .sign-media[data-sign=cero] img")?.naturalWidth > 0'));
+  assert.equal(await evaluate('!!document.querySelector(".practice-select-field select, .practice-camera-button")'), false);
   assert.equal(await evaluate('window.studentAttempts'), 0);
 
-  console.log(JSON.stringify({ catalog: 35, combinedFilters: true, profileMigration: true, deepLink: true,
+  console.log(JSON.stringify({ catalog: 36, combinedFilters: true, profileMigration: true, deepLink: true,
     keyboard: true, directedTarget: 'LSP-003', cameraOpened: false, resumeLesson: true, mobileDark: true }));
 }

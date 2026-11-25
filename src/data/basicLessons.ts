@@ -68,7 +68,7 @@ function practise(targetId: string, alternative: Question, notice?: string): Stu
     instruction: sign.instructions, reference: sign.reference, alternative: [alternative], notice };
 }
 
-const greetings = ['buenos-dias', 'buenas-noches'];
+const greetings = ['buenos-dias', 'buenas-noches', 'hola', 'adios'];
 const largerNumbers = ['seis', 'siete', 'ocho', 'nueve', 'diez'];
 const expressionIds = ['LSP-006', 'LSP-007', 'LSP-008'];
 const companyIds = ['LSP-009', 'LSP-010'];
@@ -131,15 +131,15 @@ export const basicLessons = [
       'Localizar la postura de Cero y compararla con Uno.',
       'Elegir Cero cuando una cantidad está vacía.',
     ], [
-      study('Observa Cero y Uno', 'Abre la figura 2. Coloca un objeto sobre la mesa y practica Uno con la ficha. Retíralo y ensaya Cero siguiendo la lámina.', ['cero', 'LSP-001']),
+      study('Observa Cero y Uno', 'Compara las fotografías y la lámina. Coloca un objeto sobre la mesa, practica Uno y retíralo para ensayar Cero.', ['cero', 'LSP-001']),
       exercise('Compara las posturas', choose('uno', '¿Qué número corresponde a la postura del dibujo?', ['Cero', 'Uno'], 1,
-        'El índice extendido corresponde a Uno en esta lámina. Cero se ilustra con la mano cerrada.', mediaFor('LSP-001', 'diagram'))),
+        'El índice extendido corresponde a Uno. En Cero los dedos forman un contorno redondo.', mediaFor('LSP-001', 'diagram'))),
       assessment(
-        choose('caja', 'Retiraste la última ficha de una caja. ¿Cuántas fichas quedaron?', ['Una', 'Dos', 'Cero'], 2,
-          'Cuando no queda ningún objeto, la cantidad es cero.'),
+        choose('caja', 'Observa la demostración. ¿Qué cantidad indica?', ['Una', 'Dos', 'Cero'], 2,
+          'La demostración corresponde a Cero. Se usa cuando no queda ningún objeto.', mediaFor('cero', 'video')),
         choose('forma', 'La foto muestra Uno. Según la lámina, ¿qué configuración usarías para indicar Cero?',
-          ['La mano cerrada', 'El índice extendido', 'Los cinco dedos extendidos'], 0,
-          'Para pasar de Uno a Cero, recoge el índice y cierra la mano.', mediaFor('LSP-001', 'photo'))),
+          ['Los dedos forman un contorno redondo', 'El índice extendido', 'Los cinco dedos extendidos'], 0,
+          'En Uno se extiende el índice. En Cero, los dedos forman un contorno redondo.', mediaFor('LSP-001', 'photo'))),
     ]),
   lesson('seis-a-diez', 'Del seis al diez', '10 min',
     'Estudia cinco números nuevos, compara posturas y registra cantidades de objetos.', [
@@ -147,13 +147,14 @@ export const basicLessons = [
       'Aplicar las cantidades del seis al diez en un recuento.',
     ], [
       study('De seis a diez en la lámina', 'Señala cada número en la figura 2 y ensaya la postura con una mano. Repite mirando el dibujo de Diez y prestando atención a su flecha.', largerNumbers),
-      exercise('Haz un recuento', associate('recuento', 'Cuenta las marcas de cada fila y elige el número para ensayar.',
-        numberChoices, [['● ● ● ● ● ●', 1], ['● ● ● ● ● ● ●', 3], ['● ● ● ● ● ● ● ●', 0]], 'Las tres filas representan seis, siete y ocho objetos.')),
+      exercise('Compara las fotografías', associate('recuento', 'Observa qué dedo queda recogido en cada fotografía y elige la cantidad.',
+        numberChoices, [['Fotografía A', 1, mediaFor('seis', 'photo')], ['Fotografía B', 3, mediaFor('siete', 'photo')],
+          ['Fotografía C', 0, mediaFor('ocho', 'photo')]], 'Las fotografías representan seis, siete y ocho, en ese orden.')),
       assessment(
-        choose('nueve', 'Hay ocho fichas sobre la mesa y añades una. ¿Qué número ensayarías?', numberChoices, 4,
-          'Ocho más uno da nueve. Busca Nueve en la figura 2 para repasar la postura.'),
-        choose('diez', 'Tienes dos grupos de cinco fichas. ¿Qué número representa el total?', numberChoices, 2,
-          'Cinco más cinco da diez. Revisa la flecha de movimiento en la figura de Diez.')),
+        choose('nueve', '¿Qué número muestra esta fotografía?', numberChoices, 4,
+          'La postura corresponde a Nueve. Ocho más uno da nueve.', mediaFor('nueve', 'photo')),
+        choose('diez', 'Observa el movimiento completo. ¿Qué cantidad representa?', numberChoices, 2,
+          'El movimiento corresponde a Diez. Dos grupos de cinco suman diez.', mediaFor('diez', 'video'))),
     ]),
   lesson('saludos', 'Saludos básicos', '8 min', 'Compara dos saludos ilustrados en la guía del MINEDU.', [
     'Observar la secuencia de Buenos días y Buenas noches.',
@@ -163,8 +164,9 @@ export const basicLessons = [
     exercise('Elige cómo saludar', choose('entrada', 'Llegas a la primera clase a las ocho de la mañana. ¿Qué saludo de esta lección practicarías?',
       ['Buenas noches', 'Buenos días'], 1, 'Buenos días es apropiado para un encuentro por la mañana.')),
     assessment(
-      associate('momento', 'Relaciona cada horario con el saludo que estudiarías.', ['Buenos días', 'Buenas noches'],
-        [['Encuentro a las 9 a. m.', 0], ['Encuentro a las 9 p. m.', 1]], 'Estos horarios permiten distinguir un saludo de mañana de uno de noche.'),
+      associate('momento', 'Reproduce cada clip y elige el saludo según el momento del día.', ['Buenos días', 'Buenas noches'],
+        [['Clip A', 0, mediaFor('buenos-dias', 'video')], ['Clip B', 1, mediaFor('buenas-noches', 'video')]],
+        'El primer clip corresponde a un saludo de mañana y el segundo a uno de noche.'),
       choose('demostracion', 'Ambos saludos tienen más de una viñeta. ¿Cómo comprobarías en la página 46 dónde se distinguen?',
         ['Compararía solo la primera posición de las manos', 'Seguiría las flechas de cada secuencia hasta su posición final',
           'Compararía las últimas viñetas sin observar cómo se llega a ellas'], 1,
@@ -175,10 +177,10 @@ export const basicLessons = [
       'Seguir la figura de Disculpar para ensayar su movimiento.',
       'Elegir entre saludar y pedir disculpas según la situación.',
     ], [
-      study('Observa Disculpar', 'Busca la viñeta Disculpar, arriba a la derecha. Observa el inicio y el recorrido. Ensaya con la ilustración antes de resolver el ejercicio.', ['disculpa']),
+      study('Observa expresiones de cortesía', 'Compara el movimiento de Disculpa con la demostración de Gracias. Consulta la viñeta Disculpar para repasar su recorrido.', ['disculpa', 'gracias']),
       exercise('Revisa las pistas de la viñeta', choose('turno', 'Tu compañera detiene la imitación de «Disculpa» en la posición inicial. ¿Qué le indicarías revisar en la página 47?',
         ['La posición inicial de ambas manos y nada más', 'El recorrido que indica la flecha tras colocar las manos', 'El último punto del recorrido sin seguir la flecha'], 1,
-        'La colocación de ambas manos es el punto de partida. La flecha de la viñeta indica el desplazamiento.')),
+        'La colocación de ambas manos es el punto de partida. La flecha de la viñeta indica el desplazamiento.', mediaFor('disculpa', 'video'))),
       assessment(associate('contextos', 'Elige una expresión para cada momento.', ['Disculpa', 'Buenas noches', 'Buenos días'],
         [['Saludas a tu grupo al llegar a las 8 a. m.', 2], ['Tropiezas con una persona por accidente', 0],
           ['Saludas al entrar a una reunión a las 9 p. m.', 1]], 'Los saludos se eligen según el momento del encuentro. Disculpa corresponde al accidente.')),
@@ -187,7 +189,7 @@ export const basicLessons = [
     'Distinguir una afirmación, una ausencia y una cantidad abundante.',
     'Practicar las tres señas con la guía y una actividad sin cámara o dirigida.',
   ], [
-    study('Observa Sí, Nada y Mucho', 'Compara cuántas manos intervienen en cada figura y sigue sus indicaciones de movimiento.', expressionIds),
+    study('Observa Sí, Nada y Mucho', 'Compara cuántas manos intervienen. Repasa también cómo se expresa una negación con No.', [...expressionIds, 'no']),
     practise('LSP-006', selectClip('afirmacion', '¿En qué clip se demuestra «Sí»? Fíjate en qué parte de la mano se mueve.', expressionClips, 1)),
     practise('LSP-007', selectClip('ausencia', '¿En qué clip se demuestra «Nada»? Compara la posición de los dedos.', expressionClips, 2),
       'La V1 puede dar resultados inconsistentes con Nada. Usa el ejercicio alternativo si te cuesta obtener una coincidencia.'),
@@ -220,23 +222,23 @@ export const basicLessons = [
     'Comprender qué vínculo señala cada ficha.',
     'Comparar la configuración y el movimiento en las tres ilustraciones.',
   ], [
-    study('Observa los vínculos familiares', 'Abre la página 79. Ensaya cada una de las tres figuras. Compara las configuraciones F, M y P tal como aparecen en la guía.', ['familia', 'mama', 'papa']),
+    study('Observa los vínculos familiares', 'Compara las configuraciones F, M y P. Mira la demostración de Hermano para observar sus dos fases.', ['familia', 'mama', 'papa', 'hermano']),
     exercise('Compara los movimientos', choose('semicirculo', '¿Cuál de las tres figuras muestra un semicírculo hacia delante con ambas manos?',
       ['Papá', 'Familia', 'Mamá'], 1, 'La ficha Familia muestra un semicírculo con ambas manos.')),
-    assessment(associate('vinculos', 'Compara la página 79 y relaciona cada pista visual con su ficha.', ['Mamá', 'Familia', 'Papá'],
-      [['Configuración F y recorrido con ambas manos', 1], ['Configuración M', 0],
-        ['Configuración P', 2]], 'La guía distingue las entradas por sus configuraciones F, M y P. En Familia también se aprecia el recorrido de ambas manos.')),
+    assessment(associate('vinculos', 'Relaciona cada demostración con el vínculo que representa.', ['Mamá', 'Familia', 'Papá'],
+      [['Clip A', 1, mediaFor('familia', 'video')], ['Fotografía B', 0, mediaFor('mama', 'photo')],
+        ['Fotografía C', 2, mediaFor('papa', 'photo')]], 'La guía distingue las entradas por sus configuraciones F, M y P. En Familia también se aprecia el recorrido de ambas manos.')),
   ]),
   lesson('comunidad', 'Comunidad y lugares', '8 min', 'Observa y practica las señas Casa y Colegio.', [
     'Elegir la seña de un lugar según su uso.',
     'Distinguir la silueta de Casa del movimiento de Colegio.',
   ], [
     study('Compara Casa y Colegio', 'Abre las dos páginas de la guía. Ensaya las figuras prestando atención a la posición de las manos y al movimiento que muestra cada una.', ['casa', 'colegio']),
-    exercise('Compara los desplazamientos', choose('aulas', '¿En cuál de las dos fichas observas un recorrido circular con los dedos semiflexionados?',
-      ['Colegio', 'Casa'], 0, 'La figura de Colegio muestra el recorrido circular. La de Casa representa la forma de un techo.')),
+    exercise('Compara los desplazamientos', choose('aulas', 'Observa dónde se colocan las manos y cómo se desplazan. ¿Qué lugar indica el clip?',
+      ['Colegio', 'Casa'], 0, 'La figura de Colegio muestra el recorrido circular. La de Casa representa la forma de un techo.', mediaFor('colegio', 'video'))),
     assessment(
-      choose('tejado', '¿En cuál de las figuras juntas las yemas de los dedos para dibujar un techo?', ['Colegio', 'Casa'], 1,
-        'La figura Casa representa la silueta de un techo.'),
+      choose('tejado', '¿Qué lugar representa la postura de esta fotografía?', ['Colegio', 'Casa'], 1,
+        'La figura Casa representa la silueta de un techo.', mediaFor('casa', 'photo')),
       choose('vivienda', 'Una compañera mueve las manos en círculos cuando quiere indicar dónde vive. ¿Qué ficha le ayudaría a revisar la configuración?', ['Casa', 'Colegio'], 0,
         'En Casa, las yemas de las dos manos se juntan para formar la silueta de un techo. El recorrido circular corresponde a Colegio.')),
   ]),
@@ -246,7 +248,7 @@ export const basicLessons = [
       'Resolver un recuento y distinguir una postura numérica estudiada.',
     ], [
       study('Prepara tu repaso', 'Imagina que llegas al colegio para repartir materiales. Repasa las señas de la lista y practica cada una por separado con su referencia.', [
-        'buenos-dias', 'colegio', 'LSP-003', 'seis', 'ocho', 'cero', 'LSP-007', 'LSP-010',
+        'buenos-dias', 'colegio', 'LSP-003', 'seis', 'ocho', 'cero', 'LSP-007', 'LSP-010', 'ayuda', 'agua',
       ]),
       exercise('Elige la cantidad para el reparto', choose('mesa', 'Hay cuatro fichas en una mesa y añades dos. ¿Qué número prepararías?',
         ['Cero', 'Tres', 'Seis', 'Ocho'], 2, 'Cuatro más dos da seis. Revisa esa figura en la lámina numérica.')),

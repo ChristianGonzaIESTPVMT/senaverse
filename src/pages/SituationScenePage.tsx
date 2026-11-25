@@ -5,6 +5,7 @@ import { SituationBreadcrumbs, SituationDifficultyBadge, SituationIllustration }
 import { SituationPracticeStep } from '../components/SituationPracticeStep';
 import { SituationDialogue, SituationLine } from '../components/SituationDialogue';
 import { MotionProgress } from '../components/MotionProgress';
+import { EducationalVisual } from '../components/SignMediaViewer';
 import { rememberSituationFinish } from '../components/situationFinishMotion';
 import { getEducationalSign } from '../data/library';
 import { nextSituationScene, summarizeSituation } from '../data/situationStudy';
@@ -46,6 +47,8 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
   const { completed } = summarizeSituation(situation, run);
   const followingScene = situation.scenes[sceneIndex + 1];
   const results = getSituationResultsPath(situationId, filter);
+  const options = scene.optionIds.map(id => ({ id, entry: getEducationalSign(id) }));
+  const withPhotos = options.every(({ entry }) => entry?.media.visual.kind === 'image');
 
   useEffect(() => { recordActivity({ type: 'situation-start', situationId }); }, [recordActivity, situationId]);
 
@@ -88,7 +91,7 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
           {situation.speaker ? <SituationLine speaker={situation.speaker} id="situation-question">{scene.question}</SituationLine>
             : <h2 id="situation-question">{scene.question}</h2>}
           <fieldset className="situation-options" aria-labelledby="situation-question" disabled={!!answer?.practice}>
-            {scene.optionIds.map((id, index) => {
+            {options.map(({ id, entry }, index) => {
               const selected = answer?.choiceId === id;
               const feedbackClass = selected && answer?.checked ? isCorrect ? ' is-correct' : ' is-incorrect' : '';
               return (
@@ -96,7 +99,10 @@ function SituationSceneContent({ situation, scene, sceneIndex, filter }: { situa
                   <input type="radio" name="situation-answer" value={id} checked={selected}
                     onChange={() => recordActivity({ type: 'situation-select', situationId, sceneId, choiceId: id })} />
                   <span className="situation-option-letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span>
-                  <strong>{getEducationalSign(id)?.word ?? id}</strong>
+                  {withPhotos && entry?.media.visual.kind === 'image' && <span className="situation-option-preview">
+                    <EducationalVisual visual={entry.media.visual} thumbnail decorative />
+                  </span>}
+                  <strong>{entry?.word ?? id}</strong>
                   {selected && answer.checked && (isCorrect ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleX size={21} aria-hidden="true" />)}
                 </label>
               );

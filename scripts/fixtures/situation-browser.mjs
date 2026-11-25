@@ -193,6 +193,9 @@ export async function checkSituations({ send, evaluate, requests }, origin, unti
   await capture('comedor-visual-correcto-contexto-incorrecto', pane);
   await selection('LSP-007');
   await button('Hacer ejercicio sin cámara');
+  assert.equal(await evaluate('document.querySelectorAll(".situation-alternative video").length'), 0);
+  assert.equal(await evaluate('document.querySelectorAll(".situation-alternative .sign-media-load").length'), 3);
+  await evaluate('document.querySelectorAll(".situation-alternative .sign-media-load").forEach(button => button.click())');
   assert.equal(await evaluate('document.querySelectorAll(".situation-alternative video").length'), 3);
   assert.equal(await evaluate('!!document.querySelector(".practice-camera-button")'), false);
   await radio('.situation-alternative', 'LSP-007');

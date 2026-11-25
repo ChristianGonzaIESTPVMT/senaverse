@@ -46,16 +46,16 @@ function legacyExercise(scene: SituationScene, sign: LibraryEntry): ChoiceExerci
 }
 
 export function getSituationVisualExercise(scene: SituationScene, sign: LibraryEntry): ChoiceExercise | undefined {
-  const kind = ['LSP-001', 'LSP-002', 'LSP-003', 'LSP-004', 'LSP-005'].includes(sign.id) ? 'photo' : 'video';
-  // The food scenes include Uno alongside two clips, so its photo needs comparable distractors.
-  const supplemental = kind === 'photo' && scene.dialogue === 'visual' ? ['LSP-002', 'LSP-003']
-    : !scene.dialogue && kind === 'video' ? ['LSP-007', 'LSP-009'] : [];
-  const candidates = [...new Set([...scene.optionIds, ...supplemental])];
-  const options = candidates.flatMap(id => {
+  const kind = sign.category === 'numeros' ? 'photo' : 'video';
+  const optionMedia = (ids: readonly string[]) => ids.flatMap(id => {
     const entry = getEducationalSign(id);
     const media = entry && signQuizMedia(entry, kind);
-    return media ? [{ id, label: '', media }] : [];
-  }).map((option, index) => ({ ...option, label: `Demostración ${String.fromCharCode(65 + index)}` }));
+    return media ? [{ id, media }] : [];
+  });
+  const primary = optionMedia(scene.optionIds);
+  const supplemental = kind === 'photo' ? ['LSP-002', 'LSP-003'] : ['LSP-007', 'LSP-009'];
+  const options = (primary.length >= 2 ? primary : optionMedia([...new Set([...scene.optionIds, ...supplemental])]))
+    .map((option, index) => ({ ...option, label: `Demostración ${String.fromCharCode(65 + index)}` }));
   if (options.length < 2 || !options.some(option => option.id === sign.id)) return;
   return { type: 'choice', question: `¿Qué demostración corresponde a «${sign.word}»?`,
     options, correctId: sign.id, success: 'Identificaste la demostración de la seña elegida.',

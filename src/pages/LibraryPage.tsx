@@ -30,12 +30,16 @@ function LibraryReference({ entry }: { entry: LibraryEntry }) {
   const { visual, video, document } = entry.media;
   return (
     <div className="library-thumbnail library-card-reference" data-tone={entry.tone}>
-      {visual.availability === 'available' && visual.kind !== 'sequence' ? <EducationalVisual visual={visual} decorative />
+      {visual.availability === 'available' && visual.kind !== 'sequence' ? <EducationalVisual visual={visual} thumbnail decorative />
         : <BookOpen size={31} aria-hidden="true" />}
       {document ? <ExternalReference href={document.location.url}
-        label={`Abrir lámina de ${entry.word} (nueva pestaña)`}>Abrir lámina</ExternalReference>
-        : <span>{video.availability === 'available' ? 'Video en la ficha' : visual.availability === 'available'
-          ? 'Referencia en la ficha' : 'Referencia pendiente'}</span>}
+        label={`Abrir ${document.referenceKind ? 'referencia' : 'lámina'} de ${entry.word} (nueva pestaña)`}>
+        {document.referenceKind ? 'Consultar referencia' : 'Abrir lámina'}</ExternalReference>
+        : <span>Referencia pendiente</span>}
+      {(visual.availability === 'available' || video.availability === 'available') && <div className="library-media-badges">
+        {visual.kind === 'image' && <span>Aprendizaje visual</span>}
+        {video.availability === 'available' && <span>Video disponible</span>}
+      </div>}
     </div>
   );
 }
@@ -254,6 +258,8 @@ export function LibraryPage() {
                 : selected.type === 'dynamic' ? 'Dinámica · incluye movimiento' : 'Pendiente de revisión'}</dd></div>
               <div><dt>Manos</dt><dd>{selected.hands === 1 ? 'Una' : selected.hands === 2 ? 'Dos' : 'Pendiente de revisión'}</dd></div>
               <div><dt>Validación lingüística</dt><dd>{selected.validation === 'pending' ? 'Pendiente de revisión' : 'Revisada'}</dd></div>
+              {selected.media.visual.kind === 'image' && selected.media.visual.identification && <div><dt>Identificación del material</dt>
+                <dd>{selected.media.visual.identification === 'user-confirmed' ? 'Confirmada por el usuario' : 'Preliminar · inventario educativo'}</dd></div>}
               <div><dt>Reconocimiento</dt><dd>{selected.recognitionClassId ? 'Disponible · experimental V1' : 'Sin reconocimiento automático'}</dd></div>
             </dl>
             <p>{selected.meaning}</p>

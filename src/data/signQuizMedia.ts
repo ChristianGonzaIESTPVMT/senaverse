@@ -16,7 +16,8 @@ const descriptions: Record<string, string> = {
 
 export function signQuizMedia(sign: LibraryEntry, kind: QuizMedia['kind']): QuizMedia | undefined {
   const { visual, video, quizVisual } = sign.media;
-  const description = descriptions[sign.id];
+  const resource = kind === 'video' ? video : kind === 'photo' ? visual : quizVisual;
+  const description = resource?.availability === 'available' ? resource.quizDescription ?? descriptions[sign.id] : undefined;
   if (!description) return;
   if (kind === 'photo' && !(visual.kind === 'image' && visual.availability === 'available')) return;
   if (kind === 'video' && video.availability !== 'available') return;

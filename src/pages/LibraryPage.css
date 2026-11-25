@@ -192,6 +192,8 @@ body:has(.library-dialog[open]) { overflow: hidden; }
 .library-invalid p { margin: 0 0 8px; }
 .library-card-reference { align-content: center; gap: 9px; padding: 10px; text-align: center; color: light-dark(#49346e, var(--color-text-secondary)); }
 .library-card-reference a, .library-card-reference span { font-size: .82rem; font-weight: 800; }
+.library-media-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.library-media-badges span { padding: 2px 6px; border-radius: 6px; background: var(--color-card); }
 .library-card-reference a, .library-meaning a, .library-source a { color: light-dark(#52319b, var(--color-primary)); text-decoration: underline; text-underline-offset: .16em; }
 .library-entry-category { color: var(--color-text-secondary); font-size: .85rem; }
 .library-compatibility { display: inline-block; margin-top: 5px; padding: 4px 7px; border-radius: 7px; background: var(--color-surface); color: var(--color-text-secondary); font-size: .74rem; font-weight: 800; line-height: 1.35; }

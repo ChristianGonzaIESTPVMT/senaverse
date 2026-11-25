@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, Film, Maximize, RotateCcw, X } from 'lucide-react';
 import type { EducationalVideo, EducationalVisual as Visual, IndividualImage, MediaLink, MediaSource, Usage } from '../data/educationalMedia';
 import type { LibraryEntry } from '../data/library';
@@ -22,8 +22,8 @@ function MediaCredit({ source, usage }: { source: MediaSource; usage: Usage }) {
     : source.title}{source.page && ` · p. ${source.page}`}. {usage.label}.</p>;
 }
 
-export function EducationalVisual({ visual, decorative = false, onUnavailable }: {
-  visual: Visual; decorative?: boolean; onUnavailable?: () => void;
+export function EducationalVisual({ visual, decorative = false, thumbnail = false, onUnavailable }: {
+  visual: Visual; decorative?: boolean; thumbnail?: boolean; onUnavailable?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <span className="sign-media-error" role="status">La imagen no se pudo cargar.</span>;
@@ -31,7 +31,8 @@ export function EducationalVisual({ visual, decorative = false, onUnavailable }:
     <SignHandDiagram diagram={visual.diagram} />
   </span>;
 
-  const frames = visual.kind === 'sequence' ? visual.frames : [visual];
+  const frames = visual.kind === 'sequence' ? visual.frames
+    : [thumbnail && visual.thumbnail ? { ...visual.thumbnail, alt: visual.alt } : visual];
   return <span className={visual.kind === 'sequence' ? 'sign-media-frames' : 'sign-media-image'}>
     {frames.map((frame, index) => <span className="sign-media-frame" key={frame.location.url + index}>
       <img src={localOrExternal(frame.location)} width={frame.width} height={frame.height}
@@ -70,14 +71,23 @@ function MediaPreview({ visual, word }: { visual: Visual; word: string }) {
   </div>;
 }
 
-function VideoPlayer({ resource, poster, showCredit }: {
-  resource: EducationalVideo; poster?: IndividualImage['location']; showCredit: boolean;
+export function VideoPlayer({ resource, poster, showCredit = false, quizDescription }: {
+  resource: EducationalVideo; poster?: IndividualImage['location']; showCredit?: boolean; quizDescription?: string;
 }) {
   const [requested, setRequested] = useState(false);
   const [failed, setFailed] = useState(false);
   const [playNotice, setPlayNotice] = useState('');
   const [rate, setRate] = useState(1);
   const player = useRef<HTMLVideoElement>(null);
+  const attach = useCallback((video: HTMLVideoElement | null) => {
+    player.current = video;
+    if (video) return () => {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      player.current = null;
+    };
+  }, []);
   const rateId = useId();
   useEffect(() => {
     if (requested && !failed) player.current?.focus();
@@ -90,7 +100,8 @@ function VideoPlayer({ resource, poster, showCredit }: {
     void video.play().catch(() => setPlayNotice('Usa el control de reproducción para volver a iniciar el video.'));
   }
 
-  if (!requested) return <button className="button button-outline sign-media-load" type="button" onClick={() => setRequested(true)}>
+  if (!requested) return <button className="button button-outline sign-media-load" type="button"
+    aria-label={quizDescription && `Cargar video. ${quizDescription}`} onClick={() => setRequested(true)}>
     <Film size={17} aria-hidden="true" /> Cargar video{resource.location.type === 'external' && ' externo'}
   </button>;
 
@@ -104,9 +115,11 @@ function VideoPlayer({ resource, poster, showCredit }: {
         setPlayNotice('');
       }}>Volver a intentar</button>
     </div> : <>
-      <video controls playsInline preload="metadata" tabIndex={0} ref={player} src={localOrExternal(resource.location)}
+      <video controls playsInline preload="metadata" tabIndex={0} ref={attach} src={localOrExternal(resource.location)}
         poster={poster && localOrExternal(poster)}
-        aria-label={resource.alt} onError={() => setFailed(true)} onPlay={() => setPlayNotice('')}>
+        className={quizDescription ? 'quiz-sign-video' : undefined}
+        controlsList={quizDescription ? 'nodownload' : undefined}
+        aria-label={quizDescription ?? resource.alt} onError={() => setFailed(true)} onPlay={() => setPlayNotice('')}>
         {resource.captionsUrl && <track kind="captions" src={localOrExternal({ type: 'local', url: resource.captionsUrl })}
           srcLang="es" label="Español" default />}
         Tu navegador no admite este video.

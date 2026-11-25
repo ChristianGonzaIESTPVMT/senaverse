@@ -1,5 +1,6 @@
 import { mineduGuidePdf, recognitionSigns } from '../features/sign-recognition/recognitionCatalog.ts';
-import type { DiagramResource, Finger, HandDiagram, MediaSource, MediaValidation, PublishableMedia, SignMedia, Usage } from './educationalMedia.ts';
+import type { DiagramResource, Finger, HandDiagram, IllustratedReference, MediaSource, MediaValidation, PublishableMedia, SignMedia, Usage } from './educationalMedia.ts';
+import { importedEducationalAssets } from './educationalAssets.ts';
 export type { Finger, HandDiagram } from './educationalMedia.ts';
 
 export const libraryCategories = [
@@ -29,6 +30,7 @@ type LibraryDefinition = {
   hands?: 1 | 2;
   source?: MediaSource;
   reference?: { title: string; url: string };
+  referenceKind?: IllustratedReference['referenceKind'];
   validation: MediaValidation;
   recognitionClassId?: string;
   lesson?: { unitId: number; lessonId: string; title: string };
@@ -108,6 +110,28 @@ const greetingsLink = { unitId: 3, lessonId: 'saludos', title: 'Saludos básicos
 const courtesyLink = { unitId: 3, lessonId: 'cortesia', title: 'Expresiones de cortesía' };
 const familyLink = { unitId: 5, lessonId: 'familia', title: 'Familia y personas' };
 const placesLink = { unitId: 5, lessonId: 'comunidad', title: 'Comunidad y lugares' };
+const expressionsLink = { unitId: 4, lessonId: 'expresiones', title: 'Expresiones cotidianas' };
+const reviewLink = { unitId: 6, lessonId: 'repaso-cotidiano', title: 'Evaluación integradora' };
+const dictionarySource = { title: 'Diccionario LSP al Español', publisher: 'Pontificia Universidad Católica del Perú',
+  url: 'https://diccionariolsp.pucp.edu.pe/search-by-text' };
+const newReferences = new Map<string, Partial<LibraryDefinition>>([
+  ['hola', { reference: { ...guideReference(46), title: 'Consulta la mención en el MINEDU · página 46' }, source: guideSource(46),
+    referenceKind: 'mention', lesson: greetingsLink }],
+  ['gracias', { reference: { ...guideReference(46), title: 'Consulta la mención en el MINEDU · página 46' }, source: guideSource(46),
+    referenceKind: 'mention', lesson: courtesyLink }],
+  ['no', { reference: { title: 'Consultar la entrada «No» en el diccionario de la PUCP', url: dictionarySource.url },
+    source: dictionarySource, referenceKind: 'dictionary', lesson: expressionsLink }],
+  ['adios', { reference: { title: 'Consultar «Chau» en la PUCP como referencia relacionada', url: dictionarySource.url },
+    source: dictionarySource, referenceKind: 'related', lesson: greetingsLink }],
+  ['ayuda', { reference: { ...guideReference(156), title: 'Consultar la viñeta «Ayudar» · página 156' },
+    source: guideSource(156), referenceKind: 'related', lesson: reviewLink }],
+  ['agua', { reference: guideReference(129), source: guideSource(129), lesson: reviewLink }],
+  ['hermano', { reference: guideReference(80), source: guideSource(80), lesson: familyLink }],
+  ['feliz', { reference: guideReference(187), source: guideSource(187) }],
+  ['triste', { reference: guideReference(194), source: guideSource(194) }],
+  ['sorpresa', { reference: { ...guideReference(193), title: 'Consultar la viñeta «Sorprendido» · página 193' },
+    source: guideSource(193), referenceKind: 'related' }],
+]);
 const familyReferences = new Map([
   ['familia', guideSign(79, 'Usa la configuración F de la figura con ambas manos y traza un semicírculo hacia delante.', familyLink)],
   ['mama', guideSign(79, 'Coloca la mano con la configuración M de la figura a la altura del hombro y muévela de lado a lado.', familyLink)],
@@ -151,8 +175,8 @@ const recognizedEntries = recognitionSigns
 
 const zero: LibraryDefinition = {
   id: 'cero', word: 'Cero', category: 'numeros', description: 'Número 0', meaning: 'Representa una cantidad nula.',
-  instructions: 'En la lámina, la mano queda cerrada en un puño. Observa la posición del pulgar en el dibujo de Cero.',
-  type: 'static', hands: 1, validation: 'pending', reference: numbersReference, source: numbersSource,
+  instructions: 'Observa el contorno redondo de los dedos y la posición del pulgar en la foto y en la lámina.',
+  type: 'static', hands: 1, validation: 'pending', reference: guideReference(73), source: guideSource(73),
   tone: 'blue', keywords: ['0'], lesson: { unitId: 2, lessonId: 'cero', title: 'Cero y cantidades vacías' },
 };
 
@@ -163,7 +187,7 @@ const additionalNumbers = ['Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'].map<Library
     description: `Número ${number}`, meaning: `Representa la cantidad ${number}.`, keywords: [String(number)],
     instructions: number === 10 ? 'Observa la postura de la mano y sigue la dirección de la flecha en el dibujo de Diez.'
       : `Observa la postura del número ${number} y compara qué dedos están extendidos y cuáles quedan flexionados.`,
-    reference: numbersReference, source: numbersSource,
+    reference: guideReference(number === 10 ? 74 : 73), source: guideSource(number === 10 ? 74 : 73),
     lesson: { unitId: 2, lessonId: 'seis-a-diez', title: 'Del seis al diez' },
   };
 });
@@ -180,15 +204,23 @@ const additionalSigns: Omit<LibraryDefinition, 'validation'>[] = [
     category: 'cotidiano', tone: 'mint', hands: 2, ...guideSign(254, 'Junta las yemas de los dedos de ambas manos para formar la silueta de un techo.', placesLink) },
   { id: 'colegio', word: 'Colegio', description: 'Lugar donde se estudia', meaning: 'Un lugar donde se imparten clases.',
     category: 'cotidiano', tone: 'blue', hands: 2, ...guideSign(285, 'Junta ambas manos con los dedos parcialmente flexionados y sigue el recorrido circular mostrado en la figura.', placesLink) },
+  { id: 'carne', word: 'Carne', description: 'Un tipo de alimento', meaning: 'Alimento que proviene del tejido de un animal.',
+    category: 'alimentos', tone: 'peach', keywords: ['alimento'], reference: guideReference(107), source: guideSource(107) },
 ];
 
 const figureLocations = new Map([
   ['LSP-001', 'Figura 2 · número 1, primera fila.'], ['LSP-002', 'Figura 2 · número 2, primera fila.'],
   ['LSP-003', 'Figura 2 · número 3, primera fila.'], ['LSP-004', 'Figura 2 · número 4, primera fila.'],
-  ['LSP-005', 'Figura 2 · número 5, primera fila.'], ['cero', 'Figura 2 · número 0, primera fila.'],
-  ['seis', 'Figura 2 · número 6, al final de la primera fila.'], ['siete', 'Figura 2 · número 7, al inicio de la segunda fila.'],
-  ['ocho', 'Figura 2 · número 8, segunda fila.'], ['nueve', 'Figura 2 · número 9, segunda fila.'],
-  ['diez', 'Figura 2 · número 10, segunda fila. Observa también la flecha.'],
+  ['LSP-005', 'Figura 2 · número 5, primera fila.'], ['cero', 'Viñeta CERO · arriba a la izquierda.'],
+  ['seis', 'Viñeta SEIS · cuarta fila a la izquierda.'], ['siete', 'Viñeta SIETE · cuarta fila a la derecha.'],
+  ['ocho', 'Viñeta OCHO · abajo a la izquierda.'], ['nueve', 'Viñeta NUEVE · abajo a la derecha.'],
+  ['diez', 'Viñeta DIEZ · arriba a la izquierda. Observa la flecha.'],
+  ['hola', 'La guía menciona la expresión en la introducción a las expresiones comunes.'],
+  ['gracias', 'La guía menciona la expresión en la introducción a las expresiones comunes.'],
+  ['no', 'En la búsqueda en español, escribe «No» y abre la entrada que lleva ese título.'],
+  ['adios', 'La entrada «Chau» documenta una despedida. La correspondencia entre variantes queda por revisar.'],
+  ['ayuda', 'La guía muestra el verbo «Ayudar». La correspondencia con el uso de la ficha queda por revisar.'],
+  ['sorpresa', 'La guía ilustra «Sorprendido». Observa el rostro y las dos fases del ejemplo.'],
   ['LSP-006', 'Viñeta SÍ · centro a la derecha. Observa las flechas junto al puño.'],
   ['LSP-007', 'Viñeta NADA · arriba a la derecha. Observa el rostro y el sentido del desplazamiento.'],
   ['LSP-008', 'Viñeta MUCHO · arriba a la izquierda. Observa las marcas de movimiento de ambas manos.'],
@@ -209,15 +241,17 @@ const numbersUsage: Usage = { label: 'Consulta de la cartilla original · permis
 const diagramUsage: Usage = { label: 'Diagrama didáctico de SeñaVerse · figura de referencia del MINEDU' };
 
 function withMedia({ assets, ...entry }: LibraryDefinition): LibraryEntry {
-  const { id, validation, source, reference, handDiagram } = entry;
+  const { id, validation, source, reference, referenceKind, handDiagram } = entry;
   const locator = figureLocations.get(id);
   const document = reference && source && {
     id: `${id}:lamina`, signId: id, validation, kind: 'document' as const, availability: 'available' as const,
     location: { type: 'external' as const, url: reference.url }, link: reference, source,
-    usage: reference === numbersReference ? numbersUsage : guideUsage,
-    locator: locator ?? 'Consulta la figura identificada con el nombre de la seña.', alt: `Lámina oficial con la seña «${entry.word}».`,
+    usage: source === dictionarySource ? { label: 'Consulta del diccionario original' } : reference === numbersReference ? numbersUsage : guideUsage,
+    referenceKind,
+    locator: locator ?? 'Consulta la figura identificada con el nombre de la seña.', alt: `Referencia documental de «${entry.word}».`,
   };
-  const suppliedVisual = assets?.find(asset => asset.kind !== 'video');
+  const media = assets ?? importedEducationalAssets(id, entry.word);
+  const suppliedVisual = media?.find(asset => asset.kind !== 'video');
   const diagram: DiagramResource | undefined = handDiagram && source ? {
     id: `${id}:diagrama`, signId: id, validation, kind: 'diagram', availability: 'available',
     location: { type: 'embedded', module: 'SignHandDiagram' },
@@ -226,16 +260,17 @@ function withMedia({ assets, ...entry }: LibraryDefinition): LibraryEntry {
   const visual = suppliedVisual ?? diagram ?? {
     id: `${id}:visual`, signId: id, validation, kind: 'visual' as const, availability: 'pending' as const,
   };
-  const video = assets?.find(asset => asset.kind === 'video') ?? {
+  const video = media?.find(asset => asset.kind === 'video') ?? {
     id: `${id}:video`, signId: id, validation, kind: 'video' as const, availability: 'pending' as const,
   };
-  return { ...entry, media: { document, visual, video, ...(suppliedVisual && diagram && { quizVisual: diagram }) } };
+  const instructions = entry.instructions ?? (video.availability === 'available' ? video.quizDescription : undefined);
+  return { ...entry, instructions, media: { document, visual, video, ...(suppliedVisual && diagram && { quizVisual: diagram }) } };
 }
 
 /** The educational catalogue includes entries with no corresponding model class. */
 export const libraryEntries = [
   ...originalEntries.map<LibraryDefinition>(entry => recognizedEntries.find(sign => sign.id === legacyIds.get(entry.id))
-    ?? { ...entry, ...familyReferences.get(entry.id), validation: 'pending' }),
+    ?? { ...entry, ...familyReferences.get(entry.id), ...newReferences.get(entry.id), validation: 'pending' }),
   ...recognizedEntries.filter(entry => !formerClassIds.has(entry.id)),
   zero,
   ...additionalNumbers,
@@ -244,6 +279,12 @@ export const libraryEntries = [
 
 const byId = new Map(libraryEntries.map(entry => [entry.id, entry]));
 const byClass = new Map(libraryEntries.filter(entry => entry.recognitionClassId).map(entry => [entry.recognitionClassId, entry]));
+const referenceBadgeIds = new Set([...originalMediaSlugs.keys(), zero.id, ...additionalNumbers.map(sign => sign.id),
+  ...familyReferences.keys(), 'buenos-dias', 'buenas-noches', 'disculpa', 'casa', 'colegio']);
+
+export function countsTowardReferenceBadge(id: string) {
+  return referenceBadgeIds.has(id);
+}
 
 export function getEducationalSign(id: string) {
   return byId.get(legacyIds.get(id) ?? id);

@@ -31,7 +31,8 @@ test('six units contain twelve functional lessons with sourced vocabulary and as
     for (const step of steps) {
       if (step.kind === 'study') for (const { id } of step.signs) {
         const entry = getEducationalSign(id);
-        assert.ok(entry?.reference?.url && entry.source?.page && entry.instructions, id);
+        assert.ok(entry?.reference?.url && entry.instructions, id);
+        assert.ok(entry.source?.page || (entry.media.document.referenceKind && entry.source?.publisher === 'Pontificia Universidad Católica del Perú'), id);
         assert.equal(entry.validation, 'pending');
         assert.equal(getLessonLocation(entry.lesson.lessonId)?.unit.id, entry.lesson.unitId);
         taught.add(id);
@@ -54,7 +55,7 @@ test('six units contain twelve functional lessons with sourced vocabulary and as
       }
     }
   }
-  assert.equal(vocabulary.size, 24);
+  assert.equal(vocabulary.size, 31);
   assert.equal(targets.length, 10);
   assert.deepEqual(targets.toSorted(), Array.from({ length: 10 }, (_, i) => `LSP-${String(i + 1).padStart(3, '0')}`));
   assert.ok(getLessonLocation('expresiones').lesson.plan.steps.find(step => step.targetId === 'LSP-007')?.notice);
